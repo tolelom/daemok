@@ -35,14 +35,15 @@
 | L0 | 시스템, 액터, 외부 인터페이스 | 외부 경계 인터페이스 |
 | L1 | 실행 단위 | `cmd/<name>/main.go`와 조립 코드 |
 | L2 | 모듈, tier, 의존 규칙 | 패키지 디렉토리, 허용되지 않은 import 검사 |
-| L3 | 타입, enum, 상수, 계약(interface) | struct, interface, const |
-| L4 | 함수 계약(시그니처, 에러, 전제·결과 조건) | 스텁, 테스트 뼈대 |
+| L3 | 타입, enum, 상수, 에러, 계약(interface, 핸들러 함수 타입) | struct, interface, const, sentinel error, 등록 코드 |
+| L4 | 함수 계약(시그니처, 에러, 케이스 표) | 시그니처 확인 코드, 테이블 테스트 |
 
 상위 계층을 확정한 뒤 다음 계층으로 내려간다. AI는 한 번에 한 계층만 제안한다.
 
 ## 구조
 
-- 자체 모델과 Go로 만든 CLI 하나. 파일 감시, 검증, 로컬 웹 지도, 코드 생성, import 검사, MCP 서버를 한 바이너리가 맡는다.
+- 자체 모델과 Go로 만든 CLI 하나. 파일 감시, 검증, 로컬 웹 지도, 코드 생성, import 검사를 한 바이너리가 맡는다. MCP 서버는 같은 바이너리에 나중에 붙인다.
+- 설계의 기준은 git HEAD의 설계 파일이다. 지도는 작업 중인 파일과 HEAD의 차이를 표시하고, 승인은 커밋이다.
 - 외부 의존성 없음. Go 표준 라이브러리만 쓴다. 웹 지도는 `embed`로 넣은 순수 JS와 SVG다.
 - 설계 파일은 YAML의 엄격한 부분집합이다. 지원하지 않는 문법은 줄 번호와 함께 에러를 낸다. 전용 언어는 YAML이 실제 병목이 될 때 따로 검토한다.
 - API 계약은 새로 정의하지 않고 OpenAPI 파일을 경로로 참조한다.
@@ -55,12 +56,12 @@
 | OpenAPI, TypeSpec, Smithy, Protobuf | API 계약에서 코드 생성 | API 경계만 다룬다 |
 | MDA, UML 라운드트립 | 모델에서 코드 생성 | 모델이 코드만큼 상세해야 했다. daemok은 뼈대까지만 모델로 정하고 본문은 사람이나 AI가 채운다 |
 | Spec Kit, Kiro | 마크다운 명세로 AI 구현 | 명세가 자연어라 해석 여지가 남는다 |
-| [Ossature](https://github.com/ossature/ossature) | 마크다운 스펙·아키텍처·검증 파일에서 LLM이 코드를 빌드 | 원본이 자연어이고 코드 전체를 LLM이 만든다. 시각화가 없다 |
+| [Ossature](https://github.com/ossature/ossature) | 섹션 규약이 있는 마크다운 스펙·아키텍처와 고정 문법의 검증 케이스에서 LLM이 코드를 빌드 | 요구사항 ID가 없다. 결정적으로 생성하는 것은 테스트 하네스뿐이고 계약 준수는 LLM 리뷰가 판정한다. import 규칙 검사, 시각화, 기존 코드 도입이 없다 |
 | Structurizr, LikeC4 | 텍스트를 다이어그램으로 | 코드 생성과 검증이 없다 |
 | go-arch-lint, arch-go, depguard | import 규칙 검사 | 검사만 하고 설계 모델이 없다 |
 
 ## 프로토타입
 
-L0~L2 지도 프로토타입: https://claude.ai/artifact/DG2chdST8YGEYbaCsjZVXx
+https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE (소스: [prototype/daemok-v2.html](../../prototype/daemok-v2.html))
 
-YAML 편집에 맞춰 지도를 다시 그리고, 계층 드릴다운, 의존 강조, 설계 검사, 기준 대비 변경 표시와 승인을 해본다.
+tolchain과 tolelog 설계 파일을 편집하면 R~L3 지도, 설계 검사, 생성될 Go·TS 코드가 바로 바뀐다. 코드 대조 탭은 저장소 스냅샷 기준의 고정값이다.
