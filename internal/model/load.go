@@ -49,10 +49,11 @@ func Load(dir string) (*Model, Diagnostics) {
 }
 
 type merger struct {
-	m    *Model
-	d    *decoder
-	ids  map[string]map[string]yaml.Pos // 종류 → ID → 처음 위치
-	once map[string]yaml.Pos            // 한 번만 나올 수 있는 최상위 키
+	m     *Model
+	d     *decoder
+	ids   map[string]map[string]yaml.Pos // 종류 → ID → 처음 위치
+	once  map[string]yaml.Pos            // 한 번만 나올 수 있는 최상위 키
+	first *yaml.Pos                      // 처음 읽은 파일의 위치. version 부재 오류에 쓴다
 }
 
 func (mg *merger) file(root *yaml.Node) {
@@ -61,6 +62,10 @@ func (mg *merger) file(root *yaml.Node) {
 		return
 	}
 	d.allow(root, topKeys...)
+	if mg.first == nil {
+		p := yaml.Pos{File: root.Pos.File, Line: 1, Col: 1}
+		mg.first = &p
+	}
 	mg.scalarOnce(root, "version", &mg.m.Version)
 	if v := root.Get("version"); v != nil && v.Kind == yaml.Scalar && v.Value != "0.3" {
 		d.diags.Errorf(v.Pos, "지원하는 형식 버전은 0.3이다")
@@ -108,8 +113,11 @@ func (mg *merger) unique(kind, id string, pos yaml.Pos) bool {
 	return true
 }
 
-// finish는 한 참조 필드가 받는 종류끼리 ID가 겹치는지 본다.
+// finish는 version이 있는지, 한 참조 필드가 받는 종류끼리 ID가 겹치는지 본다.
 func (mg *merger) finish() {
+	if _, ok := mg.once["version"]; !ok && mg.first != nil {
+		mg.d.diags.Errorf(*mg.first, "\"version\"이 필요하다")
+	}
 	mg.collide("모듈", "그룹")
 	mg.collide("모듈", "멤버")
 	mg.collide("그룹", "멤버")

@@ -147,9 +147,17 @@ func (f *flow) plainText(stops string) string {
 
 func (f *flow) plain() (*Node, error) {
 	pos := f.pos()
+	start := f.i
 	s := f.plainText(",}]")
 	if s == "" {
 		return nil, &Error{pos, "값이 없다"}
+	}
+	// 플로우 문맥의 평문 스칼라에는 ": "가 올 수 없다. 대개 쉼표가 빠진 것이다.
+	if i := strings.Index(s, ": "); i >= 0 || strings.HasSuffix(s, ":") {
+		if i < 0 {
+			i = len(s) - 1
+		}
+		return nil, &Error{f.cs[start+i].pos, "쉼표가 빠졌거나 값 안에 \": \"가 있다"}
 	}
 	if msg := unsupportedScalar(s); msg != "" {
 		return nil, &Error{pos, msg}

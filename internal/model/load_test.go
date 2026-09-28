@@ -510,3 +510,67 @@ func TestSamplesLoadClean(t *testing.T) {
 		}
 	}
 }
+
+func TestNullRequiredFields(t *testing.T) {
+	_, ds := loadOne(t, `
+requirements:
+  R: { text: }
+tiers: [t]
+modules:
+  core: { tier: }
+  vm: { tier: null, depends_on: [core] }
+enums:
+  e: { in: , values: }
+handler_kinds:
+  hk: { in: core, params: { payload: }, returns: [error], key: }
+groups:
+  g: { tier: t, kind: , members: { m: { handles: [a] } } }
+funcs:
+  f: { in: m, kind: hk, handles: , errors: [] }
+`)
+	for _, msg := range []string{`"text"가 필요하다`, `"tier"가 필요하다`, `"in"가 필요하다`, `"values"가 필요하다`, `"key"가 필요하다`, `"kind"가 필요하다`, `"handles"가 필요하다`, `파라미터 "payload"에 타입이 필요하다`} {
+		wantDiag(t, ds, Error, msg)
+	}
+	if n := 0; true {
+		for _, d := range ds {
+			if strings.Contains(d.Msg, `"tier"가 필요하다`) {
+				n++
+			}
+		}
+		if n != 2 {
+			t.Fatalf("tier errors %d, want 2:\n%s", n, join(ds))
+		}
+	}
+}
+
+func TestFieldTypeNull(t *testing.T) {
+	_, ds := loadOne(t, "types:\n  post: { in: core, fields: { title: , body: { type: } } }\n")
+	wantDiag(t, ds, Error, `필드 "title"에 타입이 필요하다`)
+	wantDiag(t, ds, Error, `필드 "body"에 type이나 ref가 필요하다`)
+}
+
+func TestVersionRequired(t *testing.T) {
+	_, ds := load(t, map[string]string{"d.yaml": "tiers: [t]\nmodules:\n  core: { tier: t }\n"})
+	d := wantDiag(t, ds, Error, `"version"이 필요하다`)
+	if d.Pos.Line != 1 {
+		t.Fatalf("pos %v", d.Pos)
+	}
+}
+
+func TestNeedPointsAtID(t *testing.T) {
+	_, ds := loadOne(t, "modules:\n  core:\n    summary: no tier\n  vm: {}\n")
+	var lines []int
+	for _, d := range ds {
+		if strings.Contains(d.Msg, `"tier"가 필요하다`) {
+			lines = append(lines, d.Pos.Line*100+d.Pos.Col)
+		}
+	}
+	if len(lines) != 2 || lines[0] != 303 || lines[1] != 503 {
+		t.Fatalf("positions %v, want [303 503]:\n%s", lines, join(ds))
+	}
+}
+
+func TestGroupTierRequired(t *testing.T) {
+	_, ds := loadOne(t, "groups:\n  g: { kind: k, members: {} }\n")
+	wantDiag(t, ds, Error, `"tier"가 필요하다`)
+}

@@ -17,8 +17,8 @@ func (mg *merger) funcs(n *yaml.Node) {
 		case !hasKind && !hasOf:
 			d.diags.Errorf(pos, "함수 %q에 kind+handles 또는 of가 필요하다", id)
 		case hasKind:
-			d.need(v, "kind")
-			d.need(v, "handles")
+			d.need(pos, v, "kind")
+			d.need(pos, v, "handles")
 		}
 		f.Cases = mg.cases(v.Get("cases"))
 		mg.m.Funcs = append(mg.m.Funcs, f)
@@ -41,10 +41,10 @@ func (mg *merger) cases(n *yaml.Node) []*Case {
 		}
 		d.allow(it, "name", "given", "expect", "error")
 		c := &Case{Pos: it.Pos, Error: d.ref(it, "error")}
-		if d.need(it, "name") {
+		if d.need(it.Pos, it, "name") {
 			c.Name = d.str(it, "name")
 		}
-		if d.need(it, "given") {
+		if d.need(it.Pos, it, "given") {
 			c.Given = mg.caseMap(it.Get("given"), "given")
 		}
 		if e := it.Get("expect"); e != nil {

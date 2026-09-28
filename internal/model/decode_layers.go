@@ -10,7 +10,7 @@ func (mg *merger) requirements(n *yaml.Node) {
 			return
 		}
 		r := &Requirement{Meta: Meta{ID: id, Pos: pos, Summary: d.str(v, "summary")}}
-		if d.need(v, "text") {
+		if d.need(pos, v, "text") {
 			r.Text = d.str(v, "text")
 		}
 		r.Status = d.str(v, "status")
@@ -120,7 +120,7 @@ func (mg *merger) modules(n *yaml.Node) {
 			DependsOn:  d.refs(v, "depends_on"),
 			Implements: d.refs(v, "implements"),
 		}
-		if d.need(v, "tier") {
+		if d.need(pos, v, "tier") {
 			m.Tier = d.ref(v, "tier")
 		}
 		if m.Path == "" {
@@ -139,12 +139,14 @@ func (mg *merger) groups(n *yaml.Node) {
 		}
 		g := &Group{
 			Meta:      d.meta(id, pos, v),
-			Tier:      d.ref(v, "tier"),
 			Path:      d.str(v, "path"),
 			DependsOn: d.refs(v, "depends_on"),
 			Rule:      d.str(v, "rule"),
 		}
-		if d.need(v, "kind") {
+		if d.need(pos, v, "tier") {
+			g.Tier = d.ref(v, "tier")
+		}
+		if d.need(pos, v, "kind") {
 			g.Kind = d.ref(v, "kind")
 		}
 		if g.Path == "" {
@@ -153,7 +155,7 @@ func (mg *merger) groups(n *yaml.Node) {
 		if g.Rule != "" && g.Rule != "no_sibling_deps" {
 			d.diags.Errorf(v.Get("rule").Pos, "rule은 no_sibling_deps만 지원한다")
 		}
-		if d.need(v, "members") {
+		if d.need(pos, v, "members") {
 			d.idMap(v.Get("members"), "members", func(mid string, mpos yaml.Pos, mv *yaml.Node) {
 				d.allow(mv, "summary", "satisfies", "handles", "exceptions")
 				if !mg.unique("멤버", mid, mpos) {
@@ -183,7 +185,7 @@ func (mg *merger) exceptions(n *yaml.Node) []Exception {
 			continue
 		}
 		d.allow(it, "depends_on", "reason")
-		if !d.need(it, "depends_on") {
+		if !d.need(it.Pos, it, "depends_on") {
 			continue
 		}
 		out = append(out, Exception{DependsOn: d.ref(it, "depends_on"), Reason: d.str(it, "reason")})

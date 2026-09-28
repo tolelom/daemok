@@ -327,3 +327,13 @@ func TestErrFlowTrailingText(t *testing.T) {
 func TestErrFlowUnsupportedScalar(t *testing.T) {
 	wantErr(t, parseErr(t, "a: [x, *y]\n"), 1, 8, "앵커")
 }
+
+func TestErrFlowMissingComma(t *testing.T) {
+	wantErr(t, parseErr(t, "a: { tier: t summary: hello }\n"), 1, 21, "쉼표")
+	wantErr(t, parseErr(t, "a: [x: y]\n"), 1, 6, "쉼표")
+	wantErr(t, parseErr(t, "a: { b: c: }\n"), 1, 10, "쉼표")
+	n := parse(t, "p: { path: /api/v1, s: \"a: b\" }\n")
+	if n.Get("p").Get("path").Value != "/api/v1" || n.Get("p").Get("s").Value != "a: b" {
+		t.Fatalf("%+v", n.Get("p"))
+	}
+}

@@ -10,7 +10,7 @@ func (mg *merger) enums(n *yaml.Node) {
 			return
 		}
 		e := &Enum{Owned: d.owned(id, pos, v), Go: d.goOpts(v), Export: d.strs(v, "export")}
-		if d.need(v, "values") {
+		if d.need(pos, v, "values") {
 			e.Values = d.refs(v, "values")
 		}
 		mg.m.Enums = append(mg.m.Enums, e)
@@ -33,7 +33,7 @@ func (mg *merger) consts(n *yaml.Node) {
 		default:
 			d.diags.Errorf(v.Get("type").Pos, "type은 int, string, duration 중 하나여야 한다")
 		}
-		if d.need(v, "value") {
+		if d.need(pos, v, "value") {
 			if val := d.scalar(v, "value"); val != nil {
 				c.Value, c.ValuePos = val.Value, val.Pos
 				if _, ok := val.Int(); c.Type == "int" && !ok {
@@ -53,7 +53,7 @@ func (mg *merger) errors(n *yaml.Node) {
 			return
 		}
 		e := &ErrorDef{Owned: d.owned(id, pos, v)}
-		if d.need(v, "message") {
+		if d.need(pos, v, "message") {
 			e.Message = d.str(v, "message")
 		}
 		e.HTTP, _ = d.intv(v, "http")
@@ -69,7 +69,7 @@ func (mg *merger) types(n *yaml.Node) {
 			return
 		}
 		t := &Type{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
-		if d.need(v, "fields") {
+		if d.need(pos, v, "fields") {
 			t.Fields = mg.fields(v.Get("fields"))
 		}
 		mg.m.Types = append(mg.m.Types, t)
@@ -86,6 +86,10 @@ func (mg *merger) fields(n *yaml.Node) []*Field {
 		f := &Field{Name: e.Key, Pos: e.Pos}
 		switch e.Value.Kind {
 		case yaml.Scalar:
+			if e.Value.IsNull() {
+				d.diags.Errorf(e.Pos, "필드 %q에 타입이 필요하다", e.Key)
+				continue
+			}
 			f.Type = Ref{Name: e.Value.Value, Pos: e.Value.Pos}
 		case yaml.Map:
 			v := e.Value
@@ -120,6 +124,10 @@ func (mg *merger) params(n *yaml.Node) []*Param {
 			d.diags.Errorf(e.Pos, "파라미터 %q는 타입 이름이어야 한다", e.Key)
 			continue
 		}
+		if e.Value.IsNull() {
+			d.diags.Errorf(e.Pos, "파라미터 %q에 타입이 필요하다", e.Key)
+			continue
+		}
 		out = append(out, &Param{Name: e.Key, Pos: e.Pos, Type: Ref{Name: e.Value.Value, Pos: e.Value.Pos}})
 	}
 	return out
@@ -133,7 +141,7 @@ func (mg *merger) contracts(n *yaml.Node) {
 			return
 		}
 		c := &Contract{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
-		if d.need(v, "methods") {
+		if d.need(pos, v, "methods") {
 			d.idMap(v.Get("methods"), "methods", func(name string, mpos yaml.Pos, mv *yaml.Node) {
 				d.allow(mv, "params", "returns", "errors")
 				c.Methods = append(c.Methods, &Method{
@@ -158,7 +166,7 @@ func (mg *merger) handlerKinds(n *yaml.Node) {
 			return
 		}
 		hk := &HandlerKind{Owned: d.owned(id, pos, v), Params: mg.params(v), Returns: d.refs(v, "returns"), Go: d.goOpts(v)}
-		if d.need(v, "key") {
+		if d.need(pos, v, "key") {
 			hk.Key = d.ref(v, "key")
 		}
 		mg.m.HandlerKinds = append(mg.m.HandlerKinds, hk)

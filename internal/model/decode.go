@@ -48,9 +48,10 @@ func (d *decoder) str(n *yaml.Node, key string) string {
 	return ""
 }
 
-func (d *decoder) need(n *yaml.Node, key string) bool {
-	if n.Get(key) == nil {
-		d.diags.Errorf(n.Pos, "%q가 필요하다", key)
+// need는 key가 있고 null이 아닌지 본다. 오류 위치는 노드의 ID 키(pos)다.
+func (d *decoder) need(pos yaml.Pos, n *yaml.Node, key string) bool {
+	if v := n.Get(key); v == nil || v.IsNull() {
+		d.diags.Errorf(pos, "%q가 필요하다", key)
 		return false
 	}
 	return true
@@ -123,7 +124,7 @@ func (d *decoder) meta(id string, pos yaml.Pos, n *yaml.Node) Meta {
 
 func (d *decoder) owned(id string, pos yaml.Pos, n *yaml.Node) Owned {
 	o := Owned{Meta: d.meta(id, pos, n), Gen: d.boolv(n, "gen", true)}
-	if d.need(n, "in") {
+	if d.need(pos, n, "in") {
 		o.In = d.ref(n, "in")
 	}
 	return o
