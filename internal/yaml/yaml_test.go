@@ -221,3 +221,109 @@ func TestQuotedKey(t *testing.T) {
 		t.Fatalf("%+v", n.Entries[0])
 	}
 }
+
+func TestFlowMap(t *testing.T) {
+	n := parse(t, "m: { tier: domain, depends_on: [crypto, metrics], go: { type: TxType } }\n")
+	m := n.Get("m")
+	if m.Kind != Map || len(m.Entries) != 3 {
+		t.Fatalf("%+v", m)
+	}
+	if m.Get("tier").Value != "domain" || m.Get("tier").Pos.Col != 12 {
+		t.Fatalf("tier %+v", m.Get("tier"))
+	}
+	deps := m.Get("depends_on")
+	if deps.Kind != Seq || len(deps.Items) != 2 || deps.Items[1].Value != "metrics" {
+		t.Fatalf("deps %+v", deps)
+	}
+	if m.Get("go").Get("type").Value != "TxType" {
+		t.Fatalf("go %+v", m.Get("go"))
+	}
+}
+
+func TestFlowEmpty(t *testing.T) {
+	n := parse(t, "a: {}\nb: []\nc: { req: {} }\n")
+	if n.Get("a").Kind != Map || len(n.Get("a").Entries) != 0 {
+		t.Fatal("a")
+	}
+	if n.Get("b").Kind != Seq || len(n.Get("b").Items) != 0 {
+		t.Fatal("b")
+	}
+	if n.Get("c").Get("req").Kind != Map {
+		t.Fatal("c")
+	}
+}
+
+func TestFlowQuotedAndPaths(t *testing.T) {
+	n := parse(t, "p: { ctx: \"*Context\", payload: json.RawMessage, path: /api/v1, spec: docs/a.yaml }\n")
+	p := n.Get("p")
+	if p.Get("ctx").Value != "*Context" || !p.Get("ctx").Quoted {
+		t.Fatalf("ctx %+v", p.Get("ctx"))
+	}
+	if p.Get("path").Value != "/api/v1" || p.Get("spec").Value != "docs/a.yaml" {
+		t.Fatalf("%+v", p)
+	}
+}
+
+func TestFlowNullValue(t *testing.T) {
+	n := parse(t, "g: { post: null, x: }\n")
+	if !n.Get("g").Get("post").IsNull() || !n.Get("g").Get("x").IsNull() {
+		t.Fatalf("%+v", n.Get("g"))
+	}
+}
+
+func TestFlowSeqOfMaps(t *testing.T) {
+	src := "cases:\n  - { name: \"금액 0\", given: { amount: 0 }, error: invalid }\n  - { name: ok, given: { a: 1 }, expect: { from: 7 } }\n"
+	c := parse(t, src).Get("cases")
+	if len(c.Items) != 2 || c.Items[0].Get("name").Value != "금액 0" {
+		t.Fatalf("%+v", c)
+	}
+	if v, _ := c.Items[1].Get("expect").Get("from").Int(); v != 7 {
+		t.Fatalf("expect %+v", c.Items[1].Get("expect"))
+	}
+	if c.Items[1].Pos.Line != 3 || c.Items[1].Pos.Col != 5 {
+		t.Fatalf("pos %v", c.Items[1].Pos)
+	}
+}
+
+func TestFlowMultiLineSeq(t *testing.T) {
+	src := "values: [transfer, mint_asset,\n         # 주석 줄\n\n         grant_reward]\nnext: 1\n"
+	n := parse(t, src)
+	v := n.Get("values")
+	if len(v.Items) != 3 || v.Items[2].Value != "grant_reward" {
+		t.Fatalf("%+v", v)
+	}
+	if v.Items[2].Pos.Line != 4 || v.Items[2].Pos.Col != 10 {
+		t.Fatalf("pos %v", v.Items[2].Pos)
+	}
+	if n.Get("next").Value != "1" {
+		t.Fatal("next")
+	}
+}
+
+func TestErrFlowMapMultiLine(t *testing.T) {
+	wantErr(t, parseErr(t, "a: { x: 1,\n  y: 2 }\n"), 1, 4, "한 줄")
+}
+
+func TestErrFlowUnclosedSeq(t *testing.T) {
+	wantErr(t, parseErr(t, "a: [x, y\n"), 1, 4, "닫히지 않은 [")
+}
+
+func TestErrFlowTrailingComma(t *testing.T) {
+	wantErr(t, parseErr(t, "a: [x, y, ]\n"), 1, 11, "쉼표 뒤")
+}
+
+func TestErrFlowDuplicateKey(t *testing.T) {
+	wantErr(t, parseErr(t, "a: { x: 1, x: 2 }\n"), 1, 12, "중복 키")
+}
+
+func TestErrFlowMissingColon(t *testing.T) {
+	wantErr(t, parseErr(t, "a: { x 1 }\n"), 1, 10, "콜론")
+}
+
+func TestErrFlowTrailingText(t *testing.T) {
+	wantErr(t, parseErr(t, "a: [x] y\n"), 1, 8, "닫는 괄호 뒤")
+}
+
+func TestErrFlowUnsupportedScalar(t *testing.T) {
+	wantErr(t, parseErr(t, "a: [x, *y]\n"), 1, 8, "앵커")
+}
