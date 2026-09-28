@@ -256,3 +256,14 @@ func (m *Model) ResolveType(t string) (TypeKind, string) {
 	}
 	return UnknownType, base
 }
+
+func (c *Contract) Method(name string) *Method {
+	for _, m := range c.Methods {
+		if m.Name == name {
+			return m
+		}
+	}
+	return nil
+}
+
+func (e *Enum) HasValue(name string) bool { return hasRef(e.Values, name) }
