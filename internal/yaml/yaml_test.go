@@ -151,3 +151,73 @@ func TestErrMergeKey(t *testing.T) {
 func TestErrComplexKey(t *testing.T) {
 	wantErr(t, parseErr(t, "? a\n"), 1, 1, "복합 키")
 }
+
+func TestQuotedScalar(t *testing.T) {
+	n := parse(t, "a: \"x: y, z\"\nb: \"줄\\n탭\\t\\\"따옴표\\\" \\\\\"\n")
+	if n.Get("a").Value != "x: y, z" || !n.Get("a").Quoted {
+		t.Fatalf("a %+v", n.Get("a"))
+	}
+	if n.Get("b").Value != "줄\n탭\t\"따옴표\" \\" {
+		t.Fatalf("b %q", n.Get("b").Value)
+	}
+}
+
+func TestQuotedNumberStaysString(t *testing.T) {
+	n := parse(t, "a: \"12\"\nb: 12\nc: 2s\n")
+	if _, ok := n.Get("a").Int(); ok {
+		t.Fatal("quoted number must not be int")
+	}
+	if v, ok := n.Get("b").Int(); !ok || v != 12 {
+		t.Fatalf("b %v %v", v, ok)
+	}
+	if _, ok := n.Get("c").Int(); ok || n.Get("c").Value != "2s" {
+		t.Fatalf("c %+v", n.Get("c"))
+	}
+}
+
+func TestBoolScalar(t *testing.T) {
+	n := parse(t, "a: true\nb: false\nc: yes\n")
+	if v, ok := n.Get("a").Bool(); !ok || !v {
+		t.Fatal("a")
+	}
+	if v, ok := n.Get("b").Bool(); !ok || v {
+		t.Fatal("b")
+	}
+	if _, ok := n.Get("c").Bool(); ok {
+		t.Fatal("yes is not bool")
+	}
+}
+
+func TestErrUnterminatedQuote(t *testing.T) {
+	wantErr(t, parseErr(t, "a: \"abc\n"), 1, 8, "닫히지 않은 따옴표")
+}
+
+func TestErrTrailingAfterQuote(t *testing.T) {
+	wantErr(t, parseErr(t, "a: \"abc\" def\n"), 1, 9, "닫는 따옴표 뒤")
+}
+
+func TestErrBadEscape(t *testing.T) {
+	wantErr(t, parseErr(t, "a: \"\\q\"\n"), 1, 5, "이스케이프")
+}
+
+func TestErrUnsupportedScalars(t *testing.T) {
+	cases := []struct{ src, want string }{
+		{"a: 'x'\n", "홑따옴표"},
+		{"a: &anchor\n", "앵커"},
+		{"a: *alias\n", "앵커"},
+		{"a: !!str x\n", "태그"},
+		{"a: |\n  text\n", "여러 줄 문자열"},
+		{"a: >\n  text\n", "여러 줄 문자열"},
+		{"a: %x\n", "지원하지 않는다"},
+	}
+	for _, c := range cases {
+		wantErr(t, parseErr(t, c.src), 1, 4, c.want)
+	}
+}
+
+func TestQuotedKey(t *testing.T) {
+	n := parse(t, "\"a b\": 1\n")
+	if n.Entries[0].Key != "a b" || n.Entries[0].Value.Value != "1" {
+		t.Fatalf("%+v", n.Entries[0])
+	}
+}
