@@ -269,3 +269,77 @@ func TestHandlerCoverage(t *testing.T) {
 		t.Fatal("position")
 	}
 }
+
+func TestL4Handler(t *testing.T) {
+	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [] }"))
+	want(t, ds, model.Error, "멤버 economy의 handles에 transfer가 없다")
+
+	ds = run(t, replace(t, "in: economy\n    kind: tx_handler", "in: core\n    kind: tx_handler"))
+	want(t, ds, model.Error, "핸들러 함수 handle_transfer는 그룹 멤버에 있어야 한다")
+}
+
+func TestL4Of(t *testing.T) {
+	src := replace(t, "in: economy\n    kind: tx_handler\n    handles: transfer\n", "in: vm\n    of: store.get\n")
+	ds := run(t, src)
+	want(t, ds, model.Error, "계약 store는 core에 있는데 함수 handle_transfer는 vm에 있다")
+}
+
+func TestL4CaseErrors(t *testing.T) {
+	ds := run(t, replace(t, "error: ErrLow }", "error: ErrNotFound }"))
+	want(t, ds, model.Error, `케이스 "low"의 에러 ErrNotFound가 함수 handle_transfer의 errors에 없다`)
+	want(t, ds, model.Warning, "함수 handle_transfer의 에러 ErrLow를 확인하는 케이스가 없다")
+	// invalid는 errors에 없어도 된다
+	ds = run(t, replace(t, "error: ErrLow }", "error: invalid }"))
+	wantNone(t, ds, model.Error)
+}
+
+func TestRequirements(t *testing.T) {
+	src := strings.Replace(base, "  REQ-a: { text: A }\n", "  REQ-a: { text: A }\n  REQ-b: { text: B }\n  REQ-c: { text: C, status: held }\n", 1)
+	src = strings.Replace(src, "vm:      { tier: execution, depends_on: [core] }", "vm:      { tier: execution, depends_on: [core], satisfies: [REQ-c] }", 1)
+	ds := run(t, src)
+	want(t, ds, model.Warning, "요구사항 REQ-b를 충족하는 설계 요소가 없다")
+	d := want(t, ds, model.Warning, "held 요구사항 REQ-c에 vm가 매달려 있다")
+	if d.Pos.Line == 0 {
+		t.Fatal("position")
+	}
+	if strings.Contains(join(ds), "REQ-a") {
+		t.Fatal("REQ-a is satisfied")
+	}
+}
+
+func TestSamples(t *testing.T) {
+	cases := []struct {
+		name     string
+		errors   []string
+		warnings []string
+		infos    []string
+	}{
+		{
+			name:     "tolchain",
+			warnings: []string{"held 요구사항 REQ-random에 random가 매달려 있다", "함수 handle_transfer의 에러 ErrBalanceOverflow를 확인하는 케이스가 없다"},
+			infos:    []string{"그룹 규칙 예외: reward → asset (보상 지급 시 자산 스키마 검증 재사용)"},
+		},
+		{
+			name:     "tolelog",
+			errors:   []string{"상위 tier 의존: post(service) → dto(transport)"},
+			warnings: []string{"ErrUnauthorized의 이름은 401을 뜻하지만 http가 403다", "요구사항 REQ-oauth를 충족하는 설계 요소가 없다"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m, ds := model.Load(filepath.Join("..", "model", "testdata", c.name, "design"))
+			if len(ds) != 0 {
+				t.Fatalf("load:\n%s", join(ds))
+			}
+			ds = Run(m)
+			for level, msgs := range map[model.Level][]string{model.Error: c.errors, model.Warning: c.warnings, model.Info: c.infos} {
+				if got := ds.Count(level); got != len(msgs) {
+					t.Errorf("%v: want %d, got %d\n%s", level, len(msgs), got, join(ds))
+				}
+				for _, msg := range msgs {
+					want(t, ds, level, msg)
+				}
+			}
+		})
+	}
+}
