@@ -166,3 +166,62 @@ func TestExceptionTargetMustExist(t *testing.T) {
 	ds := run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: ghost }] }"))
 	want(t, ds, model.Error, `없는 모듈 "ghost"`)
 }
+
+func TestL0(t *testing.T) {
+	ds := run(t, replace(t, "implements: [rpc]", "implements: []"))
+	want(t, ds, model.Error, "인터페이스 rpc를 구현하는 모듈이 없다")
+
+	ds = run(t, replace(t, "composes: [core, vm, tx_modules, rpc_mod]", "composes: [core, vm, tx_modules]"))
+	want(t, ds, model.Error, "실행 단위 node가 rpc를 노출하지만 구현 모듈 rpc_mod를 조립하지 않는다")
+
+	// composes에 없어도 depends_on으로 닿으면 조립된 것이다.
+	ds = run(t, replace(t, "composes: [core, vm, tx_modules, rpc_mod]", "composes: [rpc_mod, tx_modules]"))
+	wantNone(t, ds, model.Error)
+}
+
+func TestTierDirection(t *testing.T) {
+	ds := run(t, replace(t, "core:    { tier: domain, depends_on: [crypto]", "core:    { tier: domain, depends_on: [crypto, vm]"))
+	d := want(t, ds, model.Error, "상위 tier 의존: core(domain) → vm(execution)")
+	if d.Pos.Line == 0 {
+		t.Fatal("position")
+	}
+	// 같은 tier는 허용
+	ds = run(t, replace(t, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, depends_on: [hash] }\n  hash:    { tier: foundation }"))
+	wantNone(t, ds, model.Error)
+	// 멤버 예외도 tier를 따른다
+	ds = run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: rpc_mod }] }"))
+	want(t, ds, model.Error, "상위 tier 의존: asset(execution) → rpc_mod(service)")
+}
+
+func TestCycle(t *testing.T) {
+	ds := run(t, replace(t, "vm:      { tier: execution, depends_on: [core] }", "vm:      { tier: execution, depends_on: [core, tx_modules] }"))
+	want(t, ds, model.Error, "의존 순환: vm → tx_modules → vm")
+	if n := ds.Count(model.Error); n != 1 {
+		t.Fatalf("one cycle error, got %d:\n%s", n, join(ds))
+	}
+}
+
+func TestCycleThroughException(t *testing.T) {
+	src := replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: helper }] }")
+	src = strings.Replace(src, "  crypto:  { tier: foundation }", "  crypto:  { tier: foundation }\n  helper:  { tier: execution, depends_on: [tx_modules] }", 1)
+	ds := run(t, src)
+	want(t, ds, model.Error, "의존 순환: helper → tx_modules → helper")
+	if n := ds.Count(model.Error); n != 1 {
+		t.Fatalf("one cycle error, got %d:\n%s", n, join(ds))
+	}
+}
+
+func TestOrphanModule(t *testing.T) {
+	src := strings.Replace(base, "  crypto:  { tier: foundation }", "  crypto:  { tier: foundation }\n  lonely:  { tier: foundation }", 1)
+	ds := run(t, src)
+	want(t, ds, model.Warning, "어느 실행 단위에도 없는 모듈 lonely")
+	// 실행 단위가 없으면 검사하지 않는다
+	ds = run(t, strings.Replace(src, "executables:\n  node: { exposes: [rpc], composes: [core, vm, tx_modules, rpc_mod] }\n", "", 1))
+	wantNone(t, ds, model.Warning)
+}
+
+func TestGroupExceptions(t *testing.T) {
+	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [transfer], exceptions: [{ depends_on: asset, reason: \"검증 재사용\" }, { depends_on: core }] }"))
+	want(t, ds, model.Info, "그룹 규칙 예외: economy → asset (검증 재사용)")
+	want(t, ds, model.Warning, "예외 core는 그룹 tx_modules가 이미 의존한다")
+}
