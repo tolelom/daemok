@@ -30,11 +30,7 @@ enums:
   tx_type:
     in: core
     go: { type: TxType, prefix: Tx }
-    values:
-      transfer:      { payload: transfer_payload }
-      mint_asset:    { payload: mint_asset_payload }
-      grant_reward:  { payload: grant_reward_payload }
-      # 18개 전부
+    values: [transfer, mint_asset, grant_reward]   # 18개 전부
 
 errors:
   ErrInsufficientBalance: { in: core, message: "insufficient balance" }
@@ -47,6 +43,7 @@ consts:
 types:
   transfer_payload:
     in: core
+    gen: false   # core/transaction.go의 struct를 그대로 둔다
     fields: { to: address, amount: uint64 }
 
 handler_kinds:
@@ -93,8 +90,8 @@ funcs:
 |---|---|
 | `tx_type`의 모든 값이 정확히 한 멤버의 `handles`에 있는가 | 빠지거나 겹치면 생성 전에 에러. 지금은 누락이 런타임 에러, 중복이 런타임 panic이다 |
 | 형제 모듈 import | `reward → asset`은 예외로 기록돼 정보로 표시. 다른 형제 import가 생기면 에러 |
-| 설계에 없는 에러 | 모듈 안의 `errors.New`는 경고. 코드를 읽어야 하므로 `daemok check`의 코드 대조에서 한다 |
-| 같은 값의 상수가 두 곳에 정의 | `consensus.defaultMaxBlockTxs`는 설계에 없는 상수라 경고. 이것도 코드 대조에서 한다 |
+
+모듈 안의 `errors.New`와 `consensus.defaultMaxBlockTxs` 같은 설계에 없는 상수는 코드 본문을 읽어야 잡힌다. MVP의 코드 대조는 import만 읽으므로 이 둘은 MVP 범위 밖이다.
 
 ## 생성물
 
@@ -118,24 +115,33 @@ var _ vm.Handler = handleTransfer
 // vm/modules/economy/handle_transfer_gen_test.go
 func TestHandleTransfer(t *testing.T) {
 	cases := []struct {
-		name  string
-		given transferGiven
-		err   error
+		name   string
+		given  caseInput
+		expect caseInput
+		err    error
 	}{
-		{"잔액 부족", transferGiven{balance: 5, amount: 10}, core.ErrInsufficientBalance},
-		{"위임 한도 초과", transferGiven{delegatedMax: 5, amount: 10}, core.ErrUnauthorized},
+		{name: "금액 0", given: caseInput{"amount": 0}, err: errAny},
+		{name: "잔액 부족", given: caseInput{"balance": 5, "amount": 10}, err: core.ErrInsufficientBalance},
+		{name: "위임 한도 초과", given: caseInput{"delegated_max": 5, "amount": 10}, err: core.ErrUnauthorized},
+		{name: "정상 이체", given: caseInput{"balance": 10, "amount": 3}, expect: caseInput{"from": 7, "to": 3}},
 	}
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) { runTransferCase(t, c.given, c.err) })
+		t.Run(c.name, func(t *testing.T) {
+			got, err := runHandleTransferCase(t, c.given)
+			checkErr(t, err, c.err)
+			checkExpect(t, got, c.expect)
+		})
 	}
 }
 ```
 
 - `handleTransfer`의 본문은 손으로 쓰는 파일(`token.go`)에 있다. 이름이나 시그니처가 설계와 다르면 `var _ vm.Handler = handleTransfer`에서 컴파일이 깨진다.
-- 테스트 표는 설계의 `cases`에서 생성한다. `given`을 상태로 바꾸는 `runTransferCase`는 손으로 쓴다.
-- `error: invalid`처럼 sentinel이 없는 경우는 에러 여부만 확인한다.
+- 테스트 표는 설계의 `cases`에서 생성한다. `given`을 상태로 바꾸고 호출하는 `runHandleTransferCase`는 손으로 쓴다. `caseInput`, `errAny`, `checkErr`, `checkExpect`는 같은 디렉토리의 `daemok_case_gen_test.go`에 생성된다.
+- `error: invalid`는 `errAny`로 나와 에러 여부만 확인한다.
+- `transfer_payload`는 `gen: false`라 `core/types.gen.go`에 나오지 않는다. 다른 tx 모듈의 멤버는 L4 함수 노드가 없으므로 등록 코드는 `handle` + 값의 CamelCase(`handleMintAsset`)를 쓴다.
 
 ## 기존 코드에 도입할 때
 
-- 생성물의 이름이 지금 코드의 이름과 같아야 한다. `go.prefix`로 `transfer`를 `TxTransfer`로 바꾼다.
+- 생성물의 이름이 지금 코드의 이름과 같아야 한다. `go.prefix`로 `transfer`를 `TxTransfer`로 바꾸고, 페이로드 struct처럼 코드에 남기는 선언은 `gen: false`로 둔다.
 - 도입 첫 단계는 `core/transaction.go`의 상수 블록과 각 모듈의 `init()`을 지우고 생성 파일로 바꾸는 것이다. 이 두 곳 외의 코드는 바뀌지 않는다.
+- 핸들러 함수 이름이 `handle<Value>` 규약과 다른 모듈은 이름을 맞추거나 L4 함수 노드를 적는다.

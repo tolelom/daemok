@@ -32,19 +32,19 @@
 requirements:
   REQ-post-draft: { text: "작성자는 글을 임시저장하고 본인만 볼 수 있다", status: active }
 
-tiers: [foundation, domain, service, transport]
+tiers: [foundation, domain, support, service, transport]
 
 modules:
-  model: { tier: domain }
-  post:  { tier: service,   depends_on: [model] }
-  dto:   { tier: transport, depends_on: [model] }
-  router: { tier: transport, depends_on: [post, dto] }
+  model:    { tier: domain }
+  httputil: { tier: support }
+  post:     { tier: service,   depends_on: [model] }
+  dto:      { tier: transport, depends_on: [model] }
+  router:   { tier: transport, depends_on: [post, dto] }
 
 enums:
   post_status:
     in: model
     values: [published, draft]
-    default: published
     satisfies: [REQ-post-draft]
 
 consts:
@@ -72,8 +72,9 @@ types:
 | 검사 | 결과 |
 |---|---|
 | 계층 방향 | `post`(service) → `dto`(transport)는 상위 tier 의존이라 에러 |
-| 상태값 리터럴 | `post_status` 값과 같은 문자열 리터럴이 모듈 안에 있으면 경고 |
 | 에러와 HTTP 상태 | `ErrUnauthorized`가 403이면 경고. 매핑 코드(`HTTPStatus`)를 생성하므로 핸들러마다 따로 적지 않는다 |
+
+`post_status` 값과 같은 문자열 리터럴이 모듈 안에 남아 있는지는 코드 본문을 읽어야 잡힌다. MVP의 코드 대조는 import만 읽으므로 범위 밖이다.
 
 ## 생성물
 
