@@ -142,6 +142,15 @@ func TestHandleTransfer(t *testing.T) {
 
 ## 기존 코드에 도입할 때
 
-- 생성물의 이름이 지금 코드의 이름과 같아야 한다. `go.prefix`로 `transfer`를 `TxTransfer`로 바꾸고, 페이로드 struct처럼 코드에 남기는 선언은 `gen: false`로 둔다.
-- 도입 첫 단계는 `core/transaction.go`의 상수 블록과 각 모듈의 `init()`을 지우고 생성 파일로 바꾸는 것이다. 이 두 곳 외의 코드는 바뀌지 않는다.
-- 핸들러 함수 이름이 `handle<Value>` 규약과 다른 모듈은 이름을 맞추거나 L4 함수 노드를 적는다.
+- 생성물의 이름이 지금 코드의 이름과 같아야 한다. `go.prefix`로 `transfer`를 `TxTransfer`로 바꾼다.
+- 도입 첫 단계는 `core/transaction.go`의 상수 블록과 각 모듈의 `init()`을 지우고 생성 파일로 바꾸는 것이다. 이 두 곳 외의 코드는 바뀌지 않는다. 그러려면 첫 단계의 설계 파일에서 생성하는 노드는 enum `tx_type`과 멤버의 등록뿐이고, 기존 선언이 있는 나머지 L3 노드는 `gen: false`로 둔다.
+
+| 노드 | 기존 선언 |
+|---|---|
+| `consts` | `config/config.go:19` `DefaultMaxBlockTxs` |
+| `errors` | `core/errors.go:8-26` |
+| `types` | `core/transaction.go:132-242` 페이로드 struct |
+| `handler_kinds.tx_handler` | `vm/registry.go:12` `type Handler` |
+
+- 핸들러 18개의 이름은 모두 `handle<Value>` 규약과 같아서(`handleMintAsset`, `handleRegisterTemplate`) L4 함수 노드 없이 등록 코드가 생성된다.
+- `gen: false`를 하나씩 풀어 생성 파일로 바꾸는 것이 그다음 단계다.

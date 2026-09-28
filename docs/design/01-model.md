@@ -2,6 +2,50 @@
 
 설계 파일 형식 v0.3. [프로토타입](https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE)은 v0.2를 읽으며, v0.3에서 더해진 `gen` 필드와 알 수 없는 키 오류는 반영하지 않는다.
 
+## 예시
+
+트랜잭션 하나가 처리되는 데 필요한 최소 조각이다. 최상위 키가 노드 종류이고, 그 안에 `ID: { 필드 }`가 나열된다.
+
+```yaml
+requirements:                      # R: 왜 만드나
+  REQ-transfer: { text: "사용자는 토큰을 다른 주소로 보낼 수 있다" }
+
+modules:                           # L2: 코드가 어느 패키지에 사는가
+  core: { tier: domain }
+  vm:   { tier: execution, depends_on: [core] }
+
+enums:                             # L3: 값의 종류
+  tx_type: { in: core, values: [transfer, mint_asset] }
+
+handler_kinds:                     # L3: tx_type 값 하나당 핸들러 함수 하나라는 계약
+  tx_handler: { in: vm, params: { payload: json.RawMessage }, returns: [error], key: tx_type }
+
+groups:                            # L2: 같은 계약을 따르는 모듈 묶음
+  tx_modules:
+    kind: tx_handler
+    depends_on: [core, vm]
+    members:
+      economy: { handles: [transfer] }
+      asset:   { handles: [mint_asset] }
+
+funcs:                             # L4: 함수 하나의 계약과 테스트 표
+  handle_transfer:
+    in: economy
+    kind: tx_handler
+    handles: transfer
+    satisfies: [REQ-transfer]
+    errors: [ErrInsufficientBalance]
+    cases:
+      - { name: "잔액 부족", given: { balance: 5, amount: 10 }, error: ErrInsufficientBalance }
+```
+
+읽는 규칙은 둘이다.
+
+- 모든 노드는 자기 종류 안에서 ID가 하나다. 다른 곳에서는 그 ID를 이름으로만 가리킨다(`depends_on: [core]`, `key: tx_type`, `handles: transfer`).
+- L3·L4 노드는 `in`으로 어느 모듈(또는 그룹 멤버)의 코드에 들어가는지 적는다. `tx_type`은 `core` 패키지에, `handle_transfer`는 `vm/modules/economy`에 생긴다.
+
+이 파일에서 도구가 하는 일은 셋이다. `tx_type`의 값을 어느 멤버도 `handles`에 적지 않으면 에러다(검사). `core/tx_type.gen.go`에 상수 블록을, `vm/modules/economy/register.gen.go`에 `vm.Register(core.TxTransfer, handleTransfer)`를 만든다(생성). `handleTransfer`의 본문은 사람이 쓰고, 시그니처가 `tx_handler`와 다르면 컴파일이 깨진다(검증).
+
 ## 파일
 
 - `design/` 아래 `*.yaml`을 모두 읽어 하나의 모델로 합친다. 파일을 어떻게 나눌지는 자유다.
