@@ -148,3 +148,105 @@ func TestDiagnosticsSort(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+const l2Sample = `
+system:
+  id: tolchain
+  summary: 블록체인
+  actors:
+    game_server: { summary: "게임" }
+  interfaces:
+    json_rpc: { protocol: jsonrpc2-http, port: 8545, used_by: [game_server] }
+    events:   { protocol: sse, path: /events, spec: docs/events.yaml }
+executables:
+  node: { exposes: [json_rpc, events], composes: [core, vm, tx_modules] }
+  genkey: { summary: 키 생성, composes: [] }
+tiers: [foundation, domain, execution]
+modules:
+  crypto: { tier: foundation }
+  core:   { tier: domain, depends_on: [crypto], path: pkg/core }
+  vm:     { tier: execution, depends_on: [core], implements: [json_rpc, events] }
+groups:
+  tx_modules:
+    tier: execution
+    kind: tx_handler
+    path: vm/modules
+    depends_on: [core, vm]
+    rule: no_sibling_deps
+    members:
+      economy: { handles: [transfer], satisfies: [REQ-a] }
+      reward:
+        handles: [grant_reward]
+        exceptions:
+          - depends_on: asset
+            reason: "스키마 재사용"
+`
+
+func TestDecodeL2(t *testing.T) {
+	m, ds := loadOne(t, l2Sample)
+	wantClean(t, ds)
+	if m.System.ID != "tolchain" || len(m.System.Actors) != 1 || len(m.System.Interfaces) != 2 {
+		t.Fatalf("system %+v", m.System)
+	}
+	rpc := m.System.Interfaces[0]
+	if rpc.Port != 8545 || rpc.UsedBy[0].Name != "game_server" || m.System.Interfaces[1].Spec != "docs/events.yaml" {
+		t.Fatalf("interfaces %+v %+v", rpc, m.System.Interfaces[1])
+	}
+	if len(m.Executables) != 2 || len(m.Executables[0].Composes) != 3 || m.Executables[1].Composes == nil {
+		t.Fatalf("executables %+v", m.Executables)
+	}
+	if len(m.Tiers) != 3 || m.Tiers[2].Name != "execution" {
+		t.Fatalf("tiers %+v", m.Tiers)
+	}
+	core := m.Modules[1]
+	if core.ID != "core" || core.Tier.Name != "domain" || core.Path != "pkg/core" || core.DependsOn[0].Name != "crypto" {
+		t.Fatalf("core %+v", core)
+	}
+	if m.Modules[0].Path != "crypto" {
+		t.Fatalf("default path %q", m.Modules[0].Path)
+	}
+	g := m.Groups[0]
+	if g.Kind.Name != "tx_handler" || g.Rule != "no_sibling_deps" || g.Tier.Name != "execution" || len(g.Members) != 2 {
+		t.Fatalf("group %+v", g)
+	}
+	reward := g.Members[1]
+	if reward.Group != g || reward.Handles[0].Name != "grant_reward" || len(reward.Exceptions) != 1 {
+		t.Fatalf("member %+v", reward)
+	}
+	if reward.Exceptions[0].DependsOn.Name != "asset" || reward.Exceptions[0].Reason != "스키마 재사용" {
+		t.Fatalf("exception %+v", reward.Exceptions[0])
+	}
+	if g.Members[0].Satisfies[0].Name != "REQ-a" {
+		t.Fatal("member satisfies")
+	}
+}
+
+func TestDecodeL2Errors(t *testing.T) {
+	_, ds := loadOne(t, `
+modules:
+  core: { summary: x }
+  vm: { tier: a, tierr: b }
+groups:
+  g: { kind: k, rule: whatever, members: { m: { handlez: [] } } }
+  h: { members: {} }
+`)
+	wantDiag(t, ds, Error, `"tier"가 필요하다`)
+	wantDiag(t, ds, Error, `알 수 없는 키 "tierr"`)
+	wantDiag(t, ds, Error, "rule은 no_sibling_deps")
+	wantDiag(t, ds, Error, `알 수 없는 키 "handlez"`)
+	wantDiag(t, ds, Error, `"kind"가 필요하다`)
+}
+
+func TestSecondSystemAndTiers(t *testing.T) {
+	_, ds := load(t, map[string]string{
+		"a.yaml": "version: 0.3\nsystem: { id: a }\ntiers: [x]\n",
+		"b.yaml": "version: 0.3\nsystem: { id: b }\ntiers: [y]\n",
+	})
+	wantDiag(t, ds, Error, "system은 한 파일에만")
+	wantDiag(t, ds, Error, "tiers는 한 파일에만")
+}
+
+func TestExceptionNeedsDependsOn(t *testing.T) {
+	_, ds := loadOne(t, "groups:\n  g:\n    kind: k\n    members:\n      m:\n        exceptions:\n          - reason: x\n")
+	wantDiag(t, ds, Error, `"depends_on"가 필요하다`)
+}
