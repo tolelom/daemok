@@ -1,0 +1,124 @@
+version: 0.3
+go_module: github.com/tolelom/fiber_api_server
+ts_out: tolelog/src/generated/design.gen.ts
+
+# ── R 요구사항 (예시 값) ──
+requirements:
+  REQ-draft:   { text: "작성자는 글을 임시저장하고 본인만 볼 수 있다", status: active }
+  REQ-series:  { text: "글을 시리즈로 묶어 순서대로 읽을 수 있다", status: active }
+  REQ-search:  { text: "제목과 본문으로 공개 글을 검색한다", status: active }
+  REQ-oauth:   { text: "GitHub 계정으로 로그인한다", status: active }
+
+# ── L0 시스템 ──
+system:
+  id: tolelog
+  summary: 개인 기술 블로그
+  actors:
+    reader:  { summary: "블로그 방문자" }
+    author:  { summary: "글 작성자" }
+    crawler: { summary: "검색엔진, RSS 리더" }
+  interfaces:
+    rest_api: { protocol: http-json, path: /api/v1, spec: docs/swagger.yaml, used_by: [reader, author] }
+    feed:     { protocol: rss,       path: /feed,        used_by: [crawler] }
+    sitemap:  { protocol: xml,       path: /sitemap.xml, used_by: [crawler] }
+
+# ── L1 실행 단위 ──
+executables:
+  server:
+    summary: Fiber API 서버
+    exposes: [rest_api, feed, sitemap]
+    composes: [router]
+
+# ── L2 모듈 ──
+tiers: [foundation, domain, support, service, transport]
+
+modules:
+  config:     { tier: foundation, summary: "환경 설정, DB 연결" }
+  upload:     { tier: foundation, summary: "이미지 업로드 제한" }
+  model:      { tier: domain,     summary: "GORM 엔티티", path: internal/model }
+  utils:      { tier: support,    summary: "JWT, slug", depends_on: [model] }
+  httputil:   { tier: support,    summary: "페이지네이션 파라미터" }
+  post:       { tier: service,    summary: "게시글, 좋아요, 검색", path: internal/post, depends_on: [model, utils, dto], satisfies: [REQ-draft, REQ-search] }
+  comment:    { tier: service,    summary: "댓글", depends_on: [model] }
+  user:       { tier: service,    summary: "회원, 인증", depends_on: [model, utils] }
+  series:     { tier: service,    summary: "시리즈", depends_on: [model], satisfies: [REQ-series] }
+  tag:        { tier: service,    summary: "태그", depends_on: [model] }
+  image:      { tier: service,    summary: "이미지 저장", depends_on: [upload] }
+  feed:       { tier: service,    summary: "RSS", depends_on: [post], implements: [feed] }
+  sitemap:    { tier: service,    summary: "sitemap.xml", depends_on: [model], implements: [sitemap] }
+  dto:        { tier: transport,  summary: "요청/응답 DTO", path: internal/dto, depends_on: [model, utils] }
+  middleware: { tier: transport,  summary: "인증, rate limit", depends_on: [config] }
+  router:
+    tier: transport
+    summary: "라우트 등록, DI"
+    implements: [rest_api]
+    depends_on: [post, comment, user, series, tag, image, feed, sitemap, dto, middleware, httputil]
+
+# ── L3 타입·계약 ──
+enums:
+  post_status:
+    in: model
+    go: { type: PostStatus }
+    values: [published, draft]
+    export: [ts]
+    satisfies: [REQ-draft]
+
+consts:
+  page_size_default:      { in: httputil, type: int, value: 10,      export: [ts] }
+  page_size_max:          { in: httputil, type: int, value: 100 }
+  post_title_max:         { in: dto,      type: int, value: 255,     export: [ts] }
+  post_content_max:       { in: dto,      type: int, value: 500000,  export: [ts] }
+  series_title_max:       { in: dto,      type: int, value: 255,     export: [ts] }
+  series_description_max: { in: dto,      type: int, value: 2000,    export: [ts] }
+  image_max_bytes:        { in: upload,   type: int, value: 5242880, export: [ts] }
+  access_token_ttl:       { in: utils,    type: duration, value: 15m }
+  refresh_token_ttl:      { in: utils,    type: duration, value: 168h }
+
+errors:
+  ErrPostNotFound:       { in: post, message: "post not found",        http: 404 }
+  ErrUnauthorized:       { in: post, message: "unauthorized",          http: 403 }
+  ErrNoFieldsToUpdate:   { in: post, message: "no fields to update",   http: 400 }
+  ErrInvalidSearchQuery: { in: post, message: "invalid search query",  http: 400 }
+
+types:
+  user:   { in: model, fields: { username: string } }
+  tag:    { in: model, fields: { name: string } }
+  series: { in: model, fields: { title: { type: string, max: series_title_max } } }
+  post:
+    in: model
+    fields:
+      title:      { type: string, max: post_title_max }
+      content:    { type: string, max: post_content_max }
+      is_public:  bool
+      status:     post_status
+      author:     { ref: user }
+      tags:       { ref: tag, many: true }
+      series:     { ref: series, optional: true }
+      view_count: uint
+  update_post_request:
+    in: dto
+    fields:
+      title:   { type: string, max: post_title_max, optional: true }
+      content: { type: string, max: post_content_max, optional: true }
+      status:  { type: post_status, optional: true }
+
+contracts:
+  post_service:
+    in: post
+    go: { name: Service }
+    methods:
+      get_post_by_id: { params: { post_id: uint, user_id: "*uint" }, returns: [post], errors: [ErrPostNotFound] }
+      update_post:    { params: { post_id: uint, user_id: uint, req: update_post_request }, returns: [post], errors: [ErrPostNotFound, ErrUnauthorized, ErrNoFieldsToUpdate] }
+      delete_post:    { params: { post_id: uint, user_id: uint }, returns: [], errors: [ErrPostNotFound, ErrUnauthorized] }
+
+# ── L4 함수 계약 ──
+funcs:
+  update_post:
+    in: post
+    of: post_service.update_post
+    errors: [ErrPostNotFound, ErrUnauthorized, ErrNoFieldsToUpdate]
+    cases:
+      - { name: "없는 글",   given: { post: null },                  error: ErrPostNotFound }
+      - { name: "남의 글",   given: { owner: 2, user: 1 },           error: ErrUnauthorized }
+      - { name: "변경 없음", given: { owner: 1, user: 1, req: {} },  error: ErrNoFieldsToUpdate }
+      - { name: "제목 수정", given: { owner: 1, user: 1, req: { title: "새 제목" } }, expect: { title: "새 제목" } }

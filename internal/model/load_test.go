@@ -349,3 +349,164 @@ handler_kinds:
 	wantDiag(t, ds, Error, `"methods"가 필요하다`)
 	wantDiag(t, ds, Error, `"key"가 필요하다`)
 }
+
+func TestDecodeL4(t *testing.T) {
+	m, ds := loadOne(t, `
+funcs:
+  handle_transfer:
+    in: economy
+    kind: tx_handler
+    handles: transfer
+    errors: [ErrInsufficientBalance]
+    cases:
+      - { name: "금액 0", given: { amount: 0 }, error: invalid }
+      - { name: "정상", given: { balance: 10, req: { title: "새 제목" } }, expect: { from: 7 } }
+  update_post:
+    in: post
+    of: post_service.update_post
+    errors: []
+    cases: []
+`)
+	wantClean(t, ds)
+	f := m.Funcs[0]
+	if f.Kind.Name != "tx_handler" || f.Handles.Name != "transfer" || len(f.Cases) != 2 {
+		t.Fatalf("%+v", f)
+	}
+	if f.Cases[0].Error.Name != "invalid" || f.Cases[0].Expect != nil || f.Cases[0].Given.Get("amount").Value != "0" {
+		t.Fatalf("case0 %+v", f.Cases[0])
+	}
+	if f.Cases[1].Error.Name != "" || f.Cases[1].Expect.Get("from").Value != "7" {
+		t.Fatalf("case1 %+v", f.Cases[1])
+	}
+	g := m.Funcs[1]
+	if g.Of.Name != "post_service.update_post" || g.Errors == nil || len(g.Errors) != 0 {
+		t.Fatalf("%+v", g)
+	}
+}
+
+func TestDecodeL4Errors(t *testing.T) {
+	_, ds := loadOne(t, `
+funcs:
+  a: { in: m, kind: k, handles: h, of: c.m }
+  b: { in: m }
+  c: { in: m, kind: k }
+  d:
+    in: m
+    of: c.m
+    cases:
+      - { given: {} }
+      - { name: x, given: {}, expect: {}, error: E }
+      - { name: y, given: {} }
+      - { name: z, given: [1], error: E }
+      - { name: w, given: { a: [1] }, error: E }
+`)
+	wantDiag(t, ds, Error, "kind+handles와 of 중 하나만")
+	wantDiag(t, ds, Error, "kind+handles 또는 of가 필요하다")
+	wantDiag(t, ds, Error, `"handles"가 필요하다`)
+	wantDiag(t, ds, Error, `"name"가 필요하다`)
+	wantDiag(t, ds, Error, "expect와 error 중 하나만")
+	wantDiag(t, ds, Error, "expect나 error가 필요하다")
+	wantDiag(t, ds, Error, "given은 맵이어야 한다")
+	wantDiag(t, ds, Error, "given의 값은 값 하나 또는 맵이어야 한다")
+}
+
+func TestIndexAndOwner(t *testing.T) {
+	m, ds := loadOne(t, l2Sample+`
+enums:
+  tx_type: { in: core, values: [transfer] }
+types:
+  payload: { in: core, fields: { to: address } }
+`)
+	wantClean(t, ds)
+	if m.Module("core") == nil || m.Module("nope") != nil || m.Member("reward") == nil || m.Group("tx_modules") == nil {
+		t.Fatal("lookup")
+	}
+	if m.TierIndex("execution") != 2 || m.TierIndex("x") != -1 {
+		t.Fatal("tier index")
+	}
+	o, ok := m.Owner("reward")
+	if !ok || o.Path != "vm/modules/reward" || o.Tier != "execution" || o.Member == nil {
+		t.Fatalf("owner %+v", o)
+	}
+	o, _ = m.Owner("core")
+	if o.Path != "pkg/core" || o.Tier != "domain" || o.Module == nil {
+		t.Fatalf("owner %+v", o)
+	}
+	if _, ok := m.Owner("tx_modules"); ok {
+		t.Fatal("group is not an owner")
+	}
+	cases := []struct {
+		from, to string
+		want     bool
+	}{
+		{"core", "core", true}, {"core", "crypto", true}, {"crypto", "core", false},
+		{"reward", "core", true}, {"reward", "asset", true}, {"economy", "asset", false},
+		{"vm", "economy", false}, {"tx_modules", "vm", true},
+	}
+	for _, c := range cases {
+		if got := m.CanDepend(c.from, c.to); got != c.want {
+			t.Errorf("CanDepend(%s, %s) = %v", c.from, c.to, got)
+		}
+	}
+	if k, base := m.ResolveType("*uint"); k != BuiltinType || base != "uint" {
+		t.Fatal("builtin")
+	}
+	if k, _ := m.ResolveType("[]tx_type"); k != EnumType {
+		t.Fatal("enum")
+	}
+	if k, _ := m.ResolveType("payload"); k != StructType {
+		t.Fatal("struct")
+	}
+	if k, _ := m.ResolveType("json.RawMessage"); k != ExternalType {
+		t.Fatal("external dotted")
+	}
+	if k, _ := m.ResolveType("*Context"); k != ExternalType {
+		t.Fatal("external upper")
+	}
+	if k, _ := m.ResolveType("nothing"); k != UnknownType {
+		t.Fatal("unknown")
+	}
+}
+
+func TestMemberViaGroupDependency(t *testing.T) {
+	m, ds := loadOne(t, strings.Replace(l2Sample, "vm:     { tier: execution, depends_on: [core]", "vm:     { tier: execution, depends_on: [core, tx_modules]", 1))
+	wantClean(t, ds)
+	if !m.CanDepend("vm", "economy") {
+		t.Fatal("depending on a group allows its members")
+	}
+}
+
+func TestNamespaceCollisions(t *testing.T) {
+	_, ds := loadOne(t, `
+modules:
+  events: { tier: a }
+  economy: { tier: a }
+groups:
+  g: { kind: k, members: { economy: {} } }
+system:
+  id: s
+  interfaces:
+    events: {}
+enums:
+  post: { in: m, values: [a] }
+types:
+  post: { in: m, fields: {} }
+`)
+	wantDiag(t, ds, Error, `멤버 "economy"가 모듈`)
+	wantDiag(t, ds, Error, `타입 "post"가 enum`)
+	if find(ds, Error, `"events"`) != nil {
+		t.Fatal("module and interface may share an ID")
+	}
+}
+
+func TestSamplesLoadClean(t *testing.T) {
+	for _, s := range []string{"tolchain", "tolelog"} {
+		m, ds := Load(filepath.Join("testdata", s, "design"))
+		if len(ds) != 0 {
+			t.Fatalf("%s:\n%s", s, join(ds))
+		}
+		if m.GoModule == "" || len(m.Modules) == 0 {
+			t.Fatalf("%s: empty model", s)
+		}
+	}
+}
