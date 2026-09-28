@@ -250,3 +250,102 @@ func TestExceptionNeedsDependsOn(t *testing.T) {
 	_, ds := loadOne(t, "groups:\n  g:\n    kind: k\n    members:\n      m:\n        exceptions:\n          - reason: x\n")
 	wantDiag(t, ds, Error, `"depends_on"가 필요하다`)
 }
+
+const l3Sample = `
+enums:
+  tx_type:
+    in: core
+    go: { type: TxType, prefix: Tx }
+    values: [transfer, mint_asset]
+    export: [ts]
+consts:
+  max_block_txs: { in: config, type: int, value: 500, go: { name: DefaultMaxBlockTxs } }
+  max_tx_age:    { in: config, type: duration, value: 1h }
+  page_size:     { in: httputil, value: 10 }
+errors:
+  ErrNotFound: { in: core, message: "not found", http: 404 }
+  ErrOverflow: { in: core, message: "overflow" }
+types:
+  transfer_payload:
+    in: core
+    gen: false
+    fields: { to: address, amount: uint64 }
+  post:
+    in: model
+    fields:
+      title:  { type: string, max: post_title_max }
+      tags:   { ref: tag, many: true }
+      series: { ref: series, optional: true }
+      note:   { type: string, max: 80 }
+contracts:
+  post_service:
+    in: post
+    go: { name: Service }
+    methods:
+      get_post: { params: { post_id: uint, user_id: "*uint" }, returns: [post], errors: [ErrNotFound] }
+      list:     { params: {}, returns: [] }
+handler_kinds:
+  tx_handler:
+    in: vm
+    go: { name: Handler, register: Register }
+    params: { ctx: "*Context", payload: json.RawMessage }
+    returns: [error]
+    key: tx_type
+`
+
+func TestDecodeL3(t *testing.T) {
+	m, ds := loadOne(t, l3Sample)
+	wantClean(t, ds)
+	e := m.Enums[0]
+	if e.ID != "tx_type" || e.In.Name != "core" || !e.Gen || e.Go.Prefix != "Tx" || len(e.Values) != 2 || e.Export[0] != "ts" {
+		t.Fatalf("enum %+v", e)
+	}
+	if m.Consts[0].Go.Name != "DefaultMaxBlockTxs" || m.Consts[0].Value != "500" || m.Consts[1].Type != "duration" || m.Consts[2].Type != "int" {
+		t.Fatalf("consts %+v %+v %+v", m.Consts[0], m.Consts[1], m.Consts[2])
+	}
+	if m.Errors[0].HTTP != 404 || m.Errors[1].HTTP != 0 || m.Errors[1].Message != "overflow" {
+		t.Fatalf("errors %+v %+v", m.Errors[0], m.Errors[1])
+	}
+	tp := m.Types[0]
+	if tp.Gen || len(tp.Fields) != 2 || tp.Fields[1].Type.Name != "uint64" || tp.Fields[1].RefType.Name != "" {
+		t.Fatalf("type %+v", tp)
+	}
+	post := m.Types[1]
+	if post.Fields[0].Max.Name != "post_title_max" || !post.Fields[1].Many || post.Fields[1].RefType.Name != "tag" || !post.Fields[2].Optional || post.Fields[3].Max.Name != "80" {
+		t.Fatalf("post fields %+v", post.Fields)
+	}
+	c := m.Contracts[0]
+	if c.Go.Name != "Service" || len(c.Methods) != 2 || c.Methods[0].Params[1].Type.Name != "*uint" || !c.Methods[0].HasErrors || c.Methods[1].HasErrors {
+		t.Fatalf("contract %+v", c)
+	}
+	hk := m.HandlerKinds[0]
+	if hk.Key.Name != "tx_type" || hk.Go.Register != "Register" || hk.Params[0].Type.Name != "*Context" || hk.Returns[0].Name != "error" {
+		t.Fatalf("handler kind %+v", hk)
+	}
+}
+
+func TestDecodeL3Errors(t *testing.T) {
+	_, ds := loadOne(t, `
+enums:
+  e: { values: [a] }
+consts:
+  c: { in: m, type: float, value: 1 }
+  d: { in: m, value: abc }
+errors:
+  E: { in: m }
+types:
+  t: { in: m, fields: { a: { type: x, ref: y }, b: { many: true } } }
+contracts:
+  k: { in: m }
+handler_kinds:
+  h: { in: m, params: {} }
+`)
+	wantDiag(t, ds, Error, `"in"가 필요하다`)
+	wantDiag(t, ds, Error, "type은 int, string, duration")
+	wantDiag(t, ds, Error, "value는 정수여야 한다")
+	wantDiag(t, ds, Error, `"message"가 필요하다`)
+	wantDiag(t, ds, Error, "type과 ref 중 하나만")
+	wantDiag(t, ds, Error, "type이나 ref가 필요하다")
+	wantDiag(t, ds, Error, `"methods"가 필요하다`)
+	wantDiag(t, ds, Error, `"key"가 필요하다`)
+}
