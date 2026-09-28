@@ -225,3 +225,47 @@ func TestGroupExceptions(t *testing.T) {
 	want(t, ds, model.Info, "그룹 규칙 예외: economy → asset (검증 재사용)")
 	want(t, ds, model.Warning, "예외 core는 그룹 tx_modules가 이미 의존한다")
 }
+
+func TestTypeDependency(t *testing.T) {
+	// crypto(foundation)의 타입이 core의 enum을 쓰면 crypto는 core에 의존하지 않으므로 오류
+	src := strings.Replace(base, "types:\n", "types:\n  sig: { in: crypto, fields: { kind: tx_type } }\n", 1)
+	ds := run(t, src)
+	want(t, ds, model.Error, "crypto가 core의 타입 tx_type를 쓰지만 core에 의존하지 않는다")
+	// 멤버는 그룹 의존을 따른다
+	src = strings.Replace(base, "types:\n", "types:\n  memo: { in: economy, fields: { p: payload } }\n", 1)
+	wantNone(t, run(t, src), model.Error)
+	// handler_kind의 key enum도 의존 대상이다
+	src = replace(t, "vm:      { tier: execution, depends_on: [core] }", "vm:      { tier: execution, depends_on: [] }")
+	src = strings.Replace(src, "params: { payload: payload }", "params: {}", 1)
+	ds = run(t, src)
+	want(t, ds, model.Error, "vm가 core의 타입 tx_type를 쓰지만 core에 의존하지 않는다")
+}
+
+func TestErrorHTTP(t *testing.T) {
+	ds := run(t, replace(t, `http: 404 }`, `http: 400 }`))
+	want(t, ds, model.Warning, "ErrNotFound의 이름은 404를 뜻하지만 http가 400다")
+	ds = run(t, replace(t, `ErrLow:      { in: core, message: "low" }`, `ErrLow:      { in: core, message: "low" }
+  ErrUnauthorized: { in: core, message: "u", http: 403 }
+  ErrForbidden:    { in: core, message: "f", http: 403 }`))
+	want(t, ds, model.Warning, "ErrUnauthorized의 이름은 401을 뜻하지만 http가 403다")
+	if strings.Contains(join(ds), "ErrForbidden") {
+		t.Fatal("ErrForbidden 403 is consistent")
+	}
+}
+
+func TestContractWithoutErrors(t *testing.T) {
+	ds := run(t, replace(t, "returns: [payload], errors: [ErrNotFound] }", "returns: [payload] }"))
+	want(t, ds, model.Warning, "계약 store의 메서드 get에 errors가 없다")
+	ds = run(t, replace(t, "returns: [payload], errors: [ErrNotFound] }", "returns: [payload], errors: [] }"))
+	wantNone(t, ds, model.Warning)
+}
+
+func TestHandlerCoverage(t *testing.T) {
+	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [] }"))
+	want(t, ds, model.Error, "tx_type.transfer를 처리하는 멤버가 없다")
+	ds = run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint, transfer] }"))
+	d := want(t, ds, model.Error, "tx_type.transfer를 economy, asset가 함께 처리한다")
+	if d.Pos.Line == 0 {
+		t.Fatal("position")
+	}
+}
