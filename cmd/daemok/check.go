@@ -5,30 +5,25 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/tolelom/daemok/internal/check"
 	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/workspace"
 )
 
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	design := fs.String("design", "design", "설계 디렉토리")
-	fs.String("root", ".", "코드 루트 (코드 대조가 쓴다)")
+	root := fs.String("root", ".", "코드 루트")
 	strict := fs.Bool("strict", false, "경고도 실패로 본다")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-
-	m, diags := model.Load(*design)
-	if diags.HasErrors() {
-		diags.Sort()
-		printDiags(stdout, diags)
+	r := workspace.Run(*design, *root)
+	printDiags(stdout, r.Diags)
+	switch {
+	case r.Fatal:
 		return 2
-	}
-	diags = append(diags, check.Run(m)...)
-	diags.Sort()
-	printDiags(stdout, diags)
-	if diags.HasErrors() || (*strict && diags.Count(model.Warning) > 0) {
+	case r.Diags.HasErrors() || (*strict && r.Diags.Count(model.Warning) > 0):
 		return 1
 	}
 	return 0

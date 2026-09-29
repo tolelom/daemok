@@ -112,3 +112,69 @@ func TestCheckBadFlag(t *testing.T) {
 		t.Fatalf("exit %d err %q", code, errOut)
 	}
 }
+
+const genDesign = `version: 0.4
+go_module: example.com/x
+tiers: [a]
+modules:
+  core: { tier: a }
+enums:
+  kind: { in: core, values: [x, y] }
+`
+
+func TestGenWritesThenCheckPasses(t *testing.T) {
+	dir := writeDesign(t, genDesign)
+	root := filepath.Dir(dir)
+	code, out, _ := runCLI(t, "check", "--design", dir, "--root", root)
+	if code != 1 || !strings.Contains(out, "생성 파일이 없다: core/kind.gen.go") {
+		t.Fatalf("check before gen: exit %d\n%s", code, out)
+	}
+	code, out, _ = runCLI(t, "gen", "--design", dir, "--root", root, "--dry-run")
+	if code != 0 || !strings.Contains(out, "쓰기: core/kind.gen.go") {
+		t.Fatalf("dry-run: exit %d\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, "core", "kind.gen.go")); !os.IsNotExist(err) {
+		t.Fatal("dry-run이 파일을 썼다")
+	}
+	code, out, _ = runCLI(t, "gen", "--design", dir, "--root", root)
+	if code != 0 || !strings.Contains(out, "쓴 파일 1, 지운 파일 0") {
+		t.Fatalf("gen: exit %d\n%s", code, out)
+	}
+	code, out, _ = runCLI(t, "check", "--design", dir, "--root", root)
+	if code != 0 {
+		t.Fatalf("check after gen: exit %d\n%s", code, out)
+	}
+	// 설계에서 enum을 지우면 gen이 지운다
+	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, _ = runCLI(t, "gen", "--design", dir, "--root", root)
+	if code != 0 || !strings.Contains(out, "지우기: core/kind.gen.go") {
+		t.Fatalf("gen delete: exit %d\n%s", code, out)
+	}
+}
+
+func TestGenRefusesHandWrittenFile(t *testing.T) {
+	dir := writeDesign(t, genDesign)
+	root := filepath.Dir(dir)
+	hand := filepath.Join(root, "core", "kind.gen.go")
+	os.MkdirAll(filepath.Dir(hand), 0o755)
+	os.WriteFile(hand, []byte("package core\n"), 0o644)
+	for _, args := range [][]string{{"gen", "--design", dir, "--root", root, "--dry-run"}, {"gen", "--design", dir, "--root", root}} {
+		code, out, _ := runCLI(t, args...)
+		if code != 1 || !strings.Contains(out, "거부: core/kind.gen.go") {
+			t.Fatalf("%v: exit %d\n%s", args, code, out)
+		}
+	}
+	if src, _ := os.ReadFile(hand); string(src) != "package core\n" {
+		t.Fatal("손으로 쓴 파일을 덮어썼다")
+	}
+}
+
+func TestGenStopsOnDesignError(t *testing.T) {
+	dir := writeDesign(t, "version: 0.4\ntiers: [a, b]\nmodules:\n  low:  { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
+	code, out, _ := runCLI(t, "gen", "--design", dir, "--root", filepath.Dir(dir))
+	if code != 2 || !strings.Contains(out, "상위 tier 의존") {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+}
