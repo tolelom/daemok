@@ -49,8 +49,18 @@ type Module struct {
 	Meta
 	Tier       Ref
 	Path       string
+	Role       string // data, infra, adapter. 비면 도메인 모듈
 	DependsOn  []Ref
 	Implements []Ref
+	Needs      []Need
+}
+
+// Need는 받는 쪽이 적은 계약 하나다.
+type Need struct {
+	Contract Ref
+	Uses     []Ref // 비면 계약의 메서드 전부
+	Why      string
+	Pos      yaml.Pos
 }
 
 type Group struct {
@@ -59,6 +69,7 @@ type Group struct {
 	Kind      Ref
 	Path      string
 	DependsOn []Ref
+	Needs     []Need
 	Rule      string
 	Members   []*Member
 }
@@ -68,6 +79,7 @@ type Member struct {
 	Group      *Group
 	Handles    []Ref
 	Exceptions []Exception
+	Needs      []Need
 }
 
 type Exception struct {
@@ -144,6 +156,7 @@ type Method struct {
 
 type Contract struct {
 	Owned
+	Kind    string // call, query, port, external
 	Go      GoOpts
 	Methods []*Method
 }

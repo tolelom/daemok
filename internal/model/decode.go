@@ -2,6 +2,7 @@ package model
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/tolelom/daemok/internal/yaml"
 )
@@ -39,6 +40,19 @@ func (d *decoder) scalar(n *yaml.Node, key string) *yaml.Node {
 		return nil
 	}
 	return v
+}
+
+// oneOf는 key 값이 choices 중 하나인지 본다. 키가 없으면 def.
+func (d *decoder) oneOf(n *yaml.Node, key, def string, choices ...string) string {
+	v := d.scalar(n, key)
+	if v == nil || v.IsNull() {
+		return def
+	}
+	if !slices.Contains(choices, v.Value) {
+		d.diags.Errorf(v.Pos, "허용하지 않는 값: %s %q (가능한 값: %s)", key, v.Value, strings.Join(choices, ", "))
+		return def
+	}
+	return v.Value
 }
 
 func (d *decoder) str(n *yaml.Node, key string) string {

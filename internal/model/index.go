@@ -267,3 +267,18 @@ func (c *Contract) Method(name string) *Method {
 }
 
 func (e *Enum) HasValue(name string) bool { return hasRef(e.Values, name) }
+
+// GoName은 snake_case ID를 CamelCase로 바꾼다. 조각 id는 ID가 된다.
+func GoName(id string) string {
+	var b strings.Builder
+	for _, part := range strings.Split(id, "_") {
+		switch part {
+		case "":
+		case "id":
+			b.WriteString("ID")
+		default:
+			b.WriteString(strings.ToUpper(part[:1]) + part[1:])
+		}
+	}
+	return b.String()
+}

@@ -136,11 +136,11 @@ func (mg *merger) params(n *yaml.Node) []*Param {
 func (mg *merger) contracts(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "contracts", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "in", "gen", "summary", "satisfies", "go", "methods")
+		d.allow(v, "in", "gen", "summary", "satisfies", "kind", "go", "methods")
 		if !mg.unique("계약", id, pos) {
 			return
 		}
-		c := &Contract{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
+		c := &Contract{Owned: d.owned(id, pos, v), Kind: d.oneOf(v, "kind", "call", "call", "query", "port", "external"), Go: d.goOpts(v)}
 		if d.need(pos, v, "methods") {
 			d.idMap(v.Get("methods"), "methods", func(name string, mpos yaml.Pos, mv *yaml.Node) {
 				d.allow(mv, "params", "returns", "errors")

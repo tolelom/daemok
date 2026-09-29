@@ -110,15 +110,17 @@ func (mg *merger) tiers(n *yaml.Node) {
 func (mg *merger) modules(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "modules", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "summary", "satisfies", "tier", "path", "depends_on", "implements")
+		d.allow(v, "summary", "satisfies", "tier", "path", "role", "depends_on", "implements", "needs")
 		if !mg.unique("모듈", id, pos) {
 			return
 		}
 		m := &Module{
 			Meta:       d.meta(id, pos, v),
 			Path:       d.str(v, "path"),
+			Role:       d.oneOf(v, "role", "", "data", "infra", "adapter"),
 			DependsOn:  d.refs(v, "depends_on"),
 			Implements: d.refs(v, "implements"),
+			Needs:      mg.needs(v.Get("needs")),
 		}
 		if d.need(pos, v, "tier") {
 			m.Tier = d.ref(v, "tier")
@@ -133,7 +135,7 @@ func (mg *merger) modules(n *yaml.Node) {
 func (mg *merger) groups(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "groups", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "summary", "satisfies", "tier", "kind", "path", "depends_on", "rule", "members")
+		d.allow(v, "summary", "satisfies", "tier", "kind", "path", "depends_on", "needs", "rule", "members")
 		if !mg.unique("그룹", id, pos) {
 			return
 		}
@@ -141,6 +143,7 @@ func (mg *merger) groups(n *yaml.Node) {
 			Meta:      d.meta(id, pos, v),
 			Path:      d.str(v, "path"),
 			DependsOn: d.refs(v, "depends_on"),
+			Needs:     mg.needs(v.Get("needs")),
 			Rule:      d.str(v, "rule"),
 		}
 		if d.need(pos, v, "tier") {
@@ -157,12 +160,13 @@ func (mg *merger) groups(n *yaml.Node) {
 		}
 		if d.need(pos, v, "members") {
 			d.idMap(v.Get("members"), "members", func(mid string, mpos yaml.Pos, mv *yaml.Node) {
-				d.allow(mv, "summary", "satisfies", "handles", "exceptions")
+				d.allow(mv, "summary", "satisfies", "handles", "exceptions", "needs")
 				if !mg.unique("멤버", mid, mpos) {
 					return
 				}
 				mem := &Member{Meta: d.meta(mid, mpos, mv), Group: g, Handles: d.refs(mv, "handles")}
 				mem.Exceptions = mg.exceptions(mv.Get("exceptions"))
+				mem.Needs = mg.needs(mv.Get("needs"))
 				g.Members = append(g.Members, mem)
 			})
 		}
@@ -189,6 +193,33 @@ func (mg *merger) exceptions(n *yaml.Node) []Exception {
 			continue
 		}
 		out = append(out, Exception{DependsOn: d.ref(it, "depends_on"), Reason: d.str(it, "reason")})
+	}
+	return out
+}
+
+func (mg *merger) needs(n *yaml.Node) []Need {
+	if n == nil || n.IsNull() {
+		return nil
+	}
+	d := mg.d
+	if n.Kind != yaml.Seq {
+		d.diags.Errorf(n.Pos, "목록이어야 한다: %q", "needs")
+		return nil
+	}
+	var out []Need
+	for _, it := range n.Items {
+		switch {
+		case it.Kind == yaml.Scalar && !it.IsNull():
+			out = append(out, Need{Contract: Ref{Name: it.Value, Pos: it.Pos}, Pos: it.Pos})
+		case it.Kind == yaml.Map:
+			d.allow(it, "contract", "uses", "why")
+			if !d.need(it.Pos, it, "contract") {
+				continue
+			}
+			out = append(out, Need{Contract: d.ref(it, "contract"), Uses: d.refs(it, "uses"), Why: d.str(it, "why"), Pos: it.Pos})
+		default:
+			d.diags.Errorf(it.Pos, "계약 ID나 맵이어야 한다: needs 항목")
+		}
 	}
 	return out
 }

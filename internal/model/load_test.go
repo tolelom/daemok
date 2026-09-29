@@ -574,3 +574,67 @@ func TestGroupTierRequired(t *testing.T) {
 	_, ds := loadOne(t, "groups:\n  g: { kind: k, members: {} }\n")
 	wantDiag(t, ds, Error, `필요한 키가 없다: "tier"`)
 }
+
+func TestDecodeRelations(t *testing.T) {
+	m, ds := loadOne(t, `
+tiers: [base]
+modules:
+  post:  { tier: base }
+  cache: { tier: base, role: infra }
+  feed:
+    tier: base
+    needs:
+      - post_reader
+      - { contract: post_cache, uses: [get], why: "캐시" }
+groups:
+  g:
+    tier: base
+    kind: k
+    needs: [post_reader]
+    members:
+      a: { needs: [post_cache] }
+contracts:
+  post_reader: { in: post, kind: query, methods: { list: {} } }
+  post_cache:  { in: cache, kind: port, methods: { get: {} } }
+  plain:       { in: post, methods: { x: {} } }
+`)
+	wantClean(t, ds)
+	if m.Module("cache").Role != "infra" || m.Module("post").Role != "" {
+		t.Fatalf("roles")
+	}
+	n := m.Module("feed").Needs
+	if len(n) != 2 || n[0].Contract.Name != "post_reader" || n[1].Uses[0].Name != "get" || n[1].Why != "캐시" {
+		t.Fatalf("needs %+v", n)
+	}
+	if m.Group("g").Needs[0].Contract.Name != "post_reader" || m.Member("a").Needs[0].Contract.Name != "post_cache" {
+		t.Fatalf("group needs")
+	}
+	if m.Contract("post_reader").Kind != "query" || m.Contract("plain").Kind != "call" {
+		t.Fatalf("kinds")
+	}
+}
+
+func TestDecodeRelationErrors(t *testing.T) {
+	_, ds := loadOne(t, `
+tiers: [base]
+modules:
+  a: { tier: base, role: service, needs: [null, [x], { uses: [m] }] }
+contracts:
+  c: { in: a, kind: rpc, methods: { m: {} } }
+`)
+	wantDiag(t, ds, Error, `허용하지 않는 값: role "service"`)
+	wantDiag(t, ds, Error, `허용하지 않는 값: kind "rpc"`)
+	wantDiag(t, ds, Error, "계약 ID나 맵이어야 한다: needs 항목")
+	wantDiag(t, ds, Error, `필요한 키가 없다: "contract"`)
+	if n := ds.Count(Error); n != 5 {
+		t.Fatalf("want 5 errors, got %d:\n%s", n, join(ds))
+	}
+}
+
+func TestGoName(t *testing.T) {
+	for in, want := range map[string]string{"asset_id": "AssetID", "list_published": "ListPublished", "id": "ID", "a__b": "AB"} {
+		if got := GoName(in); got != want {
+			t.Errorf("%s: %s", in, got)
+		}
+	}
+}
