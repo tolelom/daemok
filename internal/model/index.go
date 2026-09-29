@@ -282,3 +282,30 @@ func GoName(id string) string {
 	}
 	return b.String()
 }
+
+func (m *Model) EventKind(id string) *EventKind {
+	for _, x := range m.EventKinds {
+		if x.ID == id {
+			return x
+		}
+	}
+	return nil
+}
+
+func (m *Model) Event(id string) *Event {
+	for _, x := range m.Events {
+		if x.ID == id {
+			return x
+		}
+	}
+	return nil
+}
+
+func (m *Model) Flow(id string) *Flow {
+	for _, x := range m.Flows {
+		if x.ID == id {
+			return x
+		}
+	}
+	return nil
+}

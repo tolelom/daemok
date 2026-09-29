@@ -638,3 +638,81 @@ func TestGoName(t *testing.T) {
 		}
 	}
 }
+
+func TestDecodeEvents(t *testing.T) {
+	m, ds := loadOne(t, `
+event_kinds:
+  chain: { in: events, key: event_type, subscribers: [rpc] }
+  web:   { in: events, key: web_type, encoding: json }
+events:
+  asset_minted:
+    kind: chain
+    publishers: [asset, reward]
+    subscribers: [indexer]
+    data: { asset_id: string, players: { type: string, many: true } }
+  session_close: { kind: chain, publishers: [session] }
+`)
+	wantClean(t, ds)
+	ek := m.EventKind("chain")
+	if ek.In.Name != "events" || ek.Key.Name != "event_type" || ek.Encoding != "map" || ek.Subscribers[0].Name != "rpc" || m.EventKind("web").Encoding != "json" {
+		t.Fatalf("kind %+v", ek)
+	}
+	e := m.Event("asset_minted")
+	if e.Kind.Name != "chain" || len(e.Publishers) != 2 || e.Subscribers[0].Name != "indexer" || len(e.Data) != 2 || !e.Data[1].Many {
+		t.Fatalf("event %+v", e)
+	}
+	if m.Event("session_close").Data != nil {
+		t.Fatal("data")
+	}
+}
+
+func TestDecodeEventErrors(t *testing.T) {
+	_, ds := loadOne(t, `
+event_kinds:
+  k: { in: events, encoding: xml }
+events:
+  e: { data: {} }
+`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "key"`)
+	wantDiag(t, ds, Error, `허용하지 않는 값: encoding "xml"`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "kind"`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "publishers"`)
+}
+
+func TestDecodeFlows(t *testing.T) {
+	m, ds := loadOne(t, `
+flows:
+  produce_block:
+    in: consensus
+    on: tick
+    steps:
+      - { id: lock, undo: unlock }
+      - { id: add_block, calls: [chain.add] }
+      - { id: commit_state, commit: true, fatal: true, summary: "상태 반영" }
+      - { id: emit, emits: [block_commit] }
+`)
+	wantClean(t, ds)
+	f := m.Flow("produce_block")
+	if f.In.Name != "consensus" || f.On.Name != "tick" || len(f.Steps) != 4 {
+		t.Fatalf("flow %+v", f)
+	}
+	s := f.Steps
+	if s[0].ID != "lock" || s[0].Undo != "unlock" || s[0].UndoPos.Line == 0 || s[1].Calls[0].Name != "chain.add" ||
+		!s[2].Commit || !s[2].Fatal || s[2].Summary != "상태 반영" || s[3].Emits[0].Name != "block_commit" || s[3].Commit {
+		t.Fatalf("steps %+v %+v %+v %+v", s[0], s[1], s[2], s[3])
+	}
+}
+
+func TestDecodeFlowErrors(t *testing.T) {
+	_, ds := loadOne(t, `
+flows:
+  a: { in: x }
+  b: { in: x, steps: { lock: {} } }
+  c: { in: x, steps: [ lock, { undo: u }, { id: s, retry: 3 } ] }
+`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "steps"`)
+	wantDiag(t, ds, Error, `목록이어야 한다: "steps"`)
+	wantDiag(t, ds, Error, "맵이어야 한다: 단계")
+	wantDiag(t, ds, Error, `필요한 키가 없다: "id"`)
+	wantDiag(t, ds, Error, `알 수 없는 키 "retry"`)
+}

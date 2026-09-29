@@ -172,3 +172,39 @@ func (mg *merger) handlerKinds(n *yaml.Node) {
 		mg.m.HandlerKinds = append(mg.m.HandlerKinds, hk)
 	})
 }
+
+func (mg *merger) eventKinds(n *yaml.Node) {
+	d := mg.d
+	d.idMap(n, "event_kinds", func(id string, pos yaml.Pos, v *yaml.Node) {
+		d.allow(v, "in", "gen", "summary", "satisfies", "key", "encoding", "subscribers")
+		if !mg.unique("이벤트 종류", id, pos) {
+			return
+		}
+		ek := &EventKind{Owned: d.owned(id, pos, v), Encoding: d.oneOf(v, "encoding", "map", "map", "json"), Subscribers: d.refs(v, "subscribers")}
+		if d.need(pos, v, "key") {
+			ek.Key = d.ref(v, "key")
+		}
+		mg.m.EventKinds = append(mg.m.EventKinds, ek)
+	})
+}
+
+func (mg *merger) events(n *yaml.Node) {
+	d := mg.d
+	d.idMap(n, "events", func(id string, pos yaml.Pos, v *yaml.Node) {
+		d.allow(v, "summary", "satisfies", "kind", "publishers", "subscribers", "data")
+		if !mg.unique("이벤트", id, pos) {
+			return
+		}
+		e := &Event{Meta: d.meta(id, pos, v), Subscribers: d.refs(v, "subscribers")}
+		if d.need(pos, v, "kind") {
+			e.Kind = d.ref(v, "kind")
+		}
+		if d.need(pos, v, "publishers") {
+			e.Publishers = d.refs(v, "publishers")
+		}
+		if dv := v.Get("data"); dv != nil && !dv.IsNull() {
+			e.Data = mg.fields(dv)
+		}
+		mg.m.Events = append(mg.m.Events, e)
+	})
+}

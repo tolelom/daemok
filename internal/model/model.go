@@ -186,6 +186,39 @@ type Func struct {
 	Cases   []*Case
 }
 
+type EventKind struct {
+	Owned
+	Key         Ref
+	Encoding    string // map, json
+	Subscribers []Ref  // 묶음의 모든 이벤트를 받는 모듈
+}
+
+type Event struct {
+	Meta
+	Kind        Ref
+	Publishers  []Ref
+	Subscribers []Ref
+	Data        []*Field
+}
+
+type Step struct {
+	ID      string
+	Pos     yaml.Pos
+	Summary string
+	Undo    string
+	UndoPos yaml.Pos
+	Commit  bool
+	Fatal   bool
+	Calls   []Ref // 계약.메서드
+	Emits   []Ref
+}
+
+type Flow struct {
+	Owned
+	On    Ref
+	Steps []*Step
+}
+
 type Model struct {
 	Version  string
 	GoModule string
@@ -203,5 +236,8 @@ type Model struct {
 	Types        []*Type
 	Contracts    []*Contract
 	HandlerKinds []*HandlerKind
+	EventKinds   []*EventKind
+	Events       []*Event
 	Funcs        []*Func
+	Flows        []*Flow
 }

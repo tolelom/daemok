@@ -11,7 +11,8 @@ import (
 var topKeys = []string{
 	"version", "go_module", "ts_out",
 	"requirements", "system", "executables", "tiers", "modules", "groups",
-	"enums", "consts", "errors", "types", "contracts", "handler_kinds", "funcs",
+	"enums", "consts", "errors", "types", "contracts", "handler_kinds", "event_kinds", "events",
+	"funcs", "flows",
 }
 
 // Load는 dir의 *.yaml을 이름순으로 읽어 한 모델로 합친다.
@@ -84,7 +85,10 @@ func (mg *merger) file(root *yaml.Node) {
 	mg.types(root.Get("types"))
 	mg.contracts(root.Get("contracts"))
 	mg.handlerKinds(root.Get("handler_kinds"))
+	mg.eventKinds(root.Get("event_kinds"))
+	mg.events(root.Get("events"))
 	mg.funcs(root.Get("funcs"))
+	mg.flows(root.Get("flows"))
 }
 
 func (mg *merger) scalarOnce(root *yaml.Node, key string, dst *string) {

@@ -79,3 +79,50 @@ func (mg *merger) caseMap(n *yaml.Node, what string) *yaml.Node {
 	}
 	return n
 }
+
+func (mg *merger) flows(n *yaml.Node) {
+	d := mg.d
+	d.idMap(n, "flows", func(id string, pos yaml.Pos, v *yaml.Node) {
+		d.allow(v, "in", "gen", "summary", "satisfies", "on", "steps")
+		if !mg.unique("흐름", id, pos) {
+			return
+		}
+		f := &Flow{Owned: d.owned(id, pos, v), On: d.ref(v, "on")}
+		if d.need(pos, v, "steps") {
+			f.Steps = mg.steps(v.Get("steps"))
+		}
+		mg.m.Flows = append(mg.m.Flows, f)
+	})
+}
+
+func (mg *merger) steps(n *yaml.Node) []*Step {
+	d := mg.d
+	if n.Kind != yaml.Seq {
+		d.diags.Errorf(n.Pos, "목록이어야 한다: %q", "steps")
+		return nil
+	}
+	var out []*Step
+	for _, it := range n.Items {
+		if !d.mapping(it, "단계") {
+			continue
+		}
+		d.allow(it, "id", "summary", "undo", "commit", "fatal", "calls", "emits")
+		if !d.need(it.Pos, it, "id") {
+			continue
+		}
+		idv := d.scalar(it, "id")
+		if idv == nil {
+			continue
+		}
+		s := &Step{
+			ID: idv.Value, Pos: idv.Pos, Summary: d.str(it, "summary"),
+			Commit: d.boolv(it, "commit", false), Fatal: d.boolv(it, "fatal", false),
+			Calls: d.refs(it, "calls"), Emits: d.refs(it, "emits"),
+		}
+		if u := d.scalar(it, "undo"); u != nil && !u.IsNull() {
+			s.Undo, s.UndoPos = u.Value, u.Pos
+		}
+		out = append(out, s)
+	}
+	return out
+}
