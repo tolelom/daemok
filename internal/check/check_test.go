@@ -363,6 +363,7 @@ func TestSamples(t *testing.T) {
 			errors:   []string{"상위 tier 의존: post(service) → dto(transport)"},
 			warnings: []string{"이름이 뜻하는 상태와 http가 다르다: ErrUnauthorized (이름 401, http 403)", "충족하는 설계 요소가 없는 요구사항: REQ-oauth"},
 		},
+		{name: "relations"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

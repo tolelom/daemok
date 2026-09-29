@@ -500,7 +500,7 @@ types:
 }
 
 func TestSamplesLoadClean(t *testing.T) {
-	for _, s := range []string{"tolchain", "tolelog"} {
+	for _, s := range []string{"tolchain", "tolelog", "relations"} {
 		m, ds := Load(filepath.Join("testdata", s, "design"))
 		if len(ds) != 0 {
 			t.Fatalf("%s:\n%s", s, join(ds))

@@ -82,6 +82,10 @@ enums:
              session_open, session_result, list_market, buy_market, cancel_listing,
              session_cancel, equip_item, unequip_item, grant_reward,
              random_commit, random_reveal, grant_delegation, revoke_delegation]
+  event_type:
+    in: events
+    go: { type: EventType, prefix: Event }
+    values: [block_commit, asset_minted, session_open]
 
 consts:
   max_block_txs: { in: config, type: int, value: 500, go: { name: DefaultMaxBlockTxs } }
@@ -110,6 +114,25 @@ handler_kinds:
     returns: [error]
     key: tx_type
 
+event_kinds:
+  chain_event: { in: events, key: event_type, encoding: map, subscribers: [rpc] }
+
+events:
+  block_commit:
+    kind: chain_event
+    publishers: [consensus]
+    data: { hash: string, txs: int, block: "*core.Block" }
+  asset_minted:
+    kind: chain_event
+    publishers: [asset, reward]
+    subscribers: [indexer]
+    data: { asset_id: string, template_id: string, owner: string }
+  session_open:
+    kind: chain_event
+    publishers: [session]
+    subscribers: [indexer]
+    data: { session_id: string, game_id: string, players: { type: string, many: true } }
+
 # ── L4 함수 계약 ──
 funcs:
   handle_transfer:
@@ -123,3 +146,25 @@ funcs:
       - { name: "잔액 부족",      given: { balance: 5, amount: 10 },            error: ErrInsufficientBalance }
       - { name: "위임 한도 초과", given: { delegated_max: 5, amount: 10 },      error: ErrUnauthorized }
       - { name: "정상 이체",      given: { balance: 10, amount: 3 },            expect: { from: 7, to: 3 } }
+
+flows:
+  produce_block:
+    in: consensus
+    summary: "제안자가 블록을 만들어 저장하고 이벤트를 내보낸다"
+    steps:
+      - { id: check_proposer }
+      - { id: select_txs }
+      - { id: lock, undo: unlock }
+      - { id: snapshot, undo: revert }
+      - { id: buffer_events, undo: discard_events }
+      - { id: execute_txs }
+      - { id: restore_emitter }
+      - { id: compute_root }
+      - { id: sign }
+      - { id: validate }
+      - { id: add_block }
+      - { id: commit_state, commit: true, fatal: true }
+      - { id: unlock }
+      - { id: flush_events }
+      - { id: emit_block_commit, emits: [block_commit] }
+      - { id: remove_from_mempool }

@@ -1,6 +1,6 @@
 # 모델
 
-설계 파일 형식 v0.3. [프로토타입](https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE)은 v0.2를 읽으며, v0.3에서 더해진 `gen` 필드와 알 수 없는 키 오류는 반영하지 않는다.
+설계 파일 형식 v0.4. [프로토타입](https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE)은 v0.2를 읽으며, 그 뒤에 더해진 `gen` 필드, 알 수 없는 키 오류, 관계 종류, 이벤트, 흐름은 반영하지 않는다.
 
 ## 예시
 
@@ -49,7 +49,7 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 ## 파일
 
 - `design/` 아래 `*.yaml`을 모두 읽어 하나의 모델로 합친다. 파일을 어떻게 나눌지는 자유다.
-- 최상위 키 `version`은 형식 버전이고 `0.3`이 아니면 에러다. `go_module`은 생성 코드의 import 경로 접두사, `ts_out`은 TypeScript 출력 파일 경로다. 여러 파일에 같은 최상위 스칼라 키가 다른 값으로 있으면 에러다.
+- 최상위 키 `version`은 형식 버전이고 `0.4`가 아니면 에러다. `go_module`은 생성 코드의 import 경로 접두사, `ts_out`은 TypeScript 출력 파일 경로다. 여러 파일에 같은 최상위 스칼라 키가 다른 값으로 있으면 에러다.
 - 같은 종류 안에서 ID가 두 번 나오면 두 위치를 함께 보여주고 에러를 낸다.
 - 어느 노드에서든 형식에 없는 키는 위치와 함께 에러다. 조용히 무시하지 않는다.
 
@@ -69,6 +69,12 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 | `kind`(그룹, 함수) | 핸들러 종류 |
 | `key` | enum |
 | `max` | 상수 또는 숫자 |
+| `needs`, `needs`의 `contract` | 계약 |
+| `needs`의 `uses` | 그 계약의 메서드 |
+| 이벤트의 `kind` | 이벤트 종류 |
+| `publishers`, `subscribers` | 모듈, 그룹 멤버 |
+| `on`, `emits` | 이벤트 |
+| `calls` | `계약.메서드` |
 
 ## 노드 종류
 
@@ -77,11 +83,11 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 | R | `requirements` | `text`, `status: active \| held \| dropped` |
 | L0 | `system`(`actors`, `interfaces` 포함) | `protocol`, `port`, `path`, `used_by`, `spec` |
 | L1 | `executables` | `exposes`, `composes` |
-| L2 | `tiers`, `modules`, `groups` | `tier`, `depends_on`, `implements`, `path`, 그룹의 `kind`·`rule`·`members`, 멤버의 `handles`·`exceptions`. `path`가 없으면 ID가 경로다 |
-| L3 | `enums`, `consts`, `errors`, `types`, `contracts`, `handler_kinds` | 아래 표 |
-| L4 | `funcs` | `in`, `kind`+`handles` 또는 `of`, `errors`, `cases` |
+| L2 | `tiers`, `modules`, `groups` | `tier`, `depends_on`, `needs`, `implements`, `path`, 모듈의 `role`, 그룹의 `kind`·`rule`·`members`, 멤버의 `handles`·`exceptions`·`needs`. `path`가 없으면 ID가 경로다 |
+| L3 | `enums`, `consts`, `errors`, `types`, `contracts`, `handler_kinds`, `event_kinds`, `events` | 아래 표 |
+| L4 | `funcs`, `flows` | 함수는 `in`, `kind`+`handles` 또는 `of`, `errors`, `cases`. 흐름은 아래 절 |
 
-설계 노드는 모두 `summary`와 `satisfies`를 가질 수 있다. L3·L4 노드는 모두 `in`으로 소속 모듈을 적는다.
+설계 노드는 모두 `summary`와 `satisfies`를 가질 수 있다. L3·L4 노드는 모두 `in`으로 소속 모듈을 적는다. 이벤트는 예외이고 이벤트 종류의 `in`을 따른다.
 
 L3·L4 노드에 `gen: false`를 적으면 그 노드는 생성에서 빠진다. 코드에 손으로 쓴 선언이 이미 있는 노드를 설계에 올릴 때 쓴다. 참조 해석과 설계 검사, 코드 대조는 `gen` 값과 무관하게 한다.
 
@@ -93,8 +99,10 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 생성에서 빠진다.
 | `consts` | `type`(int, string, duration), `value`, `go.name`, `export` | const 블록 |
 | `errors` | `message`, `http` | sentinel `var` 블록, `http`가 있으면 `HTTPStatus(err)` |
 | `types` | `fields`: 타입 문자열 또는 `{type, ref, many, optional, max}` | struct |
-| `contracts` | `methods`: `{params, returns, errors}`, `go.name` | interface. 반환 끝에 `error`가 붙는다 |
+| `contracts` | `kind`(call, query, port, external), `methods`: `{params, returns, errors}`, `go.name` | interface. 반환 끝에 `error`가 붙는다 |
 | `handler_kinds` | `params`, `returns`, `key`, `go.name`, `go.register` | 함수 타입, 멤버별 `init()` 등록과 시그니처 확인 |
+| `event_kinds` | `key`(enum), `encoding`(map, json), `subscribers` | 이벤트마다 payload struct, map이면 변환 함수 |
+| `events` | `kind`, `publishers`, `subscribers`, `data`(`types.fields`와 같은 문법) | event_kind 파일에 들어간다 |
 
 `export: [ts]`가 붙은 상수와 enum은 `ts_out`에 TypeScript 상수로도 생성한다.
 
@@ -105,7 +113,54 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 생성에서 빠진다.
 - 전제·결과 조건을 산문으로 두지 않는다.
 - 목록 필드가 비어 있는 것이 의도라면 `[]`로 적는다. 계약 메서드에 `errors`가 없으면 경고한다.
 
-실행 흐름과 시퀀스는 모델에 넣지 않는다. `cases`와 요구사항으로 표현한다.
+### 관계
+
+관계는 따로 선언하지 않고 참조에서 나온다.
+
+| 종류 | 나오는 곳 |
+|---|---|
+| 호출 | `depends_on`. 계약 없이 직접 import한다 |
+| call, query, port, external | 주는 쪽 `contracts.kind`와 받는 쪽 `needs` |
+| 이벤트 | `events`의 `publishers`에서 `subscribers`로 |
+| 등록 | `groups`의 멤버에서 `handler_kinds`의 모듈로 |
+
+- `needs`의 항목은 계약 ID이거나 `{contract, uses, why}`다. `uses`를 생략하면 계약의 메서드 전부다.
+- `modules.role`은 `data`, `infra`, `adapter` 중 하나다. `port` 계약은 `infra` 모듈에, `external` 계약은 `adapter` 모듈에 둔다.
+- `needs`는 import를 허락하지 않는다. 받는 쪽은 생성된 interface를 거쳐 부른다.
+
+### 이벤트
+
+`event_kinds`는 이벤트 묶음이다. `key` enum의 값 하나가 이벤트 하나이고, 이벤트 ID는 그 값이다. `event_kinds`의 `subscribers`는 묶음의 모든 이벤트를 받는다. 이벤트 관계는 import를 만들지 않으므로 tier 방향과 순환 검사에 들어가지 않는다.
+
+### 흐름
+
+`flows`는 단계의 순서, 되돌리기, 커밋 지점을 정한다. 단계의 본문은 손으로 쓴다.
+
+```yaml
+flows:
+  produce_block:
+    in: consensus
+    steps:
+      - { id: lock, undo: unlock }
+      - { id: snapshot, undo: revert }
+      - { id: add_block }
+      - { id: commit_state, commit: true, fatal: true }
+      - { id: unlock }
+      - { id: emit_block_commit, emits: [block_commit] }
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `in` | 흐름 함수가 생기는 모듈 또는 그룹 멤버 |
+| `on` | 이 흐름을 시작하는 이벤트 |
+| `steps` | 순서대로 부르는 단계. 항목은 `{id, undo, commit, fatal, calls, emits, summary}` |
+| `undo` | 이 단계가 끝난 뒤 뒤 단계가 실패하면 부를 되돌리기 메서드 이름 |
+| `commit` | 이 단계가 성공하면 쌓인 되돌리기를 비운다. 흐름에 하나까지 |
+| `fatal` | 이 단계가 실패하면 되돌리지 않고 `Fatal`을 부른다 |
+
+- 단계를 적힌 순서대로 부른다. 커밋 전 단계가 실패하면 쌓인 되돌리기를 역순으로 부르고 오류를 돌려준다. 되돌리기가 실패하면 `Fatal`을 부른다. 커밋 뒤 단계가 실패하면 되돌리지 않고 오류를 돌려준다.
+- 단계 사이에 값을 넘기지 않는다. 반복과 조건은 단계 본문 안에 둔다.
+- 단계 ID와 `undo`는 소문자 snake_case이고 메서드 이름은 CamelCase다.
 
 ## 생성 파일
 
@@ -141,6 +196,9 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 생성에서 빠진다.
 | 핸들러 | 키 enum의 모든 값이 정확히 한 멤버에서 처리되는지 |
 | L4 | `handles`가 멤버의 `handles`에 있는지, 케이스의 에러가 `errors`에 있는지, 케이스가 없는 에러 |
 | R | 충족 요소가 없는 active 요구사항, held·dropped 요구사항에 매달린 요소 |
+| 관계 | `needs`의 관계도 tier 방향과 순환에 넣음, port·external 계약의 모듈 role, 받은 계약의 시그니처 타입에 대한 의존 |
+| 이벤트 | key enum의 값마다 이벤트가 있는지, 발행자·구독자가 이벤트 종류의 모듈에 의존하는지, 발행자가 있는지 |
+| 흐름 | 단계 ID 형식과 중복, commit 하나, 커밋 뒤 undo 없음, `calls`의 계약을 받는지, `emits`의 발행자, `on`의 구독자 |
 
 ## 어긋남 유형별 대응
 
