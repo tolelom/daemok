@@ -132,36 +132,44 @@ select { background: var(--bg-2); border: 1px solid var(--rule-2); border-radius
 .failnote p { margin: 0; }
 .failnote .clear { border: 0; background: none; color: var(--ink-3); cursor: pointer; text-decoration: underline; padding: 0; margin-left: 10px; font-size: 14px; }
 .hint { margin: 20px 0 0; color: var(--ink-3); font-size: 14px; }
-.flows { display: grid; gap: 40px; margin-top: 16px; }
-.flows.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.flows h2 { margin: 0 0 6px; font: 700 17px var(--mono); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
 th { color: var(--ink-3); font-weight: 500; font-size: 13px; }
 td.id, td .id { font-family: var(--mono); }
-@media (min-width: 761px) {
-  table.steps { table-layout: fixed; }
-  table.steps th.n { width: 3em; }
-  table.steps th:nth-child(2) { width: 40%; }
-  table.steps th:nth-child(3) { width: 26%; }
-}
-table.steps td { overflow-wrap: break-word; }
-table.steps tbody tr[data-fail] { cursor: pointer; }
-table.steps tbody tr[data-fail]:hover { background: var(--bg-2); }
-table.steps td.n { color: var(--ink-3); font: 13px var(--mono); text-align: right; width: 2.5em; }
-table.steps .step { font: 600 14px var(--mono); }
-table.steps .note { color: var(--ink-3); font-size: 13px; }
-table.steps .undo { color: var(--k-exception); font-family: var(--mono); font-size: 13.5px; }
-table.steps .ord { color: var(--ink-2); font: 12px var(--sans); margin-left: 6px; }
-table.steps .fatal { color: var(--err); font-size: 13px; }
-table.steps .emit { color: var(--k-event); }
-table.steps .calls { display: grid; gap: 2px; font-size: 13.5px; }
-tr.commit td { border-bottom: 2px solid var(--add); color: var(--add); font-size: 13px; padding: 4px 10px; }
-tr.failed { background: color-mix(in srgb, var(--err) 16%, transparent); }
-tr.failed td.n { color: var(--err); }
-tr.undone { background: color-mix(in srgb, var(--k-exception) 10%, transparent); }
-tr.skipped td { opacity: .35; }
-
+.fgwrap { overflow-x: auto; margin-top: 16px; }
+.fg { display: grid; font-size: 14px; min-width: 560px; }
+.fg .r { display: contents; }
+.fg .c { padding: 7px 10px; border-bottom: 1px solid var(--rule); min-width: 0; overflow-wrap: break-word; }
+.fg .r[data-fail] { cursor: pointer; }
+.fg .r[data-fail]:hover > .c { background: var(--bg-2); }
+.fg .th { color: var(--ink-3); font-size: 13px; padding: 4px 10px 6px; border-bottom: 1px solid var(--rule-2); }
+.fg .n { color: var(--ink-3); font: 13px var(--mono); text-align: right; padding-right: 4px; }
+.fg .stepbtn { border: 0; background: none; padding: 0; cursor: pointer; font: 600 14px var(--mono); text-align: left; overflow-wrap: anywhere; }
+.fg .note { color: var(--ink-3); font-size: 13px; }
+.fg .undo { color: var(--k-exception); font-family: var(--mono); font-size: 13.5px; white-space: nowrap; }
+.fg .undo.cold { opacity: .4; }
+.fg .ord { display: block; color: var(--ink-2); font-size: 12px; }
+.fg .fatal { color: var(--err); font-size: 13px; }
+.fg .emit { color: var(--k-event); }
+.fg .notes { display: grid; gap: 2px; font-size: 13.5px; }
+.fg .sect { grid-column: 1 / -1; padding: 12px 10px 6px; color: var(--ink-2); font-size: 13px; border-bottom: 1px solid var(--rule); }
+.fg .sidehead { padding: 0 10px 10px; }
+.fg .sidehead h2 { margin: 0; font: 700 17px var(--mono); }
+.fg .sidehead p { margin: 2px 0 0; color: var(--ink-3); font-size: 13.5px; }
+.fg .commitmark { color: var(--add); font-size: 13px; padding: 5px 10px; border-bottom: 2px solid var(--add); }
+.fg .failed { background: color-mix(in srgb, var(--err) 16%, transparent); }
+.fg .failed.n { color: var(--err); }
+.fg .skipped { opacity: .35; }
+.ln { position: relative; --lc: var(--k-exception); }
+.ln::before, .ln::after { content: none; position: absolute; background: var(--lc); opacity: .6; }
+.ln.hot::before, .ln.hot::after { opacity: 1; }
+.ln.cold::before, .ln.cold::after { opacity: .18; }
+.ln.start::before { content: ""; left: calc(50% - 1px); width: 2px; top: 17px; bottom: 0; }
+.ln.mid::before { content: ""; left: calc(50% - 1px); width: 2px; top: 0; bottom: 0; }
+.ln.end::before { content: ""; left: calc(50% - 1px); width: 2px; top: 0; height: 19px; }
+.ln.start::after, .ln.end::after { content: ""; left: 0; right: 50%; top: 17px; height: 2px; }
+.ln.cross::after { content: ""; left: 0; right: 0; top: 17px; height: 2px; }
+.ln.hot.start::before, .ln.hot.mid::before, .ln.hot.end::before { width: 3px; }
 /* 요구사항 */
 .reqs { max-width: 90ch; margin-top: 20px; }
 .req { padding: 14px 0; border-bottom: 1px solid var(--rule); }
@@ -454,24 +462,90 @@ function renderModule() {
 }
 
 /* ---------- 흐름 ---------- */
-function flowTable(f) {
-  const idx = f.steps.findIndex(s => s.id === failAt);
-  const failed = idx >= 0 ? f.steps[idx] : null;
+// 두 흐름의 단계를 같은 이름끼리 같은 행에 놓는다(LCS). 한쪽에만 있는 단계는 다른 쪽이 빈칸이다.
+function alignSteps(flows) {
+  if (flows.length === 1) return flows[0].steps.map((_, i) => [i]);
+  const a = flows[0].steps.map(x => x.id), b = flows[1].steps.map(x => x.id);
+  const L = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+  for (let i = a.length - 1; i >= 0; i--) for (let j = b.length - 1; j >= 0; j--) L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const out = [];
+  let i = 0, j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) out.push([i++, j++]);
+    else if (j >= b.length || (i < a.length && L[i + 1][j] >= L[i][j + 1])) out.push([i++, null]);
+    else out.push([null, j++]);
+  }
+  return out;
+}
+// 되돌리기 괄호: 되돌리기를 등록한 단계에서 커밋 단계(커밋이 없으면 마지막 단계)까지. 안쪽 괄호가 단계 이름에 가깝다.
+function sideInfo(f, s, rows) {
+  const rowOf = {};
+  rows.forEach((r, ri) => { if (r.kind === 'step' && r.idx[s] != null) rowOf[r.idx[s]] = ri; });
+  const ci = f.steps.findIndex(x => x.commit);
+  const last = ci >= 0 ? ci : f.steps.length - 1;
+  const fi = f.steps.findIndex(x => x.id === failAt);
+  const failed = fi >= 0 ? f.steps[fi] : null;
   const order = failed ? failed.onFailUndo : [];
-  let rows = '';
-  f.steps.forEach((s, i) => {
-    let cls = '';
-    if (failed) { if (i === idx) cls = 'failed'; else if (i > idx) cls = 'skipped'; else if (s.undo && order.includes(s.undo)) cls = 'undone'; }
-    const undo = s.undo ? `<span class="undo">${esc(s.undo)}</span>${cls === 'undone' ? `<span class="ord">${order.indexOf(s.undo) + 1}번째로 부름</span>` : ''}` : '';
-    const notes = [
-      s.fatal ? '<span class="fatal">실패하면 Fatal</span>' : '',
-      ...s.calls.map(c => `<span>호출 <button type="button" class="link" data-open="contract:${esc(c.split('.')[0])}">${esc(c)}</button></span>`),
-      ...s.emits.map(e => `<span class="emit">발행 <button type="button" class="link" data-open="ev:${esc(e)}">${esc(e)}</button></span>`),
-    ].filter(Boolean).join('');
-    rows += `<tr class="${cls}" data-fail="${esc(s.id)}" tabindex="0"><td class="n">${i + 1}</td><td><div class="step">${esc(s.id)}</div>${s.summary ? `<div class="note">${esc(s.summary)}</div>` : ''}</td><td>${undo}</td><td><div class="calls">${notes}</div></td></tr>`;
-    if (s.commit) rows += '<tr class="commit"><td></td><td colspan="3">커밋. 이후 단계는 실패해도 되돌리지 않는다</td></tr>';
+  const lanes = f.steps.map((st, i) => ({ st, i })).filter(x => x.st.undo && x.i < (ci >= 0 ? ci : f.steps.length))
+    .map(x => {
+      const hot = !!failed && x.i < fi && order.includes(x.st.undo);
+      return { name: x.st.undo, i: x.i, start: rowOf[x.i], end: rowOf[last], hot, cold: !!failed && !hot, ord: order.indexOf(x.st.undo) + 1 };
+    })
+    .sort((p, q) => q.start - p.start);
+  return { f, lanes, fi, cols: 5 + lanes.length };
+}
+const heat = l => (l.hot ? ' hot' : l.cold ? ' cold' : '');
+function laneCells(info, ri) {
+  const starter = info.lanes.find(l => l.start === ri);
+  let h = `<div class="ln${starter ? ' cross' + heat(starter) : ''}"></div>`;
+  info.lanes.forEach((l, k) => {
+    let st = '', owner = l;
+    if (ri === l.start && ri === l.end) st = 'end';
+    else if (ri === l.start) st = 'start';
+    else if (ri > l.start && ri < l.end) st = 'mid';
+    else if (ri === l.end) st = 'end';
+    if (!st) { const o = info.lanes.find((l2, k2) => k2 > k && l2.start === ri); if (o) { st = 'cross'; owner = o; } }
+    h += `<div class="ln${st ? ' ' + st + heat(owner) : ''}"></div>`;
   });
-  return `<table class="steps"><thead><tr><th class="n">#</th><th>단계</th><th>되돌리기</th><th>호출·발행</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return h;
+}
+function stepCells(info, ri, i) {
+  if (i == null) return `<div class="r"><div class="c"></div><div class="c"></div>${laneCells(info, ri)}<div class="c"></div><div class="c"></div></div>`;
+  const s = info.f.steps[i];
+  const st = info.fi < 0 ? '' : i === info.fi ? ' failed' : i > info.fi ? ' skipped' : '';
+  const lane = info.lanes.find(l => l.i === i);
+  const undo = lane ? `<span class="undo${lane.cold ? ' cold' : ''}">${esc(lane.name)}</span>${lane.hot ? `<span class="ord">${lane.ord}번째로 부름</span>` : ''}` : '';
+  const notes = [
+    s.fatal ? '<span class="fatal">실패하면 Fatal</span>' : '',
+    ...s.calls.map(c => `<span>호출 <button type="button" class="link" data-open="contract:${esc(c.split('.')[0])}">${esc(c)}</button></span>`),
+    ...s.emits.map(e => `<span class="emit">발행 <button type="button" class="link" data-open="ev:${esc(e)}">${esc(e)}</button></span>`),
+  ].filter(Boolean).join('');
+  return `<div class="r" data-fail="${esc(s.id)}"><div class="c n${st}">${i + 1}</div><div class="c${st}"><button type="button" class="stepbtn">${esc(s.id)}</button>${s.summary ? `<div class="note">${esc(s.summary)}</div>` : ''}</div>${laneCells(info, ri)}<div class="c${st}">${undo}</div><div class="c${st}"><div class="notes">${notes}</div></div></div>`;
+}
+function flowGrid(shown) {
+  const rows = [];
+  for (const idx of alignSteps(shown)) {
+    rows.push({ kind: 'step', idx });
+    const sides = shown.map((f, s) => idx[s] != null && f.steps[idx[s]].commit);
+    if (sides.some(Boolean)) rows.push({ kind: 'commit', sides });
+  }
+  const infos = shown.map((f, s) => sideInfo(f, s, rows));
+  const two = shown.length > 1;
+  const gap = two ? '<div></div>' : '';
+  const tmpl = infos.map(x => `2.4em minmax(9em, max-content) 10px ${'14px '.repeat(x.lanes.length)}minmax(7em, max-content) minmax(8em, 1fr)`).join(' 28px ');
+  const span = x => `style="grid-column: span ${x.cols}"`;
+  let h = '';
+  if (two) h += infos.map(x => `<div class="sidehead" ${span(x)}><h2>${esc(x.f.id)}</h2><p>${esc(x.f.in)} 모듈, 단계 ${x.f.steps.length}${x.f.summary ? '. ' + esc(x.f.summary) : ''}</p></div>`).join(gap);
+  h += infos.map(x => `<div class="th">#</div><div class="th">단계</div><div class="th" style="grid-column: span ${1 + x.lanes.length}"></div><div class="th">되돌리기</div><div class="th">호출·발행</div>`).join(gap);
+  h += '<div class="sect">커밋 전. 실패하면 괄호가 열려 있는 되돌리기를 안쪽부터 부른다</div>';
+  rows.forEach((r, ri) => {
+    h += infos.map((x, s) => {
+      if (r.kind === 'step') return stepCells(x, ri, r.idx[s]);
+      if (r.sides[s]) return `<div class="c commitmark" ${span(x)}>커밋. 이후 단계는 실패해도 되돌리지 않는다</div>`;
+      return `<div class="c"></div><div class="c"></div>${laneCells(x, ri)}<div class="c"></div><div class="c"></div>`;
+    }).join(gap);
+  });
+  return `<div class="fgwrap"><div class="fg" style="grid-template-columns: ${tmpl}">${h}</div></div>`;
 }
 function failNote(f) {
   const s = f && f.steps.find(x => x.id === failAt);
@@ -495,9 +569,7 @@ function renderFlow() {
   const failFlow = shown.find(x => x.steps.some(s => s.id === failAt));
   const cmp = flows.length > 1 ? `<label>나란히 비교 <select id="cmp"><option value="">비교 안 함</option>${flows.filter(x => x.id !== flowSel).map(x => `<option value="${esc(x.id)}" ${x.id === flowCompare ? 'selected' : ''}>${esc(x.id)}</option>`).join('')}</select></label>` : '';
   const head = x => `<p class="sub">${unitLink(x.in)} 모듈, 단계 ${x.steps.length}${x.on ? `, 시작 이벤트 <span class="id">${esc(x.on)}</span>` : ''}</p>${x.summary ? `<p class="summary">${esc(x.summary)}</p>` : ''}`;
-  const body = flowCompare
-    ? `<div class="flows two">${shown.map(x => `<section><h2>${esc(x.id)}</h2>${head(x)}${flowTable(x)}</section>`).join('')}</div>`
-    : `<div class="flows">${flowTable(f)}</div>`;
+  const body = flowGrid(shown);
   $('#main').innerHTML = `<div class="flowhead"><div>${flowCompare ? '<h1 class="plain">흐름 비교</h1>' : `<h1>${esc(flowSel)}</h1>${head(f)}`}</div>${cmp}</div>${failNote(failFlow)}${body}`;
   const sel = $('#cmp');
   if (sel) sel.addEventListener('change', e => { flowCompare = e.target.value; render(); });
@@ -609,8 +681,6 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && drawerOpen) closeDrawer();
-  const fa = e.target.closest && e.target.closest('[data-fail]');
-  if (fa && e.target === fa && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); toggleFail(fa.dataset.fail); }
 });
 
 /* ---------- 서버 상태 ---------- */
