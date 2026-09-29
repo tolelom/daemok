@@ -51,6 +51,19 @@
 - API 계약은 새로 정의하지 않고 OpenAPI 파일을 경로로 참조한다.
 - 1차 대상 언어는 Go다. 포맷의 언어 중립성은 이후 UE5 C++ 프로젝트로 확인한다.
 
+## 다른 언어
+
+설계 모델에서 언어별 요소는 `go:` 같은 이름 규칙에만 있다. 언어 하나를 지원하려면 모델에서 소스 텍스트를 만드는 생성기와 모듈 간 의존을 읽는 import 스캐너가 필요하다.
+
+| 언어 | 의존 선언 |
+|---|---|
+| C, C++ | `#include` |
+| UE5 C++ | `*.Build.cs`의 `PublicDependencyModuleNames`, `PrivateDependencyModuleNames` |
+| TypeScript | `import ... from`, `export ... from`, `import()` |
+| Python | `import`, `from ... import` |
+
+타입이나 시그니처가 설계와 맞는지는 파서를 만들어 확인하지 않는다. 생성 코드 안의 확인 구문을 대상 언어의 컴파일러가 검사한다. Go는 `var _ Handler = f`, C++은 `static_assert`, TypeScript는 `satisfies`를 쓴다.
+
 ## 기존 도구와의 차이
 
 | 도구 | 하는 일 | 차이 |
