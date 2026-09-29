@@ -19,7 +19,8 @@ func (p *parser) errAt(num, col int, msg string) error {
 }
 
 func (p *parser) scan(src []byte) error {
-	raw := strings.Split(strings.ReplaceAll(string(src), "\r\n", "\n"), "\n")
+	text := strings.TrimPrefix(string(src), "\ufeff")
+	raw := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	for idx, r := range raw {
 		num := idx + 1
 		indent := 0

@@ -48,6 +48,14 @@ func TestBlockMapScalars(t *testing.T) {
 	}
 }
 
+func TestLeadingBOM(t *testing.T) {
+	n := parse(t, "\xef\xbb\xbfversion: 0.3\n")
+	e := n.Entries[0]
+	if e.Key != "version" || e.Pos.Line != 1 || e.Pos.Col != 1 {
+		t.Fatalf("entry %+v", e)
+	}
+}
+
 func TestNestedBlockMap(t *testing.T) {
 	n := parse(t, "modules:\n  core:\n    tier: domain\n  vm:\n    tier: execution\n")
 	mods := n.Get("modules")
