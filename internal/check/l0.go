@@ -16,7 +16,7 @@ func (c *checker) l0() {
 	}
 	for _, it := range m.System.Interfaces {
 		if len(implementers[it.ID]) == 0 {
-			c.errorf(it.Pos, "인터페이스 %s를 구현하는 모듈이 없다", it.ID)
+			c.errorf(it.Pos, "구현하는 모듈이 없는 인터페이스: %s", it.ID)
 		}
 	}
 	for _, e := range m.Executables {
@@ -24,7 +24,7 @@ func (c *checker) l0() {
 		for _, r := range e.Exposes {
 			for _, impl := range implementers[r.Name] {
 				if !reach[impl] {
-					c.errorf(r.Pos, "실행 단위 %s가 %s를 노출하지만 구현 모듈 %s를 조립하지 않는다", e.ID, r.Name, impl)
+					c.errorf(r.Pos, "노출하는 인터페이스의 구현 모듈을 조립하지 않는다: 실행 단위 %s, 인터페이스 %s, 모듈 %s", e.ID, r.Name, impl)
 				}
 			}
 		}

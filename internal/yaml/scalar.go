@@ -49,7 +49,7 @@ func unsupportedScalar(s string) string {
 	case '|', '>':
 		return "여러 줄 문자열은 지원하지 않는다"
 	case '%', '@', '`':
-		return fmt.Sprintf("%q로 시작하는 값은 지원하지 않는다", s[0])
+		return fmt.Sprintf("지원하지 않는 첫 문자: %q", s[0])
 	}
 	return ""
 }

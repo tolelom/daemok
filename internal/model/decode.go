@@ -15,7 +15,7 @@ func (d *decoder) mapping(n *yaml.Node, what string) bool {
 		return false
 	}
 	if n.Kind != yaml.Map {
-		d.diags.Errorf(n.Pos, "%s는 맵이어야 한다", what)
+		d.diags.Errorf(n.Pos, "맵이어야 한다: %s", what)
 		return false
 	}
 	return true
@@ -35,7 +35,7 @@ func (d *decoder) scalar(n *yaml.Node, key string) *yaml.Node {
 		return nil
 	}
 	if v.Kind != yaml.Scalar {
-		d.diags.Errorf(v.Pos, "%q는 값 하나여야 한다", key)
+		d.diags.Errorf(v.Pos, "값 하나여야 한다: %q", key)
 		return nil
 	}
 	return v
@@ -51,7 +51,7 @@ func (d *decoder) str(n *yaml.Node, key string) string {
 // need는 key가 있고 null이 아닌지 본다. 오류 위치는 노드의 ID 키(pos)다.
 func (d *decoder) need(pos yaml.Pos, n *yaml.Node, key string) bool {
 	if v := n.Get(key); v == nil || v.IsNull() {
-		d.diags.Errorf(pos, "%q가 필요하다", key)
+		d.diags.Errorf(pos, "필요한 키가 없다: %q", key)
 		return false
 	}
 	return true
@@ -71,7 +71,7 @@ func (d *decoder) refs(n *yaml.Node, key string) []Ref {
 		return nil
 	}
 	if v.Kind != yaml.Seq {
-		d.diags.Errorf(v.Pos, "%q는 목록이어야 한다", key)
+		d.diags.Errorf(v.Pos, "목록이어야 한다: %q", key)
 		return nil
 	}
 	out := []Ref{}
@@ -100,7 +100,7 @@ func (d *decoder) intv(n *yaml.Node, key string) (int, bool) {
 	}
 	i, ok := v.Int()
 	if !ok {
-		d.diags.Errorf(v.Pos, "%q는 정수여야 한다", key)
+		d.diags.Errorf(v.Pos, "정수여야 한다: %q", key)
 	}
 	return i, ok
 }
@@ -112,7 +112,7 @@ func (d *decoder) boolv(n *yaml.Node, key string, def bool) bool {
 	}
 	b, ok := v.Bool()
 	if !ok {
-		d.diags.Errorf(v.Pos, "%q는 true 또는 false여야 한다", key)
+		d.diags.Errorf(v.Pos, "true 또는 false여야 한다: %q", key)
 		return def
 	}
 	return b
@@ -146,7 +146,7 @@ func (d *decoder) idMap(n *yaml.Node, what string, fn func(id string, pos yaml.P
 	}
 	for _, e := range n.Entries {
 		if e.Value.Kind != yaml.Map {
-			d.diags.Errorf(e.Pos, "%s %q는 맵이어야 한다", what, e.Key)
+			d.diags.Errorf(e.Pos, "맵이어야 한다: %s %q", what, e.Key)
 			continue
 		}
 		fn(e.Key, e.Pos, e.Value)

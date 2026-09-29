@@ -216,7 +216,7 @@ func TestErrUnsupportedScalars(t *testing.T) {
 		{"a: !!str x\n", "태그"},
 		{"a: |\n  text\n", "여러 줄 문자열"},
 		{"a: >\n  text\n", "여러 줄 문자열"},
-		{"a: %x\n", "지원하지 않는다"},
+		{"a: %x\n", "지원하지 않는 첫 문자"},
 	}
 	for _, c := range cases {
 		wantErr(t, parseErr(t, c.src), 1, 4, c.want)

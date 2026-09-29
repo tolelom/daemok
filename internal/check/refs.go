@@ -80,7 +80,7 @@ func (c *checker) refs() {
 			}
 			if f.Max.Name != "" {
 				if _, err := strconv.Atoi(f.Max.Name); err != nil && m.Const(f.Max.Name) == nil {
-					c.errorf(f.Max.Pos, "max %q는 상수 ID나 숫자여야 한다", f.Max.Name)
+					c.errorf(f.Max.Pos, "max는 상수 ID나 숫자여야 한다: %q", f.Max.Name)
 				}
 			}
 		}
@@ -148,7 +148,7 @@ func (c *checker) in(r model.Ref) {
 		return
 	}
 	if _, ok := c.m.Owner(r.Name); !ok {
-		c.errorf(r.Pos, "in이 가리키는 모듈이나 멤버 %q가 없다", r.Name)
+		c.errorf(r.Pos, "in이 가리키는 모듈이나 멤버가 없다: %q", r.Name)
 	}
 }
 

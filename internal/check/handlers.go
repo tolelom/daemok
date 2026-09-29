@@ -33,13 +33,13 @@ func (c *checker) handlers() {
 			hs := byValue[v.Name]
 			switch {
 			case len(hs) == 0:
-				c.errorf(v.Pos, "%s.%s를 처리하는 멤버가 없다", en.ID, v.Name)
+				c.errorf(v.Pos, "처리하는 멤버가 없는 값: %s.%s", en.ID, v.Name)
 			case len(hs) > 1:
 				var names []string
 				for _, h := range hs {
 					names = append(names, h.member)
 				}
-				c.errorf(hs[1].ref.Pos, "%s.%s를 %s가 함께 처리한다", en.ID, v.Name, strings.Join(names, ", "))
+				c.errorf(hs[1].ref.Pos, "여러 멤버가 처리하는 값: %s.%s (%s)", en.ID, v.Name, strings.Join(names, ", "))
 			}
 		}
 	}

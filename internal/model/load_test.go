@@ -128,14 +128,14 @@ func TestScalarConflictAcrossFiles(t *testing.T) {
 		"a.yaml": "version: 0.3\ngo_module: x\n",
 		"b.yaml": "version: 0.3\ngo_module: y\n",
 	})
-	wantDiag(t, ds, Error, `"go_module"가 다른 파일`)
+	wantDiag(t, ds, Error, `다른 파일과 값이 다르다: "go_module"`)
 }
 
 func TestRequirementFields(t *testing.T) {
 	_, ds := loadOne(t, "requirements:\n  REQ-a: { text: A, status: maybe, extra: 1 }\n  REQ-b: { status: active }\n")
 	wantDiag(t, ds, Error, "status는 active, held, dropped")
 	wantDiag(t, ds, Error, `알 수 없는 키 "extra"`)
-	wantDiag(t, ds, Error, `"text"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "text"`)
 }
 
 func TestDiagnosticsSort(t *testing.T) {
@@ -230,11 +230,11 @@ groups:
   g: { kind: k, rule: whatever, members: { m: { handlez: [] } } }
   h: { members: {} }
 `)
-	wantDiag(t, ds, Error, `"tier"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "tier"`)
 	wantDiag(t, ds, Error, `알 수 없는 키 "tierr"`)
 	wantDiag(t, ds, Error, "rule은 no_sibling_deps")
 	wantDiag(t, ds, Error, `알 수 없는 키 "handlez"`)
-	wantDiag(t, ds, Error, `"kind"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "kind"`)
 }
 
 func TestSecondSystemAndTiers(t *testing.T) {
@@ -248,7 +248,7 @@ func TestSecondSystemAndTiers(t *testing.T) {
 
 func TestExceptionNeedsDependsOn(t *testing.T) {
 	_, ds := loadOne(t, "groups:\n  g:\n    kind: k\n    members:\n      m:\n        exceptions:\n          - reason: x\n")
-	wantDiag(t, ds, Error, `"depends_on"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "depends_on"`)
 }
 
 const l3Sample = `
@@ -340,14 +340,14 @@ contracts:
 handler_kinds:
   h: { in: m, params: {} }
 `)
-	wantDiag(t, ds, Error, `"in"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "in"`)
 	wantDiag(t, ds, Error, "type은 int, string, duration")
 	wantDiag(t, ds, Error, "value는 정수여야 한다")
-	wantDiag(t, ds, Error, `"message"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "message"`)
 	wantDiag(t, ds, Error, "type과 ref 중 하나만")
 	wantDiag(t, ds, Error, "type이나 ref가 필요하다")
-	wantDiag(t, ds, Error, `"methods"가 필요하다`)
-	wantDiag(t, ds, Error, `"key"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "methods"`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "key"`)
 }
 
 func TestDecodeL4(t *testing.T) {
@@ -402,11 +402,11 @@ funcs:
 `)
 	wantDiag(t, ds, Error, "kind+handles와 of 중 하나만")
 	wantDiag(t, ds, Error, "kind+handles 또는 of가 필요하다")
-	wantDiag(t, ds, Error, `"handles"가 필요하다`)
-	wantDiag(t, ds, Error, `"name"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "handles"`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "name"`)
 	wantDiag(t, ds, Error, "expect와 error 중 하나만")
 	wantDiag(t, ds, Error, "expect나 error가 필요하다")
-	wantDiag(t, ds, Error, "given은 맵이어야 한다")
+	wantDiag(t, ds, Error, "맵이어야 한다: given")
 	wantDiag(t, ds, Error, "given의 값은 값 하나 또는 맵이어야 한다")
 }
 
@@ -492,8 +492,8 @@ enums:
 types:
   post: { in: m, fields: {} }
 `)
-	wantDiag(t, ds, Error, `멤버 "economy"가 모듈`)
-	wantDiag(t, ds, Error, `타입 "post"가 enum`)
+	wantDiag(t, ds, Error, `이름이 같아 참조가 모호하다: 멤버 "economy", 모듈`)
+	wantDiag(t, ds, Error, `이름이 같아 참조가 모호하다: 타입 "post", enum`)
 	if find(ds, Error, `"events"`) != nil {
 		t.Fatal("module and interface may share an ID")
 	}
@@ -528,12 +528,12 @@ groups:
 funcs:
   f: { in: m, kind: hk, handles: , errors: [] }
 `)
-	for _, msg := range []string{`"text"가 필요하다`, `"tier"가 필요하다`, `"in"가 필요하다`, `"values"가 필요하다`, `"key"가 필요하다`, `"kind"가 필요하다`, `"handles"가 필요하다`, `파라미터 "payload"에 타입이 필요하다`} {
+	for _, msg := range []string{`필요한 키가 없다: "text"`, `필요한 키가 없다: "tier"`, `필요한 키가 없다: "in"`, `필요한 키가 없다: "values"`, `필요한 키가 없다: "key"`, `필요한 키가 없다: "kind"`, `필요한 키가 없다: "handles"`, `파라미터 "payload"에 타입이 필요하다`} {
 		wantDiag(t, ds, Error, msg)
 	}
 	if n := 0; true {
 		for _, d := range ds {
-			if strings.Contains(d.Msg, `"tier"가 필요하다`) {
+			if strings.Contains(d.Msg, `필요한 키가 없다: "tier"`) {
 				n++
 			}
 		}
@@ -551,7 +551,7 @@ func TestFieldTypeNull(t *testing.T) {
 
 func TestVersionRequired(t *testing.T) {
 	_, ds := load(t, map[string]string{"d.yaml": "tiers: [t]\nmodules:\n  core: { tier: t }\n"})
-	d := wantDiag(t, ds, Error, `"version"이 필요하다`)
+	d := wantDiag(t, ds, Error, `필요한 키가 없다: "version"`)
 	if d.Pos.Line != 1 {
 		t.Fatalf("pos %v", d.Pos)
 	}
@@ -561,7 +561,7 @@ func TestNeedPointsAtID(t *testing.T) {
 	_, ds := loadOne(t, "modules:\n  core:\n    summary: no tier\n  vm: {}\n")
 	var lines []int
 	for _, d := range ds {
-		if strings.Contains(d.Msg, `"tier"가 필요하다`) {
+		if strings.Contains(d.Msg, `필요한 키가 없다: "tier"`) {
 			lines = append(lines, d.Pos.Line*100+d.Pos.Col)
 		}
 	}
@@ -572,5 +572,5 @@ func TestNeedPointsAtID(t *testing.T) {
 
 func TestGroupTierRequired(t *testing.T) {
 	_, ds := loadOne(t, "groups:\n  g: { kind: k, members: {} }\n")
-	wantDiag(t, ds, Error, `"tier"가 필요하다`)
+	wantDiag(t, ds, Error, `필요한 키가 없다: "tier"`)
 }

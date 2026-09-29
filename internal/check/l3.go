@@ -30,7 +30,7 @@ func (c *checker) typeDeps() {
 			return
 		}
 		if typeOwner != "" && !m.CanDepend(owner, typeOwner) {
-			c.errorf(r.Pos, "%s가 %s의 타입 %s를 쓰지만 %s에 의존하지 않는다", owner, typeOwner, base, typeOwner)
+			c.errorf(r.Pos, "의존하지 않는 모듈의 타입을 쓴다: %s → %s.%s", owner, typeOwner, base)
 		}
 	}
 	for _, t := range m.Types {
@@ -63,13 +63,12 @@ func (c *checker) typeDeps() {
 var httpBySuffix = []struct {
 	suffix string
 	code   int
-	josa   string // "를"·"을"
 }{
-	{"NotFound", 404, "를"},
-	{"Unauthorized", 401, "을"},
-	{"Forbidden", 403, "을"},
-	{"AlreadyExists", 409, "를"},
-	{"Conflict", 409, "를"},
+	{"NotFound", 404},
+	{"Unauthorized", 401},
+	{"Forbidden", 403},
+	{"AlreadyExists", 409},
+	{"Conflict", 409},
 }
 
 // errorHTTP는 에러 이름의 접미사가 뜻하는 HTTP 상태와 http 값이 다르면 경고한다.
@@ -80,7 +79,7 @@ func (c *checker) errorHTTP() {
 		}
 		for _, s := range httpBySuffix {
 			if strings.HasSuffix(e.ID, s.suffix) && e.HTTP != s.code {
-				c.warnf(e.Pos, "%s의 이름은 %d%s 뜻하지만 http가 %d다", e.ID, s.code, s.josa, e.HTTP)
+				c.warnf(e.Pos, "이름이 뜻하는 상태와 http가 다르다: %s (이름 %d, http %d)", e.ID, s.code, e.HTTP)
 			}
 		}
 	}

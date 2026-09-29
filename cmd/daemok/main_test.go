@@ -92,7 +92,7 @@ func TestCheckStrict(t *testing.T) {
 		t.Fatalf("warning only: exit %d", code)
 	}
 	code, out, _ := runCLI(t, "check", "--design", dir, "--strict")
-	if code != 1 || !strings.Contains(out, "경고: 요구사항 REQ-a") {
+	if code != 1 || !strings.Contains(out, "경고: 충족하는 설계 요소가 없는 요구사항: REQ-a") {
 		t.Fatalf("strict: exit %d out %q", code, out)
 	}
 }

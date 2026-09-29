@@ -132,7 +132,7 @@ func TestRefErrors(t *testing.T) {
 		{"implements: [rpc]", "implements: [rest]", `없는 인터페이스 "rest"`},
 		{"kind: tx_handler\n    depends_on", "kind: nope\n    depends_on", `없는 핸들러 종류 "nope"`},
 		{"handles: [mint]", "handles: [burn]", `tx_type에 없는 값 "burn"`},
-		{"in: vm\n    params", "in: nowhere\n    params", `"nowhere"가 없다`},
+		{"in: vm\n    params", "in: nowhere\n    params", `in이 가리키는 모듈이나 멤버가 없다: "nowhere"`},
 		{"to: address", "to: adress", `알 수 없는 타입 "adress"`},
 		{"returns: [payload], errors: [ErrNotFound]", "returns: [payload], errors: [ErrGone]", `없는 에러 "ErrGone"`},
 		{"key: tx_type", "key: tx_kind", `없는 enum "tx_kind"`},
@@ -148,7 +148,7 @@ func TestRefErrors(t *testing.T) {
 func TestRefFieldRefAndMax(t *testing.T) {
 	ds := run(t, replace(t, "kind: tx_type }", "kind: tx_type, owner: { ref: user }, n: { type: uint, max: big } }"))
 	want(t, ds, model.Error, `없는 타입 "user"`)
-	want(t, ds, model.Error, `max "big"는 상수 ID나 숫자`)
+	want(t, ds, model.Error, `max는 상수 ID나 숫자여야 한다: "big"`)
 	ds = run(t, replace(t, "kind: tx_type }", "kind: tx_type, n: { type: uint, max: 80 } }"))
 	wantNone(t, ds, model.Error)
 }
@@ -169,10 +169,10 @@ func TestExceptionTargetMustExist(t *testing.T) {
 
 func TestL0(t *testing.T) {
 	ds := run(t, replace(t, "implements: [rpc]", "implements: []"))
-	want(t, ds, model.Error, "인터페이스 rpc를 구현하는 모듈이 없다")
+	want(t, ds, model.Error, "구현하는 모듈이 없는 인터페이스: rpc")
 
 	ds = run(t, replace(t, "composes: [core, vm, tx_modules, rpc_mod]", "composes: [core, vm, tx_modules]"))
-	want(t, ds, model.Error, "실행 단위 node가 rpc를 노출하지만 구현 모듈 rpc_mod를 조립하지 않는다")
+	want(t, ds, model.Error, "노출하는 인터페이스의 구현 모듈을 조립하지 않는다: 실행 단위 node, 인터페이스 rpc, 모듈 rpc_mod")
 
 	// composes에 없어도 depends_on으로 닿으면 조립된 것이다.
 	ds = run(t, replace(t, "composes: [core, vm, tx_modules, rpc_mod]", "composes: [rpc_mod, tx_modules]"))
@@ -249,14 +249,14 @@ func TestOrphanModule(t *testing.T) {
 func TestGroupExceptions(t *testing.T) {
 	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [transfer], exceptions: [{ depends_on: asset, reason: \"검증 재사용\" }, { depends_on: core }] }"))
 	want(t, ds, model.Info, "그룹 규칙 예외: economy → asset (검증 재사용)")
-	want(t, ds, model.Warning, "예외 core는 그룹 tx_modules가 이미 의존한다")
+	want(t, ds, model.Warning, "그룹이 이미 의존하는 예외: 그룹 tx_modules, 예외 core")
 }
 
 func TestTypeDependency(t *testing.T) {
 	// crypto(foundation)의 타입이 core의 enum을 쓰면 crypto는 core에 의존하지 않으므로 오류
 	src := strings.Replace(base, "types:\n", "types:\n  sig: { in: crypto, fields: { kind: tx_type } }\n", 1)
 	ds := run(t, src)
-	want(t, ds, model.Error, "crypto가 core의 타입 tx_type를 쓰지만 core에 의존하지 않는다")
+	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: crypto → core.tx_type")
 	// 멤버는 그룹 의존을 따른다
 	src = strings.Replace(base, "types:\n", "types:\n  memo: { in: economy, fields: { p: payload } }\n", 1)
 	wantNone(t, run(t, src), model.Error)
@@ -264,16 +264,16 @@ func TestTypeDependency(t *testing.T) {
 	src = replace(t, "vm:      { tier: execution, depends_on: [core] }", "vm:      { tier: execution, depends_on: [] }")
 	src = strings.Replace(src, "params: { payload: payload }", "params: {}", 1)
 	ds = run(t, src)
-	want(t, ds, model.Error, "vm가 core의 타입 tx_type를 쓰지만 core에 의존하지 않는다")
+	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: vm → core.tx_type")
 }
 
 func TestErrorHTTP(t *testing.T) {
 	ds := run(t, replace(t, `http: 404 }`, `http: 400 }`))
-	want(t, ds, model.Warning, "ErrNotFound의 이름은 404를 뜻하지만 http가 400다")
+	want(t, ds, model.Warning, "이름이 뜻하는 상태와 http가 다르다: ErrNotFound (이름 404, http 400)")
 	ds = run(t, replace(t, `ErrLow:      { in: core, message: "low" }`, `ErrLow:      { in: core, message: "low" }
   ErrUnauthorized: { in: core, message: "u", http: 403 }
   ErrForbidden:    { in: core, message: "f", http: 403 }`))
-	want(t, ds, model.Warning, "ErrUnauthorized의 이름은 401을 뜻하지만 http가 403다")
+	want(t, ds, model.Warning, "이름이 뜻하는 상태와 http가 다르다: ErrUnauthorized (이름 401, http 403)")
 	if strings.Contains(join(ds), "ErrForbidden") {
 		t.Fatal("ErrForbidden 403 is consistent")
 	}
@@ -288,9 +288,9 @@ func TestContractWithoutErrors(t *testing.T) {
 
 func TestHandlerCoverage(t *testing.T) {
 	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [] }"))
-	want(t, ds, model.Error, "tx_type.transfer를 처리하는 멤버가 없다")
+	want(t, ds, model.Error, "처리하는 멤버가 없는 값: tx_type.transfer")
 	ds = run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint, transfer] }"))
-	d := want(t, ds, model.Error, "tx_type.transfer를 economy, asset가 함께 처리한다")
+	d := want(t, ds, model.Error, "여러 멤버가 처리하는 값: tx_type.transfer (economy, asset)")
 	if d.Pos.Line == 0 {
 		t.Fatal("position")
 	}
@@ -298,22 +298,22 @@ func TestHandlerCoverage(t *testing.T) {
 
 func TestL4Handler(t *testing.T) {
 	ds := run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [] }"))
-	want(t, ds, model.Error, "멤버 economy의 handles에 transfer가 없다")
+	want(t, ds, model.Error, "멤버 handles에 없는 값: 멤버 economy, 값 transfer")
 
 	ds = run(t, replace(t, "in: economy\n    kind: tx_handler", "in: core\n    kind: tx_handler"))
-	want(t, ds, model.Error, "핸들러 함수 handle_transfer는 그룹 멤버에 있어야 한다")
+	want(t, ds, model.Error, "핸들러 함수는 그룹 멤버에 있어야 한다: handle_transfer")
 }
 
 func TestL4Of(t *testing.T) {
 	src := replace(t, "in: economy\n    kind: tx_handler\n    handles: transfer\n", "in: vm\n    of: store.get\n")
 	ds := run(t, src)
-	want(t, ds, model.Error, "계약 store는 core에 있는데 함수 handle_transfer는 vm에 있다")
+	want(t, ds, model.Error, "계약과 함수의 위치가 다르다: 계약 store(core), 함수 handle_transfer(vm)")
 }
 
 func TestL4CaseErrors(t *testing.T) {
 	ds := run(t, replace(t, "error: ErrLow }", "error: ErrNotFound }"))
-	want(t, ds, model.Error, `케이스 "low"의 에러 ErrNotFound가 함수 handle_transfer의 errors에 없다`)
-	want(t, ds, model.Warning, "함수 handle_transfer의 에러 ErrLow를 확인하는 케이스가 없다")
+	want(t, ds, model.Error, `함수 errors에 없는 에러: 케이스 "low", 에러 ErrNotFound, 함수 handle_transfer`)
+	want(t, ds, model.Warning, "확인하는 케이스가 없는 에러: 함수 handle_transfer, 에러 ErrLow")
 	// invalid는 errors에 없어도 된다
 	ds = run(t, replace(t, "error: ErrLow }", "error: invalid }"))
 	wantNone(t, ds, model.Error)
@@ -323,8 +323,8 @@ func TestRequirements(t *testing.T) {
 	src := strings.Replace(base, "  REQ-a: { text: A }\n", "  REQ-a: { text: A }\n  REQ-b: { text: B }\n  REQ-c: { text: C, status: held }\n", 1)
 	src = strings.Replace(src, "vm:      { tier: execution, depends_on: [core] }", "vm:      { tier: execution, depends_on: [core], satisfies: [REQ-c] }", 1)
 	ds := run(t, src)
-	want(t, ds, model.Warning, "요구사항 REQ-b를 충족하는 설계 요소가 없다")
-	d := want(t, ds, model.Warning, "held 요구사항 REQ-c에 vm가 매달려 있다")
+	want(t, ds, model.Warning, "충족하는 설계 요소가 없는 요구사항: REQ-b")
+	d := want(t, ds, model.Warning, "held 요구사항에 연결된 설계 요소: vm → REQ-c")
 	if d.Pos.Line == 0 {
 		t.Fatal("position")
 	}
@@ -342,13 +342,13 @@ func TestSamples(t *testing.T) {
 	}{
 		{
 			name:     "tolchain",
-			warnings: []string{"held 요구사항 REQ-random에 random가 매달려 있다", "함수 handle_transfer의 에러 ErrBalanceOverflow를 확인하는 케이스가 없다"},
+			warnings: []string{"held 요구사항에 연결된 설계 요소: random → REQ-random", "확인하는 케이스가 없는 에러: 함수 handle_transfer, 에러 ErrBalanceOverflow"},
 			infos:    []string{"그룹 규칙 예외: reward → asset (보상 지급 시 자산 스키마 검증 재사용)"},
 		},
 		{
 			name:     "tolelog",
 			errors:   []string{"상위 tier 의존: post(service) → dto(transport)"},
-			warnings: []string{"ErrUnauthorized의 이름은 401을 뜻하지만 http가 403다", "요구사항 REQ-oauth를 충족하는 설계 요소가 없다"},
+			warnings: []string{"이름이 뜻하는 상태와 http가 다르다: ErrUnauthorized (이름 401, http 403)", "충족하는 설계 요소가 없는 요구사항: REQ-oauth"},
 		},
 	}
 	for _, c := range cases {

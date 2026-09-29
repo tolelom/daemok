@@ -104,7 +104,7 @@ func (mg *merger) fields(n *yaml.Node) []*Field {
 			f.Many, f.Optional = d.boolv(v, "many", false), d.boolv(v, "optional", false)
 			f.Max = d.ref(v, "max")
 		default:
-			d.diags.Errorf(e.Pos, "필드 %q는 타입 이름이나 맵이어야 한다", e.Key)
+			d.diags.Errorf(e.Pos, "타입 이름이나 맵이어야 한다: 필드 %q", e.Key)
 			continue
 		}
 		out = append(out, f)
@@ -121,7 +121,7 @@ func (mg *merger) params(n *yaml.Node) []*Param {
 	var out []*Param
 	for _, e := range p.Entries {
 		if e.Value.Kind != yaml.Scalar {
-			d.diags.Errorf(e.Pos, "파라미터 %q는 타입 이름이어야 한다", e.Key)
+			d.diags.Errorf(e.Pos, "타입 이름이어야 한다: 파라미터 %q", e.Key)
 			continue
 		}
 		if e.Value.IsNull() {

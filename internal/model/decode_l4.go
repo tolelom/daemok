@@ -65,7 +65,7 @@ func (mg *merger) cases(n *yaml.Node) []*Case {
 func (mg *merger) caseMap(n *yaml.Node, what string) *yaml.Node {
 	d := mg.d
 	if n.Kind != yaml.Map {
-		d.diags.Errorf(n.Pos, "%s은 맵이어야 한다", what)
+		d.diags.Errorf(n.Pos, "맵이어야 한다: %s", what)
 		return nil
 	}
 	for _, e := range n.Entries {

@@ -200,7 +200,7 @@ func (c *checker) exceptions() {
 		for _, mem := range g.Members {
 			for _, e := range mem.Exceptions {
 				if has(g.DependsOn, e.DependsOn.Name) {
-					c.warnf(e.DependsOn.Pos, "예외 %s는 그룹 %s가 이미 의존한다", e.DependsOn.Name, g.ID)
+					c.warnf(e.DependsOn.Pos, "그룹이 이미 의존하는 예외: 그룹 %s, 예외 %s", g.ID, e.DependsOn.Name)
 					continue
 				}
 				msg := "그룹 규칙 예외: " + mem.ID + " → " + e.DependsOn.Name

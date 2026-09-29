@@ -93,7 +93,7 @@ func (mg *merger) scalarOnce(root *yaml.Node, key string, dst *string) {
 		return
 	}
 	if prev, ok := mg.once[key]; ok && *dst != v.Value {
-		mg.d.diags.Errorf(v.Pos, "%q가 다른 파일(%s)과 다르다", key, prev)
+		mg.d.diags.Errorf(v.Pos, "다른 파일과 값이 다르다: %q (%s)", key, prev)
 		return
 	}
 	mg.once[key] = v.Pos
@@ -116,7 +116,7 @@ func (mg *merger) unique(kind, id string, pos yaml.Pos) bool {
 // finish는 version이 있는지, 한 참조 필드가 받는 종류끼리 ID가 겹치는지 본다.
 func (mg *merger) finish() {
 	if _, ok := mg.once["version"]; !ok && mg.first != nil {
-		mg.d.diags.Errorf(*mg.first, "\"version\"이 필요하다")
+		mg.d.diags.Errorf(*mg.first, "필요한 키가 없다: \"version\"")
 	}
 	mg.collide("모듈", "그룹")
 	mg.collide("모듈", "멤버")
@@ -127,7 +127,7 @@ func (mg *merger) finish() {
 func (mg *merger) collide(a, b string) {
 	for id, posB := range mg.ids[b] {
 		if posA, ok := mg.ids[a][id]; ok {
-			mg.d.diags.Errorf(posB, "%s %q가 %s(%s)와 같은 이름이라 참조가 모호하다", b, id, a, posA)
+			mg.d.diags.Errorf(posB, "이름이 같아 참조가 모호하다: %s %q, %s(%s)", b, id, a, posA)
 		}
 	}
 }
