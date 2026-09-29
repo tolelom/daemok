@@ -110,7 +110,7 @@ Go 표준 라이브러리만 쓴다. MVP의 지도는 `embed`로 넣는 로컬 �
 - `internal/gen`: `testdata/<샘플>/design`에서 생성한 결과를 골든 파일과 비교한다. 생성된 Go는 임시 모듈에 손으로 쓴 스텁 본문과 함께 넣고 `go build`와 `go vet`을 통과해야 한다. 샘플은 [프로토타입](../../../prototype/daemok-v2.html) `SAMPLES`의 tolchain과 tolelog 설계 파일을 v0.3에 맞춰 옮긴 것이다.
 - `internal/codescan`: `testdata` 안의 작은 Go 모듈로 허용, 위반, 예외, 관리하지 않는 패키지를 확인한다.
 - `internal/serve`: `httptest`로 `/api/state` 응답을 확인한다.
-- 웹 화면은 자동 테스트를 두지 않는다. 6단계를 마칠 때 headless Chrome으로 렌더링과 콘솔 오류를 확인한다.
+- 웹 화면은 자동 테스트를 두지 않는다. 웹 화면 단계를 마칠 때 headless Chrome으로 렌더링과 콘솔 오류를 확인한다.
 
 ## 구현 순서
 
