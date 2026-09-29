@@ -222,7 +222,7 @@ const (
 var Builtins = map[string]string{
 	"string": "string", "int": "int", "uint": "uint", "int64": "int64", "uint64": "uint64",
 	"bool": "bool", "float64": "float64", "duration": "time.Duration", "time": "time.Time",
-	"address": "string", "bytes": "[]byte", "error": "error",
+	"address": "string", "bytes": "[]byte", "error": "error", "any": "any",
 }
 
 // SplitType은 "*[]post"를 ("*[]", "post")로 나눈다.

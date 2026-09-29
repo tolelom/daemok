@@ -121,7 +121,7 @@ events:
   block_commit:
     kind: chain_event
     publishers: [consensus]
-    data: { hash: string, txs: int, block: "*core.Block" }
+    data: { hash: string, txs: int, block: any }
   asset_minted:
     kind: chain_event
     publishers: [asset, reward]

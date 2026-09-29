@@ -537,3 +537,12 @@ func TestQAFixes(t *testing.T) {
 	want(t, run(t, replace(t, "needs: [store]", "needs: [store, store]")), model.Warning, "같은 계약을 두 번 받는다: rpc_mod → store")
 	want(t, run(t, replace(t, "needs: [store]", "needs: [{ contract: store, uses: [] }]")), model.Error, "uses가 비어 있다: store")
 }
+
+func TestQualifiedExternalType(t *testing.T) {
+	// core가 vm.Thing을 쓰면 vm에 의존해야 한다
+	src := strings.Replace(base, "types:\n", "types:\n  wrap: { in: core, fields: { x: \"*vm.Thing\" } }\n", 1)
+	want(t, run(t, src), model.Error, "의존하지 않는 모듈의 타입을 쓴다: core → vm.Thing")
+	// any는 내장 타입이다
+	src = strings.Replace(base, "types:\n", "types:\n  wrap: { in: core, fields: { x: any } }\n", 1)
+	wantNone(t, run(t, src), model.Error)
+}

@@ -69,7 +69,7 @@ func (c *checker) useNeededType(owner string, r model.Ref, n model.Need, contrac
 	}
 }
 
-// typeOwner는 r이 설계 enum·struct면 그 모듈과 이름을 준다.
+// typeOwner는 r이 설계 enum·struct거나 "모듈.이름" 외부 타입이면 그 모듈과 이름을 준다.
 func (c *checker) typeOwner(r model.Ref) (string, string) {
 	if r.Name == "" {
 		return "", ""
@@ -80,27 +80,22 @@ func (c *checker) typeOwner(r model.Ref) (string, string) {
 		return c.m.Enum(base).In.Name, base
 	case model.StructType:
 		return c.m.Type(base).In.Name, base
+	case model.ExternalType:
+		if pkg, name, ok := strings.Cut(base, "."); ok {
+			if _, isOwner := c.m.Owner(pkg); isOwner {
+				return pkg, name
+			}
+		}
 	}
 	return "", base
 }
 
 // useType은 owner가 r이 가리키는 enum·타입의 모듈에 의존하는지 본다.
 func (c *checker) useType(owner string, r model.Ref) {
-	m := c.m
-	if r.Name == "" || owner == "" {
+	if owner == "" {
 		return
 	}
-	kind, base := m.ResolveType(r.Name)
-	var typeOwner string
-	switch kind {
-	case model.EnumType:
-		typeOwner = m.Enum(base).In.Name
-	case model.StructType:
-		typeOwner = m.Type(base).In.Name
-	default:
-		return
-	}
-	if typeOwner != "" && !m.CanDepend(owner, typeOwner) {
+	if typeOwner, base := c.typeOwner(r); typeOwner != "" && !c.m.CanDepend(owner, typeOwner) {
 		c.errorf(r.Pos, "의존하지 않는 모듈의 타입을 쓴다: %s → %s.%s", owner, typeOwner, base)
 	}
 }
