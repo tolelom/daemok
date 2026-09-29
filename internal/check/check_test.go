@@ -211,6 +211,32 @@ func TestCycleThroughException(t *testing.T) {
 	}
 }
 
+func TestSelfDependency(t *testing.T) {
+	ds := run(t, replace(t, "depends_on: [crypto]", "depends_on: [crypto, core]"))
+	d := want(t, ds, model.Error, "자기 자신에 의존: core")
+	if d.Pos.Line == 0 {
+		t.Fatal("position")
+	}
+	ds = run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: asset }] }"))
+	want(t, ds, model.Error, "자기 자신에 의존: asset")
+	// 멤버가 자기 그룹에 의존하면 자기 자신에 의존하는 것이다
+	ds = run(t, replace(t, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: tx_modules }] }"))
+	want(t, ds, model.Error, "자기 자신에 의존: asset")
+}
+
+func TestSiblingCycle(t *testing.T) {
+	src := replace(t, "economy: { handles: [transfer] }", "economy: { handles: [transfer], exceptions: [{ depends_on: asset }] }")
+	src = strings.Replace(src, "asset:   { handles: [mint] }", "asset:   { handles: [mint], exceptions: [{ depends_on: economy }] }", 1)
+	ds := run(t, src)
+	want(t, ds, model.Error, "의존 순환: economy → asset → economy")
+	if n := ds.Count(model.Error); n != 1 {
+		t.Fatalf("one cycle error, got %d:\n%s", n, join(ds))
+	}
+	// 한 방향 형제 예외는 순환이 아니다
+	ds = run(t, replace(t, "economy: { handles: [transfer] }", "economy: { handles: [transfer], exceptions: [{ depends_on: asset }] }"))
+	wantNone(t, ds, model.Error)
+}
+
 func TestOrphanModule(t *testing.T) {
 	src := strings.Replace(base, "  crypto:  { tier: foundation }", "  crypto:  { tier: foundation }\n  lonely:  { tier: foundation }", 1)
 	ds := run(t, src)

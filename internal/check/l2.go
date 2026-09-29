@@ -9,7 +9,9 @@ import (
 
 func (c *checker) l2() {
 	c.tierDirection()
+	c.selfDependency()
 	c.cycles()
+	c.siblingCycles()
 	c.orphans()
 	c.exceptions()
 }
@@ -42,9 +44,39 @@ func (c *checker) tierDirection() {
 	}
 }
 
+// selfDependency는 자기 자신을 가리키는 의존을 오류로 낸다. 멤버가 자기 그룹에 의존하는 것도 포함한다.
+// cycles는 그룹으로 접은 뒤 자기 간선을 버리므로 여기서 따로 잡는다.
+func (c *checker) selfDependency() {
+	report := func(id string, d model.Ref) {
+		c.errorf(d.Pos, "자기 자신에 의존: %s", id)
+	}
+	for _, mod := range c.m.Modules {
+		for _, d := range mod.DependsOn {
+			if d.Name == mod.ID {
+				report(mod.ID, d)
+			}
+		}
+	}
+	for _, g := range c.m.Groups {
+		for _, d := range g.DependsOn {
+			if d.Name == g.ID {
+				report(g.ID, d)
+			}
+		}
+		for _, mem := range g.Members {
+			for _, e := range mem.Exceptions {
+				if e.DependsOn.Name == mem.ID || e.DependsOn.Name == g.ID {
+					report(mem.ID, e.DependsOn)
+				}
+			}
+		}
+	}
+}
+
 // cycles는 모듈과 그룹의 의존 그래프에서 순환을 찾는다. 순환마다 한 번 보고한다.
 // 멤버는 그룹으로 접는다: 멤버를 가리키는 의존은 그 그룹으로, 멤버의 예외는 그룹의 의존으로 본다.
 // 그룹에 의존하면 멤버에도 의존할 수 있으므로 멤버 예외를 거치는 순환도 여기서 잡힌다.
+// 형제 멤버 사이의 순환은 siblingCycles가 잡는다.
 func (c *checker) cycles() {
 	m := c.m
 	var ids []string
@@ -80,6 +112,31 @@ func (c *checker) cycles() {
 		}
 		return out
 	}
+	c.findCycles(ids, edges)
+}
+
+// siblingCycles는 그룹마다 형제 멤버를 가리키는 예외만으로 순환을 찾는다.
+func (c *checker) siblingCycles() {
+	for _, g := range c.m.Groups {
+		var ids []string
+		for _, mem := range g.Members {
+			ids = append(ids, mem.ID)
+		}
+		edges := func(id string) []string {
+			var out []string
+			for _, e := range c.m.Member(id).Exceptions {
+				if d := e.DependsOn.Name; d != id && slices.Contains(ids, d) {
+					out = append(out, d)
+				}
+			}
+			return out
+		}
+		c.findCycles(ids, edges)
+	}
+}
+
+// findCycles는 ids 안에서 edges를 따라 DFS로 순환을 찾아 순환마다 한 번 보고한다.
+func (c *checker) findCycles(ids []string, edges func(string) []string) {
 	const (
 		white = iota
 		gray
