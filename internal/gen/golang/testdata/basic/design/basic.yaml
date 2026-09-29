@@ -1,0 +1,111 @@
+version: 0.4
+go_module: example.com/basic
+
+executables:
+  node: { composes: [core, vm, chain, tx_modules, events, store] }
+
+tiers: [foundation, domain, execution, service]
+
+modules:
+  events: { tier: foundation }
+  store:  { tier: foundation, role: infra }
+  core:   { tier: domain, depends_on: [events] }
+  vm:     { tier: execution, depends_on: [core] }
+  chain:  { tier: service, depends_on: [core, vm, events], needs: [kv] }
+
+groups:
+  tx_modules:
+    tier: execution
+    kind: tx_handler
+    path: vm/modules
+    depends_on: [core, vm, events]
+    members:
+      economy: { handles: [transfer] }
+      asset:   { handles: [mint_asset] }
+
+enums:
+  tx_type:    { in: core, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
+  status:     { in: core, values: [draft, published] }
+  event_type: { in: events, go: { type: EventType, prefix: Event }, values: [block_commit, asset_minted] }
+
+consts:
+  max_block_txs: { in: core, type: int, value: 500, go: { name: DefaultMaxBlockTxs } }
+  max_tx_age:    { in: core, type: duration, value: 1h }
+  chain_name:    { in: core, type: string, value: "basic" }
+
+errors:
+  ErrNotFound:            { in: core, message: "not found", http: 404 }
+  ErrInsufficientBalance: { in: core, message: "insufficient balance" }
+
+types:
+  account:
+    in: core
+    fields: { address: address, balance: uint64, status: status, nick: { type: string, optional: true, max: 20 } }
+  block:
+    in: core
+    fields: { height: int64, txs: { ref: account, many: true }, owner: { ref: account } }
+
+contracts:
+  ledger:
+    in: core
+    methods:
+      get: { params: { address: address }, returns: [account], errors: [ErrNotFound] }
+      put: { params: { acc: account }, errors: [] }
+  kv:
+    in: store
+    kind: port
+    methods:
+      get: { params: { key: string }, returns: [bytes], errors: [] }
+      set: { params: { key: string, value: bytes }, errors: [] }
+
+handler_kinds:
+  tx_handler:
+    in: vm
+    go: { name: Handler, register: Register }
+    params: { ctx: "*Context", payload: json.RawMessage }
+    returns: [error]
+    key: tx_type
+
+event_kinds:
+  chain_event: { in: events, key: event_type, subscribers: [chain] }
+
+events:
+  block_commit:
+    kind: chain_event
+    publishers: [chain]
+    data: { hash: string, txs: int, block: any }
+  asset_minted:
+    kind: chain_event
+    publishers: [asset]
+    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true } }
+
+funcs:
+  handle_transfer:
+    in: economy
+    kind: tx_handler
+    handles: transfer
+    errors: [ErrInsufficientBalance]
+    cases:
+      - { name: "잔액 부족", given: { balance: 5, amount: 10 }, error: ErrInsufficientBalance }
+      - { name: "금액 0", given: { amount: 0 }, error: invalid }
+      - { name: "정상", given: { balance: 10, amount: 3, memo: "hi", nested: { ok: true } }, expect: { from: 7, to: 3 } }
+
+flows:
+  produce_block:
+    in: chain
+    summary: "블록을 만들어 저장한다"
+    steps:
+      - { id: lock, undo: unlock }
+      - { id: snapshot, undo: revert }
+      - { id: buffer_events, undo: discard_events }
+      - { id: execute_txs, summary: "tx를 실행한다" }
+      - { id: add_block, calls: [kv.set] }
+      - { id: commit_state, commit: true, fatal: true }
+      - { id: unlock }
+      - { id: flush_events }
+      - { id: emit_block_commit, emits: [block_commit] }
+  simple:
+    in: chain
+    steps:
+      - { id: first }
+      - { id: second }

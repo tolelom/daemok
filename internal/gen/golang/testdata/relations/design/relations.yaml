@@ -1,0 +1,40 @@
+version: 0.4
+go_module: example.com/relations
+
+executables:
+  server: { composes: [feed, post, cache, mailer_adapter, model] }
+
+tiers: [base, infra, domain, edge]
+
+modules:
+  model:          { tier: base, role: data }
+  cache:          { tier: infra, role: infra }
+  mailer_adapter: { tier: infra, role: adapter, path: mailer }
+  post:           { tier: domain, depends_on: [model], needs: [post_cache] }
+  feed:
+    tier: edge
+    depends_on: [model]
+    needs:
+      - { contract: post_reader, uses: [list_published], why: "피드용 공개 글 목록" }
+      - mailer
+
+types:
+  post: { in: model, fields: { id: uint, title: string } }
+
+contracts:
+  post_reader:
+    in: post
+    kind: query
+    methods:
+      list_published: { params: { page: int }, returns: ["[]post"], errors: [] }
+      count: { returns: [int], errors: [] }
+  post_cache:
+    in: cache
+    kind: port
+    methods:
+      get: { params: { key: string }, returns: [bytes], errors: [] }
+  mailer:
+    in: mailer_adapter
+    kind: external
+    methods:
+      send: { params: { to: string, body: string }, errors: [] }
