@@ -61,10 +61,10 @@ func (g *gen) enums() error {
 			continue
 		}
 		f := g.file(g.ownerPath(e.In.Name) + "/" + e.ID + ".gen.go")
-		tn, pre := enumName(e), enumPrefix(e)
+		tn := e.GoType()
 		var lines, names []string
 		for _, v := range e.Values {
-			n := pre + model.GoName(v.Name)
+			n := e.ConstName(v.Name)
 			names = append(names, n)
 			lines = append(lines, fmt.Sprintf("\t%s %s = %q", n, tn, v.Name))
 		}
@@ -314,7 +314,7 @@ func (g *gen) registrations() error {
 			for _, v := range mem.Handles {
 				key := fmt.Sprintf("%q", v.Name)
 				if en != nil {
-					key = g.qualify(en.In.Name, enumPrefix(en)+model.GoName(v.Name), dir, f)
+					key = g.qualify(en.In.Name, en.ConstName(v.Name), dir, f)
 				}
 				fn := g.handlerFunc(mem.ID, hk.ID, v.Name)
 				calls = append(calls, fmt.Sprintf("\t%s.%s(%s, %s)", hp, register, key, fn))

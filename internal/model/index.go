@@ -309,3 +309,31 @@ func (m *Model) Flow(id string) *Flow {
 	}
 	return nil
 }
+
+// GoType은 enum의 Go 타입 이름이다.
+func (e *Enum) GoType() string {
+	if e.Go.Type != "" {
+		return e.Go.Type
+	}
+	return GoName(e.ID)
+}
+
+// GoPrefix는 enum 상수 이름의 접두사다.
+func (e *Enum) GoPrefix() string {
+	if e.Go.Prefix != "" {
+		return e.Go.Prefix
+	}
+	return e.GoType()
+}
+
+// ConstName은 enum 값 하나의 Go 상수 이름이다.
+func (e *Enum) ConstName(value string) string { return e.GoPrefix() + GoName(value) }
+
+// ImportPath는 모듈·멤버의 Go import 경로다. 없는 ID면 빈 문자열이다.
+func (m *Model) ImportPath(ownerID string) string {
+	o, ok := m.Owner(ownerID)
+	if !ok {
+		return ""
+	}
+	return m.GoModule + "/" + o.Path
+}

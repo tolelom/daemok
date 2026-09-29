@@ -48,20 +48,6 @@ func lowerFirst(s string) string {
 	return strings.ToLower(s[:1]) + s[1:]
 }
 
-func enumName(e *model.Enum) string {
-	if e.Go.Type != "" {
-		return e.Go.Type
-	}
-	return model.GoName(e.ID)
-}
-
-func enumPrefix(e *model.Enum) string {
-	if e.Go.Prefix != "" {
-		return e.Go.Prefix
-	}
-	return enumName(e)
-}
-
 func typeName(t *model.Type) string {
 	if t.Go.Name != "" {
 		return t.Go.Name
@@ -89,7 +75,7 @@ func (g *gen) goType(t string, fromDir string, f *goFile) string {
 		return prefix + name
 	case model.EnumType:
 		e := g.m.Enum(base)
-		return prefix + g.qualify(e.In.Name, enumName(e), fromDir, f)
+		return prefix + g.qualify(e.In.Name, e.GoType(), fromDir, f)
 	case model.StructType:
 		st := g.m.Type(base)
 		return prefix + g.qualify(st.In.Name, typeName(st), fromDir, f)
