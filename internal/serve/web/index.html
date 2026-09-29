@@ -81,23 +81,25 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .map { overflow-x: auto; }
 .map svg { display: block; max-width: 100%; height: auto; }
 .map text { font-family: var(--sans); }
-.tierline { stroke: var(--rule); }
-.tiername { fill: var(--ink-3); font-size: 13px; }
+.band rect { fill: var(--bg-2); }
+.band text { fill: var(--ink-3); font-size: 13px; }
 .unit { cursor: pointer; }
-.unit text { transition: opacity .12s; }
-.unit rect.hit { fill: var(--bg); stroke: transparent; }
-.unit .nm { fill: var(--ink); font: 600 15px var(--mono); }
-.unit .sb { fill: var(--ink-3); font-size: 13px; }
-.unit:hover rect.hit, .unit:focus rect.hit, .unit.on rect.hit { fill: var(--bg-3); }
-.unit.near rect.hit { fill: var(--bg-2); }
-.unit.st-add rect.hit { stroke: var(--add); } .unit.st-chg rect.hit { stroke: var(--chg); }
-.unit.st-rem rect.hit { stroke: var(--rem); stroke-dasharray: 4 4; } .unit.st-rem .nm { text-decoration: line-through; }
+.unit rect, .unit text, .unit circle { transition: opacity .12s; }
+.unit rect.box { fill: var(--bg-3); stroke: var(--rule-2); stroke-width: 1.2; }
+.unit rect.stack { fill: var(--bg-2); stroke: var(--rule-2); }
+.unit .nm { fill: var(--ink); font: 600 14.5px var(--mono); }
+.unit .sb { fill: var(--ink-3); font-size: 12.5px; }
+.unit:hover rect.box, .unit:focus rect.box, .unit.on rect.box { stroke: var(--accent); stroke-width: 2; }
+.unit.st-add rect.box { stroke: var(--add); stroke-width: 2; } .unit.st-chg rect.box { stroke: var(--chg); stroke-width: 2; }
+.unit.st-rem rect.box { stroke: var(--rem); stroke-dasharray: 5 4; } .unit.st-rem .nm { text-decoration: line-through; }
 .unit:focus { outline: none; }
-.dim .unit:not(.near):not(.on) text, .dim .unit:not(.near):not(.on) circle { opacity: .28; }
-.edge { fill: none; stroke: var(--c); stroke-width: 1.6; opacity: 0; transition: opacity .12s; }
-.edge.show { opacity: .9; }
+.dim .unit:not(.near):not(.on) > * { opacity: .3; }
+.edge { fill: none; stroke: var(--c); stroke-width: 1.8; opacity: 0; transition: opacity .12s; }
+.edge.show { opacity: .95; }
 .edge.dash { stroke-dasharray: 7 5; } .edge.dot { stroke-dasharray: 2 4; }
-.issue-dot { r: 4; } .issue-dot.err { fill: var(--err); } .issue-dot.warn { fill: var(--warn); }
+.edge-label { font-size: 11.5px; paint-order: stroke; stroke: var(--bg-2); stroke-width: 4px; fill: var(--c); opacity: 0; }
+.edge-label.show { opacity: 1; }
+.issue-dot { r: 4.5; } .issue-dot.err { fill: var(--err); } .issue-dot.warn { fill: var(--warn); }
 .panel { position: sticky; top: 80px; display: grid; gap: 14px; font-size: 14px; }
 .panel h2 { margin: 0; font: 700 18px var(--mono); }
 .panel p { margin: 0; }
@@ -198,7 +200,7 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
   main { padding: 20px 16px 48px; }
   .diagbtn { margin-left: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .edge, .unit text { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .edge, .unit > * { transition: none; } }
 </style>
 </head>
 <body>
@@ -301,7 +303,7 @@ function setSide(html) {
 }
 
 /* ---------- 지도 ---------- */
-const CW = 190, CH = 54, LEFT = 130, PAD = 26, ROWGAP = 14, PER = 5;
+const NW = 176, NH = 58, GAP = 22, LEFT = 120, TOP = 12, BAND_PAD = 18, PER = 5;
 function mapEdges() {
   const out = new Map();
   for (const r of S.relations) {
@@ -328,35 +330,39 @@ function mapPanel(id) {
 }
 function renderMap() {
   setSide('');
-  const units = topUnits(), pos = {}, tiers = [];
-  let y = 24;
+  const units = topUnits(), pos = {}, bands = [];
+  let y = TOP;
   for (const t of tiersTopDown()) {
     const us = units.filter(u => (u.tier || '') === t);
     if (!us.length) continue;
     const top = y, rows = Math.ceil(us.length / PER);
-    us.forEach((u, i) => { pos[u.id] = { x: LEFT + (i % PER) * CW, y: y + PAD + Math.floor(i / PER) * (CH + ROWGAP) }; });
-    y += PAD * 2 + rows * CH + (rows - 1) * ROWGAP;
-    tiers.push({ t: t || 'tier 없음', y0: top });
+    us.forEach((u, i) => { pos[u.id] = { x: LEFT + (i % PER) * (NW + GAP), y: y + BAND_PAD + Math.floor(i / PER) * (NH + GAP) }; });
+    y += BAND_PAD * 2 + rows * NH + (rows - 1) * GAP;
+    bands.push({ t: t || 'tier 없음', y0: top, y1: y });
+    y += 12;
   }
-  const W = LEFT + PER * CW, H = Math.max(y, 80), BW = CW - 16;
+  const W = LEFT + PER * (NW + GAP) + 6, H = Math.max(y, 80);
   const edges = mapEdges().filter(e => pos[e.from] && pos[e.to]);
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" id="mapsvg" role="img" aria-label="모듈 지도">`;
   s += `<defs>${Object.keys(KINDS).map(k => `<marker id="ar-${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" style="fill: var(--k-${k})"/></marker>`).join('')}</defs>`;
-  tiers.forEach((b, i) => { if (i) s += `<line class="tierline" x1="0" x2="${W}" y1="${b.y0}" y2="${b.y0}"/>`; s += `<text class="tiername" x="0" y="${b.y0 + PAD + 22}">${esc(b.t)}</text>`; });
-  const anchor = (p, q) => { const cx = p.x + BW / 2, cy = p.y + CH / 2, tx = q.x + BW / 2, ty = q.y + CH / 2; return Math.abs(ty - cy) < 4 ? [cx + (tx > cx ? 24 : -24), p.y] : [cx, ty > cy ? p.y + CH : p.y]; };
+  for (const b of bands) s += `<g class="band"><rect x="0" y="${b.y0}" width="${W}" height="${b.y1 - b.y0}" rx="6"/><text x="14" y="${b.y0 + 24}">${esc(b.t)}</text></g>`;
+  const anchor = (p, q) => { const cx = p.x + NW / 2, cy = p.y + NH / 2, tx = q.x + NW / 2, ty = q.y + NH / 2; return Math.abs(ty - cy) < 4 ? [cx + (tx > cx ? NW / 2 : -NW / 2), cy] : [cx, ty > cy ? p.y + NH : p.y]; };
   for (const e of edges) {
     const [x1, y1] = anchor(pos[e.from], pos[e.to]), [x2, y2] = anchor(pos[e.to], pos[e.from]);
     const my = (y1 + y2) / 2;
-    const d = Math.abs(y2 - y1) < 4 ? `M${x1},${y1} C${x1},${y1 - 24} ${x2},${y2 - 24} ${x2},${y2}` : `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+    const d = Math.abs(y2 - y1) < 4 ? `M${x1},${y1} C${(x1 + x2) / 2},${y1 - 40} ${(x1 + x2) / 2},${y2 - 40} ${x2},${y2}` : `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+    const lbl = [...e.labels].slice(0, 2).join(', ') + (e.labels.size > 2 ? ` 외 ${e.labels.size - 2}` : '');
     s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" marker-end="url(#ar-${e.kind})"/>`;
+    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}">${esc(lbl)}</text>`;
   }
   for (const u of units) {
     const p = pos[u.id], st = unitSt(u.id), iss = worst(issuesFor(ownedKeys(u.id)));
     const sub = u.type === 'grp' ? `그룹, 멤버 ${u.members.length}` : (u.summary || (u.path !== u.id ? u.path : '') || u.role || '');
     s += `<g class="unit ${st ? 'st-' + st : ''}" tabindex="0" role="button" data-id="${esc(u.id)}" aria-label="${esc(u.id)} 모듈 보기">`;
-    s += `<rect class="hit" x="${p.x - 10}" y="${p.y}" width="${BW}" height="${CH}" rx="4"/>`;
-    s += `<text class="nm" x="${p.x}" y="${p.y + 22}">${esc(u.id)}</text><text class="sb" x="${p.x}" y="${p.y + 42}">${esc(fit(sub, 22))}</text>`;
-    if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + BW - 22}" cy="${p.y + 16}"/>`;
+    if (u.type === 'grp') s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${NW}" height="${NH}" rx="6"/>`;
+    s += `<rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="6"/>`;
+    s += `<text class="nm" x="${p.x + 12}" y="${p.y + 25}">${esc(u.id)}</text><text class="sb" x="${p.x + 12}" y="${p.y + 44}">${esc(fit(sub, 22))}</text>`;
+    if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + NW - 12}" cy="${p.y + 12}"/>`;
     s += `</g>`;
   }
   s += '</svg>';
@@ -365,7 +371,7 @@ function renderMap() {
   const hi = id => {
     svg.classList.toggle('dim', !!id);
     const near = new Set();
-    svg.querySelectorAll('.edge').forEach(el => {
+    svg.querySelectorAll('.edge, .edge-label').forEach(el => {
       const on = showAll || (id && (el.dataset.from === id || el.dataset.to === id));
       el.classList.toggle('show', !!on);
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
