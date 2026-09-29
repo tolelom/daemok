@@ -67,8 +67,8 @@ func (mg *merger) file(root *yaml.Node) {
 		mg.first = &p
 	}
 	mg.scalarOnce(root, "version", &mg.m.Version)
-	if v := root.Get("version"); v != nil && v.Kind == yaml.Scalar && v.Value != "0.3" {
-		d.diags.Errorf(v.Pos, "지원하는 형식 버전은 0.3이다")
+	if v := root.Get("version"); v != nil && v.Kind == yaml.Scalar && v.Value != "0.4" {
+		d.diags.Errorf(v.Pos, "지원하는 형식 버전은 0.4다")
 	}
 	mg.scalarOnce(root, "go_module", &mg.m.GoModule)
 	mg.scalarOnce(root, "ts_out", &mg.m.TSOut)

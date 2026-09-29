@@ -1,4 +1,4 @@
-version: 0.3
+version: 0.4
 go_module: github.com/tolelom/fiber_api_server
 ts_out: tolelog/src/generated/design.gen.ts
 

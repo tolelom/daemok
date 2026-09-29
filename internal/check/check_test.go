@@ -13,7 +13,7 @@ import (
 func run(t *testing.T, src string) model.Diagnostics {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.3\n"+src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\n"+src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	m, ds := model.Load(dir)

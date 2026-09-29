@@ -44,7 +44,7 @@ func writeDesign(t *testing.T, src string) string {
 	return dir
 }
 
-const cleanDesign = `version: 0.3
+const cleanDesign = `version: 0.4
 tiers: [a]
 modules:
   core: { tier: a }
@@ -70,7 +70,7 @@ func TestCheckMissingDir(t *testing.T) {
 }
 
 func TestCheckModelErrorExits2(t *testing.T) {
-	dir := writeDesign(t, "version: 0.3\nmodulez: {}\n")
+	dir := writeDesign(t, "version: 0.4\nmodulez: {}\n")
 	code, out, _ := runCLI(t, "check", "--design", dir)
 	if code != 2 || !strings.Contains(out, "d.yaml:2:1: 오류: 알 수 없는 키 \"modulez\"") {
 		t.Fatalf("exit %d out %q", code, out)
@@ -78,7 +78,7 @@ func TestCheckModelErrorExits2(t *testing.T) {
 }
 
 func TestCheckDesignErrorExits1(t *testing.T) {
-	dir := writeDesign(t, "version: 0.3\ntiers: [a, b]\nmodules:\n  low:  { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
+	dir := writeDesign(t, "version: 0.4\ntiers: [a, b]\nmodules:\n  low:  { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
 	code, out, _ := runCLI(t, "check", "--design", dir)
 	if code != 1 || !strings.Contains(out, "d.yaml:4:33: 오류: 상위 tier 의존: low(a) → high(b)") || !strings.Contains(out, "오류 1, 경고 0, 정보 0") {
 		t.Fatalf("exit %d out %q", code, out)
@@ -86,7 +86,7 @@ func TestCheckDesignErrorExits1(t *testing.T) {
 }
 
 func TestCheckStrict(t *testing.T) {
-	dir := writeDesign(t, "version: 0.3\nrequirements:\n  REQ-a: { text: A }\n")
+	dir := writeDesign(t, "version: 0.4\nrequirements:\n  REQ-a: { text: A }\n")
 	code, _, _ := runCLI(t, "check", "--design", dir)
 	if code != 0 {
 		t.Fatalf("warning only: exit %d", code)
@@ -98,7 +98,7 @@ func TestCheckStrict(t *testing.T) {
 }
 
 func TestCheckOutputSorted(t *testing.T) {
-	dir := writeDesign(t, "version: 0.3\nrequirements:\n  REQ-b: { text: B }\n  REQ-a: { text: A }\n")
+	dir := writeDesign(t, "version: 0.4\nrequirements:\n  REQ-b: { text: B }\n  REQ-a: { text: A }\n")
 	_, out, _ := runCLI(t, "check", "--design", dir, "--strict")
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if len(lines) != 3 || !strings.Contains(lines[0], ":3:3:") || !strings.Contains(lines[1], ":4:3:") {
