@@ -168,17 +168,23 @@ flows:
 
 | 원본 | 파일 | 내용 |
 |---|---|---|
-| enum 하나 | `<모듈>/<enum id>.gen.go` | 타입, 상수 블록, `Valid()` |
+| enum 하나 | `<모듈>/<enum id>.gen.go` | 타입, 상수 블록, `Valid()`, `<타입>Values()` |
 | 모듈의 consts 전부 | `<모듈>/consts.gen.go` | const 블록 |
 | 모듈의 errors 전부 | `<모듈>/errors.gen.go` | sentinel `var` 블록, `HTTPStatus` |
 | 모듈의 types 전부 | `<모듈>/types.gen.go` | struct |
-| 모듈의 contracts 전부 | `<모듈>/contracts.gen.go` | interface |
-| handler_kind 하나 | `<모듈>/<handler_kind id>.gen.go` | 함수 타입, 등록 함수 시그니처 확인 |
+| 모듈의 `kind: call` 계약 전부 | `<모듈>/contracts.gen.go` | interface |
+| handler_kind 하나 | `<모듈>/<handler_kind id>.gen.go` | 함수 타입 |
 | 그룹 멤버 하나 | `<그룹 path>/<멤버>/register.gen.go` | `init()` 등록, `var _ Handler = f` |
-| 실행 단위 하나 | `cmd/<실행 단위>/modules.gen.go` | 조립하는 모듈의 blank import |
+| 실행 단위 하나 | `cmd/<실행 단위>/modules.gen.go` | `composes`에 적은 그룹의 멤버 blank import |
+| `needs`가 있는 모듈·멤버 | `<path>/needs.gen.go` | 계약마다 `uses`의 메서드만 담은 interface. 멤버는 그룹의 needs를 포함 |
+| 실행 단위 하나 | `cmd/<실행 단위>/contracts.gen.go` | 조립하는 받는 쪽·주는 쪽 쌍마다 구현 타입의 interface 만족 확인. query 구현은 `<주는 모듈>/query` |
+| event_kind 하나 | `<모듈>/<event_kind id>.gen.go` | 이벤트마다 `<이벤트>Data` struct, `encoding: map`이면 `Map()`과 `<이벤트>DataFrom` |
+| `encoding: map` event_kind를 가진 모듈 | `<모듈>/daemok_event.gen.go` | 변환 도우미 |
+| 흐름 하나 | `<모듈>/<흐름 id>.gen.go` | `<흐름>Steps` interface, `Run<흐름>` |
+| 흐름을 가진 모듈 | `<모듈>/daemok_flow.gen.go` | `FlowError` |
 | cases가 있는 함수 하나 | `<모듈>/<함수 id>_gen_test.go` | 테이블 테스트 |
 | cases가 있는 함수를 가진 모듈 | `<모듈>/daemok_case_gen_test.go` | `caseInput`, `checkErr`, `checkExpect` 도우미 |
-| `export: [ts]`가 붙은 consts·enums 전부 | `ts_out` | TypeScript 상수와 타입 |
+| `export: [ts]`가 붙은 consts·enums 전부 | `ts_out` | TypeScript 상수와 타입. MVP에서는 생성하지 않는다 |
 
 - 이름 변환: ID `handle_transfer`는 함수 `handleTransfer`, enum 값 `mint_asset`은 `go.prefix` + `MintAsset`. `Id`로 끝나는 조각은 `ID`로 바꾼다.
 - 멤버의 `handles` 값에 대응하는 L4 함수 노드가 없으면 등록 코드는 `handle` + 값의 CamelCase(`handleMintAsset`)를 쓴다. 함수 노드가 있으면 그 ID를 쓴다.
@@ -196,9 +202,10 @@ flows:
 | 핸들러 | 키 enum의 모든 값이 정확히 한 멤버에서 처리되는지 |
 | L4 | `handles`가 멤버의 `handles`에 있는지, 케이스의 에러가 `errors`에 있는지, 케이스가 없는 에러 |
 | R | 충족 요소가 없는 active 요구사항, held·dropped 요구사항에 매달린 요소 |
-| 관계 | `needs`의 관계도 tier 방향과 순환에 넣음, port·external 계약의 모듈 role, 받은 계약의 시그니처 타입에 대한 의존 |
-| 이벤트 | key enum의 값마다 이벤트가 있는지, 발행자·구독자가 이벤트 종류의 모듈에 의존하는지, 발행자가 있는지 |
-| 흐름 | 단계 ID 형식과 중복, commit 하나, 커밋 뒤 undo 없음, `calls`의 계약을 받는지, `emits`의 발행자, `on`의 구독자 |
+| 관계 | `needs`의 관계도 tier 방향과 순환(형제 멤버 포함)에 넣음, 자기 계약을 받는 needs, 같은 계약을 두 번 받음(경고), 빈 `uses`, port·external 계약의 모듈 role, 받은 계약의 시그니처 타입에 대한 의존 |
+| 이벤트 | key enum의 값마다 이벤트가 있는지, 한 enum을 여러 이벤트 종류가 쓰는지, 발행자가 있는지, 발행자·구독자가 모듈이나 그룹 멤버인지, 이벤트 종류의 모듈에 의존하는지 |
+| 흐름 | 빈 흐름, 단계 ID와 undo 형식, 단계 중복, Go 메서드 이름 충돌, commit 하나, commit 단계와 커밋 뒤 단계의 undo, `calls`의 계약과 `uses`, `emits`의 발행자, `on`의 구독자 |
+| 외부 타입 | `모듈.이름` 형식의 외부 타입은 그 모듈에 대한 의존으로 본다 |
 
 ## 어긋남 유형별 대응
 
