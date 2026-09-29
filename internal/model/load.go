@@ -24,6 +24,26 @@ func Load(dir string) (*Model, Diagnostics) {
 		diags.Errorf(yaml.Pos{File: dir}, "설계 파일(*.yaml)이 없다")
 		return nil, diags
 	}
+	files := map[string][]byte{}
+	for _, p := range paths {
+		src, err := os.ReadFile(p)
+		if err != nil {
+			diags.Errorf(yaml.Pos{File: p}, "읽을 수 없다: %v", err)
+			continue
+		}
+		files[p] = src
+	}
+	m, more := LoadSources(files)
+	return m, append(diags, more...)
+}
+
+// LoadSources는 이름과 내용의 설계 파일들을 이름순으로 한 모델로 합친다. 이름은 진단 위치에 쓰인다.
+func LoadSources(files map[string][]byte) (*Model, Diagnostics) {
+	var diags Diagnostics
+	paths := make([]string, 0, len(files))
+	for p := range files {
+		paths = append(paths, p)
+	}
 	sort.Strings(paths)
 	mg := &merger{
 		m:    &Model{},
@@ -32,11 +52,7 @@ func Load(dir string) (*Model, Diagnostics) {
 		once: map[string]yaml.Pos{},
 	}
 	for _, p := range paths {
-		src, err := os.ReadFile(p)
-		if err != nil {
-			diags.Errorf(yaml.Pos{File: p}, "읽을 수 없다: %v", err)
-			continue
-		}
+		src := files[p]
 		root, perr := yaml.Parse(p, src)
 		if perr != nil {
 			e := perr.(*yaml.Error)
