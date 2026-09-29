@@ -25,16 +25,17 @@ var webFS embed.FS
 
 // state는 /api/state의 본문이다.
 type state struct {
-	Version int       `json:"version"`
-	Design  string    `json:"design"`
-	Root    string    `json:"root"`
-	Model   *vModel   `json:"model"`
-	Base    *vModel   `json:"base"`
-	HasBase bool      `json:"hasBase"`
-	Issues  []vIssue  `json:"issues"`
-	Files   []vFile   `json:"files"`
-	Fatal   bool      `json:"fatal"`
-	Updated time.Time `json:"updated"`
+	Version   int         `json:"version"`
+	Design    string      `json:"design"`
+	Root      string      `json:"root"`
+	Model     *vModel     `json:"model"`
+	Base      *vModel     `json:"base"`
+	HasBase   bool        `json:"hasBase"`
+	Issues    []vIssue    `json:"issues"`
+	Relations []vRelation `json:"relations"`
+	Files     []vFile     `json:"files"`
+	Fatal     bool        `json:"fatal"`
+	Updated   time.Time   `json:"updated"`
 }
 
 // Server는 설계 디렉토리 하나의 지도를 제공한다.
@@ -59,6 +60,7 @@ func (s *Server) Refresh() {
 	st := state{Design: s.design, Root: s.root, Model: toView(r.Model), Fatal: r.Fatal, Updated: time.Now()}
 	st.Issues = toIssues(r.Model, s.root, r.Diags, r.Code)
 	st.Files = toFiles(r.Model, r.Files)
+	st.Relations = toRelations(r.Model)
 	if files, ok, err := gitbase.Files(s.design); err == nil && ok {
 		base, _ := model.LoadSources(files)
 		st.Base, st.HasBase = toView(base), true

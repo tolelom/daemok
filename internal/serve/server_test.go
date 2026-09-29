@@ -234,3 +234,89 @@ func TestCodeScanDiagOnDesignFileIsCodeOrigin(t *testing.T) {
 	}
 	t.Fatal("진단이 없다")
 }
+
+const relDesign = `version: 0.4
+go_module: example.com/x
+tiers: [a, b, c]
+modules:
+  core:  { tier: a }
+  store: { tier: a, role: infra }
+  vm:    { tier: b, depends_on: [core] }
+  api:   { tier: c, depends_on: [core], needs: [{ contract: kv, uses: [get], why: "캐시" }] }
+groups:
+  mods:
+    tier: b
+    kind: h
+    depends_on: [core, vm]
+    members:
+      m1: { handles: [x], exceptions: [{ depends_on: m2, reason: "재사용" }] }
+      m2: { handles: [y] }
+enums:
+  hkey: { in: core, values: [x, y] }
+  ev_type: { in: core, values: [done] }
+handler_kinds:
+  h: { in: vm, key: hkey, params: {}, returns: [error] }
+contracts:
+  kv: { in: store, kind: port, methods: { get: { errors: [] } } }
+event_kinds:
+  evk: { in: core, key: ev_type, subscribers: [api] }
+events:
+  done: { kind: evk, publishers: [m1], subscribers: [vm] }
+flows:
+  f:
+    in: api
+    steps:
+      - { id: a, undo: ua }
+      - { id: b, undo: ub }
+      - { id: c, commit: true, fatal: true }
+      - { id: d }
+`
+
+func TestRelations(t *testing.T) {
+	s, _ := setup(t, relDesign)
+	var got []string
+	for _, it := range getState(t, s)["relations"].([]any) {
+		r := it.(map[string]any)
+		got = append(got, r["kind"].(string)+" "+r["from"].(string)+">"+r["to"].(string)+" "+r["label"].(string))
+	}
+	for _, want := range []string{
+		"depends vm>core ",
+		"depends mods>core ",
+		"exception m1>m2 재사용",
+		"port api>store kv",
+		"event m1>vm done",
+		"event m1>api done",
+		"register m1>vm h",
+		"register m2>vm h",
+	} {
+		found := false
+		for _, g := range got {
+			if g == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("관계 없음: %q\n%v", want, got)
+		}
+	}
+}
+
+func TestFlowFailurePaths(t *testing.T) {
+	s, _ := setup(t, relDesign)
+	flows := getState(t, s)["model"].(map[string]any)["flows"].([]any)
+	steps := flows[0].(map[string]any)["steps"].([]any)
+	want := []struct {
+		undo  string
+		fatal bool
+	}{{"", false}, {"ua", false}, {"", true}, {"", false}}
+	for i, st := range steps {
+		m := st.(map[string]any)
+		var undo []string
+		for _, u := range m["onFailUndo"].([]any) {
+			undo = append(undo, u.(string))
+		}
+		if strings.Join(undo, ",") != want[i].undo || m["onFailFatal"].(bool) != want[i].fatal {
+			t.Errorf("step %s: undo %v fatal %v", m["id"], undo, m["onFailFatal"])
+		}
+	}
+}

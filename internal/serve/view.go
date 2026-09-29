@@ -212,6 +212,18 @@ type vStep struct {
 	Calls   []string `json:"calls"`
 	Emits   []string `json:"emits"`
 	Summary string   `json:"summary"`
+	// OnFailUndo는 이 단계가 실패하면 부르는 되돌리기를 부르는 순서대로 담는다.
+	OnFailUndo  []string `json:"onFailUndo"`
+	OnFailFatal bool     `json:"onFailFatal"`
+}
+
+// vRelation은 화면이 그리는 관계 하나다. 종류는 depends, exception, call, query, port, external, event, register.
+type vRelation struct {
+	From  string `json:"from"`
+	To    string `json:"to"`
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+	Why   string `json:"why"`
 }
 
 type vFlow struct {
@@ -434,8 +446,25 @@ func toView(m *model.Model) *vModel {
 	}
 	for _, f := range m.Flows {
 		vf := vFlow{ID: f.ID, In: f.In.Name, On: f.On.Name, Summary: f.Summary, Steps: []vStep{}, Satisfies: names(f.Satisfies)}
+		// 실패 경로는 생성되는 Run 함수와 같은 규칙이다. 커밋 전 실패는 쌓인 되돌리기를 역순으로,
+		// fatal 단계는 되돌리지 않고 Fatal, 커밋 뒤 실패는 아무것도 되돌리지 않는다.
+		var stack []string
+		committed := false
 		for _, s := range f.Steps {
-			vf.Steps = append(vf.Steps, vStep{s.ID, s.Undo, s.Commit, s.Fatal, names(s.Calls), names(s.Emits), s.Summary})
+			undo := []string{}
+			if !committed && !s.Fatal {
+				for i := len(stack) - 1; i >= 0; i-- {
+					undo = append(undo, stack[i])
+				}
+			}
+			vf.Steps = append(vf.Steps, vStep{ID: s.ID, Undo: s.Undo, Commit: s.Commit, Fatal: s.Fatal, Calls: names(s.Calls),
+				Emits: names(s.Emits), Summary: s.Summary, OnFailUndo: undo, OnFailFatal: s.Fatal})
+			if !committed && s.Undo != "" && !s.Commit {
+				stack = append(stack, s.Undo)
+			}
+			if s.Commit {
+				committed, stack = true, nil
+			}
 		}
 		v.Flows = append(v.Flows, vf)
 	}
@@ -651,6 +680,61 @@ func toFiles(m *model.Model, files []golang.File) []vFile {
 	src := fileSources(m)
 	for _, f := range files {
 		out = append(out, vFile{Path: f.Path, Lang: "go", Code: string(f.Content), Sources: strsOrEmpty(src[f.Path])})
+	}
+	return out
+}
+
+// toRelations는 설계의 참조에서 관계 목록을 만든다. 화면은 이 목록을 그리기만 한다.
+func toRelations(m *model.Model) []vRelation {
+	out := []vRelation{}
+	if m == nil {
+		return out
+	}
+	add := func(from, to, kind, label, why string) {
+		if from != "" && to != "" {
+			out = append(out, vRelation{from, to, kind, label, why})
+		}
+	}
+	needs := func(from string, ns []model.Need) {
+		for _, n := range ns {
+			if ct := m.Contract(n.Contract.Name); ct != nil {
+				add(from, ct.In.Name, ct.Kind, ct.ID, n.Why)
+			}
+		}
+	}
+	for _, x := range m.Modules {
+		for _, d := range x.DependsOn {
+			add(x.ID, d.Name, "depends", "", "")
+		}
+		needs(x.ID, x.Needs)
+	}
+	for _, g := range m.Groups {
+		for _, d := range g.DependsOn {
+			add(g.ID, d.Name, "depends", "", "")
+		}
+		needs(g.ID, g.Needs)
+		hk := m.HandlerKind(g.Kind.Name)
+		for _, mem := range g.Members {
+			for _, e := range mem.Exceptions {
+				add(mem.ID, e.DependsOn.Name, "exception", e.Reason, e.Reason)
+			}
+			needs(mem.ID, mem.Needs)
+			if hk != nil {
+				add(mem.ID, hk.In.Name, "register", hk.ID, "")
+			}
+		}
+	}
+	for _, e := range m.Events {
+		var subs []model.Ref
+		subs = append(subs, e.Subscribers...)
+		if ek := m.EventKind(e.Kind.Name); ek != nil {
+			subs = append(subs, ek.Subscribers...)
+		}
+		for _, p := range e.Publishers {
+			for _, s := range subs {
+				add(p.Name, s.Name, "event", e.ID, "")
+			}
+		}
 	}
 	return out
 }
