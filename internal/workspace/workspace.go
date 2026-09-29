@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/tolelom/daemok/internal/check"
+	"github.com/tolelom/daemok/internal/codescan"
 	"github.com/tolelom/daemok/internal/gen/golang"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
@@ -85,6 +86,7 @@ func Run(designDir, root string) Result {
 		plan.Delete = append(plan.Delete, p)
 		diags.Errorf(yaml.Pos{File: filepath.Join(root, filepath.FromSlash(p))}, "설계에 없는 생성 파일: %s (daemok gen)", p)
 	}
+	diags = append(diags, codescan.Scan(m, root)...)
 	diags.Sort()
 	return Result{Model: m, Diags: diags, Plan: plan}
 }

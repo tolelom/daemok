@@ -1,0 +1,292 @@
+// Package codescan은 코드의 import와 이벤트 상수 참조를 설계와 대조한다.
+package codescan
+
+import (
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"slices"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/yaml"
+)
+
+type scanner struct {
+	m     *model.Model
+	root  string
+	fset  *token.FileSet
+	diags model.Diagnostics
+	units map[string]string // import 경로 → 모듈·멤버 ID
+	// 모듈·멤버 ID → 그 패키지가 import한 설계 단위
+	imports map[string]map[string]bool
+	// 모듈·멤버 ID → 쓴 이벤트 상수와 목록 함수의 이름
+	refs map[string]map[string]bool
+}
+
+// unit은 코드 디렉토리를 가진 모듈이나 그룹 멤버다.
+type unit struct {
+	id, dir string
+}
+
+// Scan은 설계 검사를 통과한 모델의 모듈·멤버 코드를 읽어 진단을 준다.
+func Scan(m *model.Model, root string) model.Diagnostics {
+	s := &scanner{
+		m: m, root: root, fset: token.NewFileSet(),
+		units: map[string]string{}, imports: map[string]map[string]bool{}, refs: map[string]map[string]bool{},
+	}
+	us := s.unitList()
+	for _, u := range us {
+		s.units[m.GoModule+"/"+u.dir] = u.id
+	}
+	for _, u := range us {
+		s.scanUnit(u)
+	}
+	s.queryPackages()
+	s.unusedDeps(us)
+	s.eventRefs(us)
+	s.diags.Sort()
+	return s.diags
+}
+
+func (s *scanner) unitList() []unit {
+	var out []unit
+	for _, mod := range s.m.Modules {
+		out = append(out, unit{mod.ID, mod.Path})
+	}
+	for _, g := range s.m.Groups {
+		for _, mem := range g.Members {
+			out = append(out, unit{mem.ID, mem.Path()})
+		}
+	}
+	return out
+}
+
+// goFiles는 디렉토리의 Go 파일을 문법 트리로 준다. _test.go는 뺀다. 디렉토리가 없으면 비어 있다.
+func (s *scanner) goFiles(dir string) []*ast.File {
+	entries, err := os.ReadDir(filepath.Join(s.root, filepath.FromSlash(dir)))
+	if err != nil {
+		return nil
+	}
+	var out []*ast.File
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		p := filepath.Join(s.root, filepath.FromSlash(dir), name)
+		f, err := parser.ParseFile(s.fset, p, nil, parser.SkipObjectResolution)
+		if err != nil {
+			s.diags.Errorf(yaml.Pos{File: p}, "Go 파일을 읽을 수 없다: %v", err)
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+func (s *scanner) pos(p token.Pos) yaml.Pos {
+	q := s.fset.Position(p)
+	return yaml.Pos{File: q.Filename, Line: q.Line, Col: q.Column}
+}
+
+func (s *scanner) scanUnit(u unit) {
+	s.imports[u.id] = map[string]bool{}
+	s.refs[u.id] = map[string]bool{}
+	unmanaged := map[string]bool{}
+	for _, f := range s.goFiles(u.dir) {
+		for _, im := range f.Imports {
+			ip, _ := strconv.Unquote(im.Path.Value)
+			if ip != s.m.GoModule && !strings.HasPrefix(ip, s.m.GoModule+"/") {
+				continue
+			}
+			target, ok := s.units[ip]
+			if !ok {
+				if !unmanaged[ip] {
+					unmanaged[ip] = true
+					s.diags.Infof(s.pos(im.Pos()), "관리하지 않는 패키지를 import한다: %s → %s", u.id, ip)
+				}
+				continue
+			}
+			if target == u.id {
+				continue
+			}
+			s.imports[u.id][target] = true
+			if s.m.CanDepend(u.id, target) {
+				continue
+			}
+			if s.receivesFrom(u.id, target) {
+				s.diags.Errorf(s.pos(im.Pos()), "needs로만 이어진 모듈을 직접 import한다: %s → %s", u.id, target)
+			} else {
+				s.diags.Errorf(s.pos(im.Pos()), "설계에 없는 의존을 import한다: %s → %s", u.id, target)
+			}
+		}
+		s.collectRefs(u.id, f)
+	}
+}
+
+// needsOf는 id가 받는 계약이다. 멤버는 그룹의 needs도 받는다.
+func (s *scanner) needsOf(id string) []model.Need {
+	if mem := s.m.Member(id); mem != nil {
+		return append(slices.Clone(mem.Group.Needs), mem.Needs...)
+	}
+	if mod := s.m.Module(id); mod != nil {
+		return mod.Needs
+	}
+	return nil
+}
+
+// receivesFrom은 id가 target 모듈의 계약을 needs로 받는지다.
+func (s *scanner) receivesFrom(id, target string) bool {
+	for _, n := range s.needsOf(id) {
+		if ct := s.m.Contract(n.Contract.Name); ct != nil && ct.In.Name == target {
+			return true
+		}
+	}
+	return false
+}
+
+// queryPackages는 query 계약을 가진 모듈의 query 패키지가 data 모듈 말고 다른 설계 모듈을 import하는지 본다.
+func (s *scanner) queryPackages() {
+	done := map[string]bool{}
+	for _, ct := range s.m.Contracts {
+		if ct.Kind != "query" || done[ct.In.Name] {
+			continue
+		}
+		done[ct.In.Name] = true
+		o, ok := s.m.Owner(ct.In.Name)
+		if !ok {
+			continue
+		}
+		dir := o.Path + "/query"
+		for _, f := range s.goFiles(dir) {
+			for _, im := range f.Imports {
+				ip, _ := strconv.Unquote(im.Path.Value)
+				target, ok := s.units[ip]
+				if !ok {
+					continue
+				}
+				if mod := s.m.Module(target); mod == nil || mod.Role != "data" {
+					s.diags.Errorf(s.pos(im.Pos()), "query 패키지가 data가 아닌 모듈을 import한다: %s → %s", dir, target)
+				}
+			}
+		}
+	}
+}
+
+// unusedDeps는 모듈의 depends_on 대상을 import하지 않으면 정보로 알린다. 그룹 대상은 멤버 하나를 import하면 된다.
+// 코드 디렉토리가 없는 모듈은 보지 않는다.
+func (s *scanner) unusedDeps(us []unit) {
+	for _, mod := range s.m.Modules {
+		if !s.dirExists(mod.Path) {
+			continue
+		}
+		for _, d := range mod.DependsOn {
+			targets := []string{d.Name}
+			if g := s.m.Group(d.Name); g != nil {
+				targets = nil
+				for _, mem := range g.Members {
+					targets = append(targets, mem.ID)
+				}
+			}
+			used := false
+			for _, t := range targets {
+				used = used || s.imports[mod.ID][t]
+			}
+			if !used {
+				s.diags.Infof(d.Pos, "설계상 의존하지만 import하지 않는다: %s → %s", mod.ID, d.Name)
+			}
+		}
+	}
+}
+
+func (s *scanner) dirExists(dir string) bool {
+	st, err := os.Stat(filepath.Join(s.root, filepath.FromSlash(dir)))
+	return err == nil && st.IsDir()
+}
+
+// collectRefs는 이벤트 종류 모듈의 이름을 쓴 식별자를 모은다.
+// 다른 패키지에서는 import 이름(별칭 포함)의 선택자, 이벤트 종류 모듈 안에서는 맨 식별자다.
+func (s *scanner) collectRefs(id string, f *ast.File) {
+	kindImports := map[string]bool{} // 이 파일에서 이벤트 종류 모듈을 가리키는 이름
+	inKindModule := false
+	for _, ek := range s.m.EventKinds {
+		ip := s.m.ImportPath(ek.In.Name)
+		if ek.In.Name == id {
+			inKindModule = true
+		}
+		for _, im := range f.Imports {
+			if p, _ := strconv.Unquote(im.Path.Value); p == ip {
+				name := filepath.Base(ip)
+				if im.Name != nil {
+					name = im.Name.Name
+				}
+				kindImports[name] = true
+			}
+		}
+	}
+	ast.Inspect(f, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.SelectorExpr:
+			if pkg, ok := x.X.(*ast.Ident); ok && kindImports[pkg.Name] {
+				s.refs[id][x.Sel.Name] = true
+			}
+		case *ast.Ident:
+			if inKindModule {
+				s.refs[id][x.Name] = true
+			}
+		}
+		return true
+	})
+}
+
+// eventRefs는 발행자·구독자가 이벤트 상수를 쓰는지, 적히지 않은 모듈이 쓰는지 본다.
+func (s *scanner) eventRefs(us []unit) {
+	m := s.m
+	for _, ek := range m.EventKinds {
+		en := m.Enum(ek.Key.Name)
+		if en == nil {
+			continue
+		}
+		declared := map[string]bool{}
+		for _, r := range ek.Subscribers {
+			declared[r.Name] = true
+			if s.dirExists(s.ownerDir(r.Name)) && !s.refs[r.Name][en.GoType()+"Values"] {
+				s.diags.Errorf(r.Pos, "이벤트 목록 함수를 쓰지 않는다: 모듈 %s, 이벤트 종류 %s (%sValues)", r.Name, ek.ID, en.GoType())
+			}
+		}
+		for _, v := range en.Values {
+			e := m.Event(v.Name)
+			if e == nil {
+				continue
+			}
+			constName := en.ConstName(v.Name)
+			users := map[string]bool{}
+			for _, r := range append(slices.Clone(e.Publishers), e.Subscribers...) {
+				users[r.Name] = true
+				if s.dirExists(s.ownerDir(r.Name)) && !s.refs[r.Name][constName] {
+					s.diags.Errorf(r.Pos, "이벤트 상수를 쓰지 않는다: 모듈 %s, 이벤트 %s (%s)", r.Name, e.ID, constName)
+				}
+			}
+			var extra []string
+			for _, u := range us {
+				if u.id != ek.In.Name && !users[u.id] && !declared[u.id] && s.refs[u.id][constName] {
+					extra = append(extra, u.id)
+				}
+			}
+			sort.Strings(extra)
+			for _, id := range extra {
+				s.diags.Warnf(e.Pos, "발행자나 구독자로 적히지 않은 모듈이 이벤트를 쓴다: 모듈 %s, 이벤트 %s", id, e.ID)
+			}
+		}
+	}
+}
+
+func (s *scanner) ownerDir(id string) string {
+	o, _ := s.m.Owner(id)
+	return o.Path
+}

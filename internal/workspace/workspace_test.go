@@ -122,3 +122,9 @@ func TestStaleGeneratedFileAnywhere(t *testing.T) {
 		t.Fatal("지워지지 않았다")
 	}
 }
+
+func TestCodeScanIncluded(t *testing.T) {
+	root, dir := setup(t, "version: 0.4\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\n  api: { tier: a }\n")
+	write(t, filepath.Join(root, "core", "core.go"), "package core\n\nimport _ \"example.com/x/api\"\n")
+	wantDiag(t, Run(dir, root), "설계에 없는 의존을 import한다: core → api")
+}

@@ -1,0 +1,32 @@
+version: 0.4
+go_module: example.com/scan
+tiers: [base, mid, top]
+modules:
+  model:  { tier: base, role: data }
+  events: { tier: base }
+  store:  { tier: mid, depends_on: [model] }
+  post:   { tier: mid, depends_on: [model, events] }
+  feed:   { tier: top, depends_on: [model, events], needs: [post_reader] }
+  lonely: { tier: top, depends_on: [store] }
+groups:
+  plugins:
+    tier: top
+    kind: hk
+    depends_on: [model, events]
+    members:
+      a: { handles: [x], exceptions: [{ depends_on: b }] }
+      b: { handles: [y] }
+enums:
+  hkey:       { in: model, values: [x, y] }
+  event_type: { in: events, go: { type: EventType, prefix: Event }, values: [created, deleted] }
+types:
+  item: { in: model, fields: { id: int } }
+handler_kinds:
+  hk: { in: model, key: hkey, params: {}, returns: [error] }
+contracts:
+  post_reader: { in: post, kind: query, methods: { list: { returns: ["[]item"], errors: [] } } }
+event_kinds:
+  ev: { in: events, key: event_type, subscribers: [feed] }
+events:
+  created: { kind: ev, publishers: [post], subscribers: [a] }
+  deleted: { kind: ev, publishers: [post] }
