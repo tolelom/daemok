@@ -42,6 +42,7 @@ func (c *checker) refs() {
 		for _, r := range mod.Implements {
 			c.iface(r)
 		}
+		c.needRefs(mod.Needs)
 	}
 	for _, g := range m.Groups {
 		c.tier(g.Tier)
@@ -51,7 +52,9 @@ func (c *checker) refs() {
 		for _, r := range g.DependsOn {
 			c.dep(r)
 		}
+		c.needRefs(g.Needs)
 		for _, mem := range g.Members {
+			c.needRefs(mem.Needs)
 			for _, r := range mem.Handles {
 				c.handleValue(g.Kind, r)
 			}
@@ -71,19 +74,7 @@ func (c *checker) refs() {
 	}
 	for _, t := range m.Types {
 		c.in(t.In)
-		for _, f := range t.Fields {
-			if f.Type.Name != "" {
-				c.typeRef(f.Type)
-			}
-			if f.RefType.Name != "" && m.Type(f.RefType.Name) == nil {
-				c.errorf(f.RefType.Pos, "없는 타입 %q", f.RefType.Name)
-			}
-			if f.Max.Name != "" {
-				if _, err := strconv.Atoi(f.Max.Name); err != nil && m.Const(f.Max.Name) == nil {
-					c.errorf(f.Max.Pos, "max는 상수 ID나 숫자여야 한다: %q", f.Max.Name)
-				}
-			}
-		}
+		c.fieldRefs(t.Fields)
 	}
 	for _, ct := range m.Contracts {
 		c.in(ct.In)
@@ -111,7 +102,7 @@ func (c *checker) refs() {
 			}
 		}
 		if f.Of.Name != "" {
-			c.ofRef(f.Of)
+			c.methodRef(f.Of, "of")
 		}
 		for _, r := range f.Errors {
 			c.errRef(r)
@@ -121,6 +112,79 @@ func (c *checker) refs() {
 				c.errRef(cs.Error)
 			}
 		}
+	}
+	for _, ek := range m.EventKinds {
+		c.in(ek.In)
+		if ek.Key.Name != "" && m.Enum(ek.Key.Name) == nil {
+			c.errorf(ek.Key.Pos, "없는 enum %q", ek.Key.Name)
+		}
+		for _, r := range ek.Subscribers {
+			c.dep(r)
+		}
+	}
+	for _, e := range m.Events {
+		if e.Kind.Name != "" && m.EventKind(e.Kind.Name) == nil {
+			c.errorf(e.Kind.Pos, "없는 이벤트 종류 %q", e.Kind.Name)
+		}
+		for _, r := range e.Publishers {
+			c.dep(r)
+		}
+		for _, r := range e.Subscribers {
+			c.dep(r)
+		}
+		c.fieldRefs(e.Data)
+	}
+	for _, f := range m.Flows {
+		c.in(f.In)
+		if f.On.Name != "" {
+			c.eventRef(f.On)
+		}
+		for _, s := range f.Steps {
+			for _, r := range s.Calls {
+				c.methodRef(r, "calls")
+			}
+			for _, r := range s.Emits {
+				c.eventRef(r)
+			}
+		}
+	}
+}
+
+func (c *checker) fieldRefs(fields []*model.Field) {
+	m := c.m
+	for _, f := range fields {
+		if f.Type.Name != "" {
+			c.typeRef(f.Type)
+		}
+		if f.RefType.Name != "" && m.Type(f.RefType.Name) == nil {
+			c.errorf(f.RefType.Pos, "없는 타입 %q", f.RefType.Name)
+		}
+		if f.Max.Name != "" {
+			if _, err := strconv.Atoi(f.Max.Name); err != nil && m.Const(f.Max.Name) == nil {
+				c.errorf(f.Max.Pos, "max는 상수 ID나 숫자여야 한다: %q", f.Max.Name)
+			}
+		}
+	}
+}
+
+func (c *checker) needRefs(ns []model.Need) {
+	for _, n := range ns {
+		ct := c.m.Contract(n.Contract.Name)
+		if ct == nil {
+			c.errorf(n.Contract.Pos, "없는 계약 %q", n.Contract.Name)
+			continue
+		}
+		for _, u := range n.Uses {
+			if ct.Method(u.Name) == nil {
+				c.errorf(u.Pos, "계약 %s에 없는 메서드 %q", ct.ID, u.Name)
+			}
+		}
+	}
+}
+
+func (c *checker) eventRef(r model.Ref) {
+	if c.m.Event(r.Name) == nil {
+		c.errorf(r.Pos, "없는 이벤트 %q", r.Name)
 	}
 }
 
@@ -189,10 +253,10 @@ func (c *checker) handleValue(kind model.Ref, r model.Ref) {
 	}
 }
 
-func (c *checker) ofRef(r model.Ref) {
+func (c *checker) methodRef(r model.Ref, field string) {
 	ct, meth, ok := strings.Cut(r.Name, ".")
 	if !ok {
-		c.errorf(r.Pos, "of는 계약.메서드 형식이어야 한다")
+		c.errorf(r.Pos, "계약.메서드 형식이어야 한다: %s %q", field, r.Name)
 		return
 	}
 	contract := c.m.Contract(ct)

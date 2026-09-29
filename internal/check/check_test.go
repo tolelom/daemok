@@ -67,7 +67,7 @@ modules:
   crypto:  { tier: foundation }
   core:    { tier: domain, depends_on: [crypto], satisfies: [REQ-a] }
   vm:      { tier: execution, depends_on: [core] }
-  rpc_mod: { tier: service, depends_on: [core, vm], implements: [rpc] }
+  rpc_mod: { tier: service, depends_on: [core, vm], implements: [rpc], needs: [store] }
 groups:
   tx_modules:
     tier: execution
@@ -79,6 +79,7 @@ groups:
       asset:   { handles: [mint] }
 enums:
   tx_type: { in: core, values: [transfer, mint] }
+  event_type: { in: core, values: [minted] }
 errors:
   ErrNotFound: { in: core, message: "not found", http: 404 }
   ErrLow:      { in: core, message: "low" }
@@ -95,6 +96,18 @@ handler_kinds:
     params: { payload: payload }
     returns: [error]
     key: tx_type
+event_kinds:
+  chain_event: { in: core, key: event_type, subscribers: [rpc_mod] }
+events:
+  minted: { kind: chain_event, publishers: [asset], subscribers: [vm], data: { to: address } }
+flows:
+  run_block:
+    in: core
+    steps:
+      - { id: lock, undo: unlock }
+      - { id: load, calls: [store.get] }
+      - { id: commit, commit: true, fatal: true }
+      - { id: unlock }
 funcs:
   handle_transfer:
     in: economy
@@ -368,4 +381,109 @@ func TestSamples(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRefErrorsV04(t *testing.T) {
+	cases := []struct{ old, new, msg string }{
+		{"needs: [store]", "needs: [shop]", `없는 계약 "shop"`},
+		{"needs: [store]", "needs: [{ contract: store, uses: [put] }]", `계약 store에 없는 메서드 "put"`},
+		{"key: event_type", "key: evt", `없는 enum "evt"`},
+		{"subscribers: [rpc_mod]", "subscribers: [nobody]", `없는 모듈 "nobody"`},
+		{"kind: chain_event", "kind: chain", `없는 이벤트 종류 "chain"`},
+		{"publishers: [asset]", "publishers: [ghost]", `없는 모듈 "ghost"`},
+		{"data: { to: address }", "data: { to: adress }", `알 수 없는 타입 "adress"`},
+		{"calls: [store.get]", "calls: [store.put]", `계약 store에 없는 메서드 "put"`},
+		{"calls: [store.get]", "calls: [storeget]", "계약.메서드 형식"},
+		{"in: core\n    steps", "in: nowhere\n    steps", `in이 가리키는 모듈이나 멤버가 없다: "nowhere"`},
+		{"{ id: unlock }", "{ id: unlock, emits: [burned] }", `없는 이벤트 "burned"`},
+		{"in: core\n    steps", "in: core\n    on: burned\n    steps", `없는 이벤트 "burned"`},
+	}
+	for _, c := range cases {
+		ds := run(t, replace(t, c.old, c.new))
+		want(t, ds, model.Error, c.msg)
+	}
+}
+
+func TestNeedsTierAndCycle(t *testing.T) {
+	// crypto(foundation)가 core(domain)의 계약을 받으면 상위 tier 의존
+	ds := run(t, replace(t, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [store] }"))
+	want(t, ds, model.Error, "상위 tier 의존: crypto(foundation) → core(domain)")
+	// core가 vm의 계약을 받고 vm이 core에 의존하면 순환
+	src := replace(t, "core:    { tier: domain, depends_on: [crypto]", "core:    { tier: domain, depends_on: [crypto], needs: [runner]")
+	src = strings.Replace(src, "contracts:\n", "contracts:\n  runner: { in: vm, methods: { run: {} } }\n", 1)
+	ds = run(t, src)
+	want(t, ds, model.Error, "의존 순환: core → vm → core")
+}
+
+func TestContractRole(t *testing.T) {
+	src := strings.Replace(base, "contracts:\n", "contracts:\n  cache_port: { in: crypto, kind: port, methods: { get: {} } }\n  mailer: { in: crypto, kind: external, methods: { send: {} } }\n", 1)
+	ds := run(t, src)
+	want(t, ds, model.Error, "port 계약의 모듈은 role이 infra여야 한다: 계약 cache_port, 모듈 crypto")
+	want(t, ds, model.Error, "external 계약의 모듈은 role이 adapter여야 한다: 계약 mailer, 모듈 crypto")
+	ds = run(t, strings.Replace(src, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, role: infra }", 1))
+	for _, d := range ds {
+		if strings.Contains(d.Msg, "role이 infra") {
+			t.Fatalf("unexpected %s", d)
+		}
+	}
+}
+
+func TestNeedsTypeDependency(t *testing.T) {
+	// crypto가 store를 받으면 반환 타입 payload(core)에 의존하지 않으므로 오류
+	ds := run(t, replace(t, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [store] }"))
+	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: crypto → core.payload")
+	// uses로 고른 메서드의 타입만 본다
+	src := strings.Replace(base, "contracts:\n", "contracts:\n  keys: { in: core, methods: { plain: { returns: [int] }, typed: { returns: [payload] } } }\n", 1)
+	ds = run(t, strings.Replace(src, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [{ contract: keys, uses: [plain] }] }", 1))
+	for _, d := range ds {
+		if strings.Contains(d.Msg, "의존하지 않는 모듈의 타입") {
+			t.Fatalf("unexpected %s", d)
+		}
+	}
+}
+
+func TestEvents(t *testing.T) {
+	ds := run(t, replace(t, "values: [minted]", "values: [minted, burned]"))
+	want(t, ds, model.Error, "이벤트가 없는 값: event_type.burned")
+
+	ds = run(t, strings.Replace(base, "events:\n", "events:\n  ghost: { kind: chain_event, publishers: [asset] }\n", 1))
+	want(t, ds, model.Error, `event_type에 없는 값 "ghost"`)
+
+	// crypto는 core에 의존하지 않는다
+	ds = run(t, replace(t, "publishers: [asset]", "publishers: [asset, crypto]"))
+	want(t, ds, model.Error, "이벤트 종류의 모듈에 의존하지 않는다: crypto → core")
+	ds = run(t, replace(t, "subscribers: [rpc_mod]", "subscribers: [rpc_mod, crypto]"))
+	want(t, ds, model.Error, "이벤트 종류의 모듈에 의존하지 않는다: crypto → core")
+	ds = run(t, replace(t, "publishers: [asset]", "publishers: []"))
+	want(t, ds, model.Error, "발행자가 없는 이벤트: minted")
+	// 이벤트 data의 타입도 이벤트 종류 모듈의 의존을 따른다
+	src := strings.Replace(base, "types:\n", "types:\n  job: { in: vm, fields: { n: int } }\n", 1)
+	ds = run(t, strings.Replace(src, "data: { to: address }", "data: { to: address, j: job }", 1))
+	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: core → vm.job")
+}
+
+func TestFlows(t *testing.T) {
+	cases := []struct{ old, new, msg string }{
+		{"{ id: load, calls", "{ id: Load, calls", `단계 ID는 소문자 snake_case여야 한다: "Load"`},
+		{"{ id: unlock }", "{ id: lock }", "흐름 안에서 중복된 단계: lock"},
+		{"{ id: unlock }", "{ id: fatal }", "Fatal과 겹치는 단계 이름: fatal"},
+		{"{ id: unlock }", "{ id: unlock, commit: true }", "commit 단계가 둘 이상이다: unlock"},
+		{"{ id: unlock }", "{ id: unlock, undo: relock }", "커밋 뒤 단계에 undo가 있다: unlock"},
+		{"{ id: commit, commit: true, fatal: true }", "{ id: commit, commit: true, fatal: true, undo: rollback }", "커밋 뒤 단계에 undo가 있다: commit"},
+		{"{ id: lock, undo: unlock }", "{ id: lock, undo: Unlock }", `undo는 소문자 snake_case여야 한다: "Unlock"`},
+		{"in: core\n    steps", "in: vm\n    steps", "흐름의 모듈이 받지 않는 계약: vm → store"},
+		{"{ id: unlock }", "{ id: unlock, emits: [minted] }", "흐름의 모듈이 발행자가 아닌 이벤트: core → minted"},
+		{"in: core\n    steps", "in: core\n    on: minted\n    steps", "흐름의 모듈이 구독자가 아닌 이벤트: core → minted"},
+	}
+	for _, c := range cases {
+		ds := run(t, replace(t, c.old, c.new))
+		want(t, ds, model.Error, c.msg)
+	}
+	// rpc_mod는 store를 받고 묶음 전체의 구독자다
+	ds := run(t, replace(t, "in: core\n    steps", "in: rpc_mod\n    on: minted\n    steps"))
+	wantNone(t, ds, model.Error)
+	// vm은 minted의 구독자다(흐름에서 계약 호출을 빼면 통과)
+	src := replace(t, "in: core\n    steps", "in: vm\n    on: minted\n    steps")
+	ds = run(t, strings.Replace(src, "calls: [store.get]", "calls: []", 1))
+	wantNone(t, ds, model.Error)
 }

@@ -15,48 +15,71 @@ func (c *checker) l3() {
 // typeDeps는 노드가 쓰는 enum·타입의 모듈에 그 노드의 모듈이 의존하는지 본다.
 func (c *checker) typeDeps() {
 	m := c.m
-	use := func(owner string, r model.Ref) {
-		if r.Name == "" || owner == "" {
-			return
-		}
-		kind, base := m.ResolveType(r.Name)
-		var typeOwner string
-		switch kind {
-		case model.EnumType:
-			typeOwner = m.Enum(base).In.Name
-		case model.StructType:
-			typeOwner = m.Type(base).In.Name
-		default:
-			return
-		}
-		if typeOwner != "" && !m.CanDepend(owner, typeOwner) {
-			c.errorf(r.Pos, "의존하지 않는 모듈의 타입을 쓴다: %s → %s.%s", owner, typeOwner, base)
-		}
-	}
 	for _, t := range m.Types {
 		for _, f := range t.Fields {
-			use(t.In.Name, f.Type)
-			use(t.In.Name, f.RefType)
+			c.useType(t.In.Name, f.Type)
+			c.useType(t.In.Name, f.RefType)
 		}
 	}
 	for _, ct := range m.Contracts {
 		for _, me := range ct.Methods {
 			for _, p := range me.Params {
-				use(ct.In.Name, p.Type)
+				c.useType(ct.In.Name, p.Type)
 			}
 			for _, r := range me.Returns {
-				use(ct.In.Name, r)
+				c.useType(ct.In.Name, r)
 			}
 		}
 	}
 	for _, hk := range m.HandlerKinds {
 		for _, p := range hk.Params {
-			use(hk.In.Name, p.Type)
+			c.useType(hk.In.Name, p.Type)
 		}
 		for _, r := range hk.Returns {
-			use(hk.In.Name, r)
+			c.useType(hk.In.Name, r)
 		}
-		use(hk.In.Name, hk.Key)
+		c.useType(hk.In.Name, hk.Key)
+	}
+	// needs로 받은 계약의 시그니처 타입에도 받는 쪽이 의존해야 한다.
+	for _, id := range c.unitIDs() {
+		for _, n := range c.ownNeeds(id) {
+			ct := m.Contract(n.Contract.Name)
+			if ct == nil {
+				continue
+			}
+			for _, me := range ct.Methods {
+				if len(n.Uses) > 0 && !has(n.Uses, me.Name) {
+					continue
+				}
+				for _, p := range me.Params {
+					c.useType(id, p.Type)
+				}
+				for _, r := range me.Returns {
+					c.useType(id, r)
+				}
+			}
+		}
+	}
+}
+
+// useType은 owner가 r이 가리키는 enum·타입의 모듈에 의존하는지 본다.
+func (c *checker) useType(owner string, r model.Ref) {
+	m := c.m
+	if r.Name == "" || owner == "" {
+		return
+	}
+	kind, base := m.ResolveType(r.Name)
+	var typeOwner string
+	switch kind {
+	case model.EnumType:
+		typeOwner = m.Enum(base).In.Name
+	case model.StructType:
+		typeOwner = m.Type(base).In.Name
+	default:
+		return
+	}
+	if typeOwner != "" && !m.CanDepend(owner, typeOwner) {
+		c.errorf(r.Pos, "의존하지 않는 모듈의 타입을 쓴다: %s → %s.%s", owner, typeOwner, base)
 	}
 }
 

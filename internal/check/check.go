@@ -2,6 +2,8 @@
 package check
 
 import (
+	"slices"
+
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
 )
@@ -30,7 +32,9 @@ func Run(m *model.Model) model.Diagnostics {
 	c.l2()
 	c.l3()
 	c.handlers()
+	c.events()
 	c.l4()
+	c.flows()
 	c.requirements()
 	c.diags.Sort()
 	return c.diags
@@ -89,7 +93,16 @@ func (c *checker) eachMeta(fn func(*model.Meta)) {
 	for _, x := range m.HandlerKinds {
 		fn(&x.Meta)
 	}
+	for _, x := range m.EventKinds {
+		fn(&x.Meta)
+	}
+	for _, x := range m.Events {
+		fn(&x.Meta)
+	}
 	for _, x := range m.Funcs {
+		fn(&x.Meta)
+	}
+	for _, x := range m.Flows {
 		fn(&x.Meta)
 	}
 }
@@ -124,7 +137,62 @@ func (c *checker) depsOf(id string) []string {
 			out = append(out, e.DependsOn.Name)
 		}
 	}
+	for _, r := range c.needTargets(c.needsOf(id)) {
+		out = append(out, r.Name)
+	}
 	return out
+}
+
+// ownNeeds는 모듈·그룹·멤버가 자기 노드에 적은 needs다.
+func (c *checker) ownNeeds(id string) []model.Need {
+	m := c.m
+	switch {
+	case m.Module(id) != nil:
+		return m.Module(id).Needs
+	case m.Group(id) != nil:
+		return m.Group(id).Needs
+	case m.Member(id) != nil:
+		return m.Member(id).Needs
+	}
+	return nil
+}
+
+// needsOf는 id가 받는 계약이다. 멤버는 그룹의 needs와 자기 needs를 받는다.
+func (c *checker) needsOf(id string) []model.Need {
+	if mem := c.m.Member(id); mem != nil {
+		return append(slices.Clone(mem.Group.Needs), mem.Needs...)
+	}
+	return c.ownNeeds(id)
+}
+
+// needTargets는 needs가 가리키는 계약의 모듈을 참조 위치와 함께 준다.
+func (c *checker) needTargets(ns []model.Need) []model.Ref {
+	var out []model.Ref
+	for _, n := range ns {
+		if ct := c.m.Contract(n.Contract.Name); ct != nil && ct.In.Name != "" {
+			out = append(out, model.Ref{Name: ct.In.Name, Pos: n.Contract.Pos})
+		}
+	}
+	return out
+}
+
+// unitIDs는 모듈, 그룹, 멤버 ID 전부다.
+func (c *checker) unitIDs() []string {
+	var ids []string
+	for _, mod := range c.m.Modules {
+		ids = append(ids, mod.ID)
+	}
+	for _, g := range c.m.Groups {
+		ids = append(ids, g.ID)
+		for _, mem := range g.Members {
+			ids = append(ids, mem.ID)
+		}
+	}
+	return ids
+}
+
+func (c *checker) isUnit(id string) bool {
+	return c.m.Module(id) != nil || c.m.Group(id) != nil || c.m.Member(id) != nil
 }
 
 // unitPos는 모듈·그룹·멤버 ID의 정의 위치다.

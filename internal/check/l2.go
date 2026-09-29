@@ -10,6 +10,7 @@ import (
 func (c *checker) l2() {
 	c.tierDirection()
 	c.selfDependency()
+	c.contractRoles()
 	c.cycles()
 	c.siblingCycles()
 	c.orphans()
@@ -33,10 +34,13 @@ func (c *checker) tierDirection() {
 	}
 	for _, mod := range m.Modules {
 		check(mod.ID, mod.Tier.Name, mod.DependsOn)
+		check(mod.ID, mod.Tier.Name, c.needTargets(mod.Needs))
 	}
 	for _, g := range m.Groups {
 		check(g.ID, g.Tier.Name, g.DependsOn)
+		check(g.ID, g.Tier.Name, c.needTargets(g.Needs))
 		for _, mem := range g.Members {
+			check(mem.ID, g.Tier.Name, c.needTargets(mem.Needs))
 			for _, e := range mem.Exceptions {
 				check(mem.ID, g.Tier.Name, []model.Ref{e.DependsOn})
 			}
@@ -209,6 +213,20 @@ func (c *checker) exceptions() {
 				}
 				c.infof(e.DependsOn.Pos, "%s", msg)
 			}
+		}
+	}
+}
+
+// contractRoles는 port·external 계약이 알맞은 role의 모듈에 있는지 본다.
+func (c *checker) contractRoles() {
+	want := map[string]string{"port": "infra", "external": "adapter"}
+	for _, ct := range c.m.Contracts {
+		role, ok := want[ct.Kind]
+		if !ok {
+			continue
+		}
+		if mod := c.m.Module(ct.In.Name); mod == nil || mod.Role != role {
+			c.errorf(ct.Pos, "%s 계약의 모듈은 role이 %s여야 한다: 계약 %s, 모듈 %s", ct.Kind, role, ct.ID, ct.In.Name)
 		}
 	}
 }
