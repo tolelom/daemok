@@ -21,12 +21,15 @@ func (d BlockCommitData) Map() map[string]any {
 // BlockCommitDataFrom은 봉투의 map 본문에서 BlockCommitData를 읽는다.
 func BlockCommitDataFrom(m map[string]any) (BlockCommitData, error) {
 	var d BlockCommitData
-	var err error
-	if d.Hash, err = daemokString(m, "block_commit", "hash"); err != nil {
+	if v, err := daemokString(m, "block_commit", "hash"); err != nil {
 		return d, err
+	} else {
+		d.Hash = v
 	}
-	if d.Txs, err = daemokInt(m, "block_commit", "txs"); err != nil {
+	if v, err := daemokInt(m, "block_commit", "txs"); err != nil {
 		return d, err
+	} else {
+		d.Txs = v
 	}
 	if v, ok := m["block"].(any); ok {
 		d.Block = v
@@ -42,28 +45,71 @@ type AssetMintedData struct {
 	Owner   string   `json:"owner"`
 	Amount  uint64   `json:"amount"`
 	Players []string `json:"players"`
+	Kind    MintKind `json:"kind"`
+	Memo    *string  `json:"memo,omitempty"`
+	Count   *int     `json:"count,omitempty"`
 }
 
-// Map은 봉투의 map 본문으로 바꾼다.
+// Map은 봉투의 map 본문으로 바꾼다. optional 필드는 값이 있을 때만 넣는다.
 func (d AssetMintedData) Map() map[string]any {
-	return map[string]any{"asset_id": d.AssetID, "owner": d.Owner, "amount": d.Amount, "players": d.Players}
+	m := map[string]any{"asset_id": d.AssetID, "owner": d.Owner, "amount": d.Amount, "players": d.Players, "kind": d.Kind}
+	if d.Memo != nil {
+		m["memo"] = *d.Memo
+	}
+	if d.Count != nil {
+		m["count"] = *d.Count
+	}
+	return m
 }
 
 // AssetMintedDataFrom은 봉투의 map 본문에서 AssetMintedData를 읽는다.
 func AssetMintedDataFrom(m map[string]any) (AssetMintedData, error) {
 	var d AssetMintedData
-	var err error
-	if d.AssetID, err = daemokString(m, "asset_minted", "asset_id"); err != nil {
+	if v, err := daemokString(m, "asset_minted", "asset_id"); err != nil {
 		return d, err
+	} else {
+		d.AssetID = v
 	}
-	if d.Owner, err = daemokString(m, "asset_minted", "owner"); err != nil {
+	if v, err := daemokString(m, "asset_minted", "owner"); err != nil {
 		return d, err
+	} else {
+		d.Owner = v
 	}
-	if d.Amount, err = daemokUint64(m, "asset_minted", "amount"); err != nil {
+	if v, err := daemokUint64(m, "asset_minted", "amount"); err != nil {
 		return d, err
+	} else {
+		d.Amount = v
 	}
-	if d.Players, err = daemokStrings(m, "asset_minted", "players"); err != nil {
+	if v, err := daemokStrings(m, "asset_minted", "players"); err != nil {
 		return d, err
+	} else {
+		d.Players = v
+	}
+	switch v := m["kind"].(type) {
+	case MintKind:
+		d.Kind = v
+	case string:
+		d.Kind = MintKind(v)
+	default:
+		return d, fmt.Errorf("%s: %s: %T", "asset_minted", "kind", m["kind"])
+	}
+	if raw, present := m["memo"]; present && raw != nil {
+		var x string
+		if v, err := daemokString(m, "asset_minted", "memo"); err != nil {
+			return d, err
+		} else {
+			x = v
+		}
+		d.Memo = &x
+	}
+	if raw, present := m["count"]; present && raw != nil {
+		var x int
+		if v, err := daemokInt(m, "asset_minted", "count"); err != nil {
+			return d, err
+		} else {
+			x = v
+		}
+		d.Count = &x
 	}
 	return d, nil
 }

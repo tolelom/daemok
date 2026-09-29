@@ -62,7 +62,7 @@ contracts:
 | 원본 | 파일 | 내용 |
 |---|---|---|
 | `needs`가 있는 모듈 | `<모듈>/needs.gen.go` | 계약마다 `uses`의 메서드만 담은 interface. 이름은 계약 ID의 CamelCase |
-| 실행 단위 하나 | `cmd/<실행 단위>/contracts.gen.go` | 실행 단위가 조립하는 모듈 사이의 `needs`마다 `var _ <받는 모듈>.<계약> = (*<구현 패키지>.<계약>)(nil)` |
+| 실행 단위 하나 | `cmd/<실행 단위>/contracts.gen.go` | 실행 단위가 조립하는 모듈 사이의 query·port·external `needs`마다 `var _ <받는 모듈>.<계약> = (*<구현 패키지>.<계약>)(nil)`. call 계약은 구현 타입이 정해져 있지 않아 뺀다 |
 
 - 구현 타입은 손으로 쓴다. 이름은 계약 ID의 CamelCase다.
 - `query` 계약의 구현은 `<주는 모듈 path>/query` 패키지에, 나머지 종류는 주는 모듈 패키지에 둔다.
@@ -119,7 +119,8 @@ events:
 |---|---|---|
 | event_kind 하나 | `<모듈>/<event_kind id>.gen.go` | 이벤트마다 `<이벤트>Data` struct(필드마다 `json` 태그는 필드 ID). `encoding: map`이면 `Map() map[string]any`와 `<이벤트>DataFrom(map[string]any) (<이벤트>Data, error)` |
 
-- `...DataFrom`은 키가 없거나 타입이 다르면 이벤트 ID와 키를 담은 오류를 돌려준다. JSON을 거친 값(`[]any`, `float64`)도 받는다.
+- `...DataFrom`은 키가 없거나 타입이 다르면 이벤트 ID와 키를 담은 오류를 돌려준다. 내장 숫자·문자열·bool, 문자열 목록, 설계 enum은 JSON을 거친 값(`float64`, `[]any`, 문자열)도 받고, 그 밖의 타입은 타입 단언만 한다. 숫자는 부호·범위를 넘거나 정수가 아니면 오류다.
+- optional 필드는 struct에서 포인터이고, `Map()`은 값이 있을 때만 역참조해서 넣으며, `...DataFrom`은 키가 없거나 nil이면 건너뛴다.
 - 봉투 타입(tolchain의 `events.Event`)과 발행·구독 함수는 생성하지 않는다. 발행하는 쪽은 `Data: d.Map()`, 받는 쪽은 `...DataFrom(ev.Data)`를 쓴다.
 
 ### 검사

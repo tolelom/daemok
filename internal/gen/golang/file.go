@@ -32,7 +32,11 @@ func (f *goFile) use(importPath string) string {
 	}
 	name := path.Base(importPath)
 	if f.nameTaken(name) {
-		name = path.Base(path.Dir(importPath)) + name
+		if parent := path.Base(path.Dir(importPath)); parent != "." && parent != "/" {
+			name = parent + name
+		} else {
+			name += "pkg"
+		}
 		for i := 2; f.nameTaken(name); i++ {
 			name = fmt.Sprintf("%s%d", path.Base(importPath), i)
 		}
@@ -46,8 +50,14 @@ func (f *goFile) blank(importPath string) {
 	f.imports[importPath] = "_"
 }
 
+// localNames는 생성 함수 안에서 쓰는 지역 이름이다. import 이름으로 쓰지 않는다.
+var localNames = map[string]bool{
+	"m": true, "d": true, "v": true, "ok": true, "err": true, "s": true, "t": true, "c": true,
+	"i": true, "x": true, "out": true, "key": true, "ev": true, "fail": true, "undo": true, "got": true, "cases": true,
+}
+
 func (f *goFile) nameTaken(name string) bool {
-	if name == f.pkg {
+	if name == f.pkg || localNames[name] {
 		return true
 	}
 	for _, n := range f.imports {
@@ -98,7 +108,7 @@ func (f *goFile) render() (File, error) {
 	}
 	out, err := format.Source([]byte(b.String()))
 	if err != nil {
-		return File{}, fmt.Errorf("생성 코드를 포맷할 수 없다: %s: %v\n%s", f.path, err, b.String())
+		return File{}, fmt.Errorf("생성 코드를 포맷할 수 없다: %s: %v", f.path, err)
 	}
 	return File{Path: f.path, Content: out}, nil
 }

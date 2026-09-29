@@ -25,8 +25,11 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	p := r.Plan
+	for _, d := range r.Others {
+		fmt.Fprintln(stdout, d.String())
+	}
 	for _, f := range p.Refuse {
-		fmt.Fprintf(stdout, "거부: %s (생성 헤더가 없는 파일)\n", f)
+		fmt.Fprintf(stdout, "거부: %s (%s)\n", f.Path, f.Reason)
 	}
 	if len(p.Refuse) > 0 {
 		return 1

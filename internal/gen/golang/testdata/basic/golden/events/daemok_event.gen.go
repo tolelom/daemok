@@ -4,6 +4,7 @@ package events
 
 import (
 	"fmt"
+	"math"
 )
 
 func daemokString(m map[string]any, ev, key string) (string, error) {
@@ -19,31 +20,45 @@ func daemokInt(m map[string]any, ev, key string) (int, error) {
 	case int:
 		return v, nil
 	case int64:
-		return int(v), nil
+		if v >= math.MinInt && v <= math.MaxInt {
+			return int(v), nil
+		}
+	case uint:
+		if v <= math.MaxInt {
+			return int(v), nil
+		}
 	case uint64:
-		return int(v), nil
+		if v <= math.MaxInt {
+			return int(v), nil
+		}
 	case float64:
-		if v == float64(int(v)) {
+		if v == math.Trunc(v) && v >= -9.223372036854775808e18 && v < 9.223372036854775808e18 {
 			return int(v), nil
 		}
 	}
-	return 0, fmt.Errorf("%s: %s: %T", ev, key, m[key])
+	return 0, fmt.Errorf("%s: %s: %T %v", ev, key, m[key], m[key])
 }
 
 func daemokUint64(m map[string]any, ev, key string) (uint64, error) {
 	switch v := m[key].(type) {
+	case int:
+		if v >= 0 {
+			return uint64(v), nil
+		}
+	case int64:
+		if v >= 0 {
+			return uint64(v), nil
+		}
+	case uint:
+		return uint64(v), nil
 	case uint64:
 		return v, nil
-	case int:
-		return uint64(v), nil
-	case int64:
-		return uint64(v), nil
 	case float64:
-		if v == float64(uint64(v)) {
+		if v == math.Trunc(v) && v >= 0 && v < 1.8446744073709552e19 {
 			return uint64(v), nil
 		}
 	}
-	return 0, fmt.Errorf("%s: %s: %T", ev, key, m[key])
+	return 0, fmt.Errorf("%s: %s: %T %v", ev, key, m[key], m[key])
 }
 
 func daemokStrings(m map[string]any, ev, key string) ([]string, error) {

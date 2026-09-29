@@ -128,3 +128,46 @@ func TestCodeScanIncluded(t *testing.T) {
 	write(t, filepath.Join(root, "core", "core.go"), "package core\n\nimport _ \"example.com/x/api\"\n")
 	wantDiag(t, Run(dir, root), "설계에 없는 의존을 import한다: core → api")
 }
+
+func TestSymlinkAndDirectoryRefused(t *testing.T) {
+	root, dir := setup(t, design)
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "core")); err != nil {
+		t.Skip("심볼릭 링크를 만들 수 없다")
+	}
+	r := Run(dir, root)
+	wantDiag(t, r, "생성 경로에 심볼릭 링크가 있다: core/kind.gen.go")
+	if len(r.Plan.Refuse) != 1 || r.Plan.Refuse[0].Reason != "심볼릭 링크" || len(r.Plan.Write) != 0 {
+		t.Fatalf("%+v", r.Plan)
+	}
+
+	root2, dir2 := setup(t, design)
+	os.MkdirAll(filepath.Join(root2, "core", "kind.gen.go"), 0o755)
+	r = Run(dir2, root2)
+	wantDiag(t, r, "생성 경로에 디렉토리가 있다: core/kind.gen.go")
+}
+
+func TestDeleteRemovesEmptyDirs(t *testing.T) {
+	root, dir := setup(t, design)
+	Apply(root, Run(dir, root).Plan)
+	write(t, filepath.Join(root, "gone", "deep", "x.gen.go"), golang.Header+"\n\npackage deep\n")
+	Apply(root, Run(dir, root).Plan)
+	if _, err := os.Stat(filepath.Join(root, "gone")); !os.IsNotExist(err) {
+		t.Fatal("빈 디렉토리가 남았다")
+	}
+	if _, err := os.Stat(root); err != nil {
+		t.Fatal("코드 루트까지 지웠다")
+	}
+}
+
+func TestMissingRootIsEmpty(t *testing.T) {
+	_, dir := setup(t, design)
+	root := filepath.Join(t.TempDir(), "new")
+	r := Run(dir, root)
+	if r.Fatal || len(r.Plan.Write) != 1 {
+		t.Fatalf("%+v", r)
+	}
+	if err := Apply(root, r.Plan); err != nil {
+		t.Fatal(err)
+	}
+}

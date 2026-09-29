@@ -28,3 +28,30 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatal("정수가 아닌 txs는 오류여야 한다")
 	}
 }
+
+func TestOptionalEnumAndRange(t *testing.T) {
+	memo := "m"
+	in := AssetMintedData{AssetID: "a", Owner: "o", Amount: 3, Players: []string{}, Kind: MintKindBonus, Memo: &memo}
+	raw, _ := json.Marshal(in.Map())
+	var m map[string]any
+	json.Unmarshal(raw, &m)
+	got, err := AssetMintedDataFrom(m)
+	if err != nil || got.Kind != MintKindBonus || got.Memo == nil || *got.Memo != "m" || got.Count != nil {
+		t.Fatalf("json: %+v %v", got, err)
+	}
+	// optional 키가 없어도 된다
+	delete(m, "memo")
+	delete(m, "count")
+	if got, err := AssetMintedDataFrom(m); err != nil || got.Memo != nil {
+		t.Fatalf("optional 없음: %+v %v", got, err)
+	}
+	// 음수는 uint64가 될 수 없다
+	m["amount"] = -1
+	if _, err := AssetMintedDataFrom(m); err == nil {
+		t.Fatal("음수 amount는 오류여야 한다")
+	}
+	m["amount"] = 2.5
+	if _, err := AssetMintedDataFrom(m); err == nil {
+		t.Fatal("정수가 아닌 amount는 오류여야 한다")
+	}
+}

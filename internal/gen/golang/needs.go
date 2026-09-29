@@ -107,7 +107,7 @@ func (g *gen) executableContracts() error {
 					continue
 				}
 				if f == nil {
-					f = g.file("cmd/" + e.ID + "/contracts.gen.go")
+					f = g.mainFile("cmd/" + e.ID + "/contracts.gen.go")
 				}
 				implDir := g.ownerPath(ct.In.Name)
 				if ct.Kind == "query" {

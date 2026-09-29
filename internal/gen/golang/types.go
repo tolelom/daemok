@@ -33,11 +33,15 @@ func (g *gen) file(p string) *goFile {
 		return f
 	}
 	f := &goFile{path: p, pkg: path.Base(path.Dir(p)), imports: map[string]string{}}
-	if strings.HasPrefix(p, "cmd/") {
-		f.pkg = "main"
-	}
 	g.files[p] = f
 	g.order = append(g.order, p)
+	return f
+}
+
+// mainFile은 실행 단위의 main 패키지 파일이다.
+func (g *gen) mainFile(p string) *goFile {
+	f := g.file(p)
+	f.pkg = "main"
 	return f
 }
 
@@ -47,7 +51,6 @@ func lowerFirst(s string) string {
 	}
 	return strings.ToLower(s[:1]) + s[1:]
 }
-
 
 // goType은 설계 타입 문자열을 from 디렉토리의 파일 f에서 쓸 Go 타입으로 바꾼다.
 func (g *gen) goType(t string, fromDir string, f *goFile) string {

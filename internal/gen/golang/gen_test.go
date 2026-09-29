@@ -82,3 +82,43 @@ contracts:
 		}
 	}
 }
+
+func TestCmdPathModuleIsNotMain(t *testing.T) {
+	files := genSrc(t, `
+executables:
+  tool: { composes: [cli] }
+tiers: [a]
+modules:
+  cli: { tier: a, path: cmd/tool/cli }
+enums:
+  k: { in: cli, values: [x] }
+`)
+	if !strings.Contains(files["cmd/tool/cli/k.gen.go"], "package cli") {
+		t.Fatalf("%s", files["cmd/tool/cli/k.gen.go"])
+	}
+}
+
+func TestLocalNamesDoNotShadowImports(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a, b]
+modules:
+  m: { tier: a }
+  d: { tier: a }
+  ev: { tier: b, depends_on: [m, d] }
+enums:
+  mk: { in: m, values: [x] }
+  event_type: { in: ev, values: [e1] }
+types:
+  dt: { in: d, fields: { n: int } }
+event_kinds:
+  kind: { in: ev, key: event_type }
+events:
+  e1: { kind: kind, publishers: [ev], data: { a: mk, b: { ref: dt } } }
+`)
+	got := files["ev/kind.gen.go"]
+	for _, bad := range []string{"\t\"example.com/x/m\"", "\t\"example.com/x/d\""} {
+		if strings.Contains(got, bad) {
+			t.Fatalf("지역 이름과 같은 import 이름:\n%s", got)
+		}
+	}
+}

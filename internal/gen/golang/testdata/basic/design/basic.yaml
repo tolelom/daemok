@@ -27,6 +27,7 @@ enums:
   tx_type:    { in: core, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
   status:     { in: core, values: [draft, published] }
   event_type: { in: events, go: { type: EventType, prefix: Event }, values: [block_commit, asset_minted] }
+  mint_kind:  { in: events, values: [normal, bonus] }
 
 consts:
   max_block_txs: { in: core, type: int, value: 500, go: { name: DefaultMaxBlockTxs } }
@@ -77,7 +78,7 @@ events:
   asset_minted:
     kind: chain_event
     publishers: [asset]
-    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true } }
+    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true }, kind: mint_kind, memo: { type: string, optional: true }, count: { type: int, optional: true } }
 
 funcs:
   handle_transfer:

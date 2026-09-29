@@ -333,7 +333,7 @@ func (g *gen) executableModules() error {
 		if len(dirs) == 0 {
 			continue
 		}
-		f := g.file("cmd/" + e.ID + "/modules.gen.go")
+		f := g.mainFile("cmd/" + e.ID + "/modules.gen.go")
 		for _, d := range dirs {
 			f.blank(g.importPath(d))
 		}
