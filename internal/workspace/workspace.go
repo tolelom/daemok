@@ -41,6 +41,8 @@ type Result struct {
 	Files []golang.File // 생성 파일 전부. 설계 검사와 생성이 성공했을 때만 있다
 	// Others는 Diags에서 생성 파일 대조를 뺀 진단이다. gen이 출력한다.
 	Others model.Diagnostics
+	// Code는 Diags 가운데 코드를 읽어 낸 진단(생성 파일 대조와 codescan)이다.
+	Code model.Diagnostics
 }
 
 // Run은 designDir의 설계를 읽고 검사하고 생성해서 root의 파일과 대조한다.
@@ -106,11 +108,13 @@ func Run(designDir, root string) Result {
 		plan.Delete = append(plan.Delete, p)
 		fresh.Errorf(yaml.Pos{File: filepath.Join(root, filepath.FromSlash(p))}, "설계에 없는 생성 파일: %s (daemok gen)", p)
 	}
-	diags = append(diags, codescan.Scan(m, root)...)
+	scanned := codescan.Scan(m, root)
+	diags = append(diags, scanned...)
 	diags.Sort()
 	all := append(slices.Clone(diags), fresh...)
 	all.Sort()
-	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags}
+	code := append(slices.Clone(fresh), scanned...)
+	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags, Code: code}
 }
 
 // blocked는 생성 경로에 쓰면 안 되는 이유를 준다. 쓸 수 있으면 빈 문자열이다.
@@ -148,8 +152,8 @@ func hasHeader(p string) bool {
 	return strings.TrimSuffix(string(first), "\r") == golang.Header
 }
 
-// skipDir는 생성 파일 범위에서 빼는 디렉토리다.
-func skipDir(name string) bool {
+// SkipDir는 생성 파일 범위와 코드 감시에서 빼는 디렉토리다.
+func SkipDir(name string) bool {
 	return strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules"
 }
 
@@ -165,7 +169,7 @@ func ScanGenerated(root string) (map[string][]byte, error) {
 			return err
 		}
 		if d.IsDir() {
-			if p != root && skipDir(d.Name()) {
+			if p != root && SkipDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

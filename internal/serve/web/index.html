@@ -516,6 +516,7 @@ function renderMap() {
   if (t.level === 'R') return renderReqs();
   if (t.level === 'L3') return renderL3();
   const g = merged(t);
+  if (!g.nodes.length) { $('#canvas').innerHTML = '<p class="muted" style="padding:14px">이 계층에 그릴 요소가 없다.</p>'; return; }
   const { pos, bands, height } = layout(g);
   const marker = id => `<marker id="ar-${id}" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="ah-${id}"/></marker>`;
   let s = `<svg id="diagram" viewBox="0 0 ${W} ${height}" role="img" aria-label="설계 지도"><defs>${['dep', 'hi', 'bad', 'exc', 'add', 'rem', 'need'].map(marker).join('')}</defs>`;

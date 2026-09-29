@@ -64,7 +64,7 @@ type vUnit struct {
 	DependsOn  []string `json:"depends_on"`
 	Implements []string `json:"implements"`
 	Satisfies  []string `json:"satisfies"`
-	Members    []string `json:"members,omitempty"`
+	Members    []string `json:"members"`
 	Needs      []vNeed  `json:"needs"`
 }
 
@@ -367,7 +367,7 @@ func toView(m *model.Model) *vModel {
 		v.Exes = append(v.Exes, vExe{e.ID, e.Summary, names(e.Exposes), names(e.Composes)})
 	}
 	for _, x := range m.Modules {
-		v.Mods = append(v.Mods, vUnit{ID: x.ID, Type: "mod", Tier: x.Tier.Name, Summary: x.Summary, Path: x.Path, Role: x.Role,
+		v.Mods = append(v.Mods, vUnit{ID: x.ID, Type: "mod", Members: []string{}, Tier: x.Tier.Name, Summary: x.Summary, Path: x.Path, Role: x.Role,
 			DependsOn: names(x.DependsOn), Implements: names(x.Implements), Satisfies: names(x.Satisfies), Needs: vNeeds(m, x.Needs)})
 	}
 	for _, g := range m.Groups {
@@ -511,7 +511,7 @@ func nodePositions(m *model.Model) []nodePos {
 }
 
 // issueKey는 진단이 가리키는 화면 노드 키다.
-// 설계 파일 진단이면 같은 파일에서 진단 위치 이전의 마지막 노드, Go 파일 진단이면 그 디렉토리의 모듈·멤버다.
+// 설계 파일 진단이면 같은 파일에서 진단 위치 이전의 마지막 노드, Go 파일 진단이면 경로 접두사가 가장 긴 모듈·멤버다.
 func issueKey(m *model.Model, nodes []nodePos, root string, d model.Diagnostic) (key, origin string) {
 	if strings.HasSuffix(d.Pos.File, ".go") {
 		rel, err := filepath.Rel(root, d.Pos.File)
@@ -519,19 +519,21 @@ func issueKey(m *model.Model, nodes []nodePos, root string, d model.Diagnostic) 
 			return "", "code"
 		}
 		dir := path.Dir(filepath.ToSlash(rel))
-		for _, x := range m.Modules {
-			if x.Path == dir {
-				return "mod:" + x.ID, "code"
+		best := -1
+		consider := func(p, k string) {
+			if (dir == p || strings.HasPrefix(dir, p+"/")) && len(p) > best {
+				best, key = len(p), k
 			}
+		}
+		for _, x := range m.Modules {
+			consider(x.Path, "mod:"+x.ID)
 		}
 		for _, g := range m.Groups {
 			for _, mem := range g.Members {
-				if mem.Path() == dir {
-					return "mem:" + mem.ID, "code"
-				}
+				consider(mem.Path(), "mem:"+mem.ID)
 			}
 		}
-		return "", "code"
+		return key, "code"
 	}
 	for _, n := range nodes {
 		if n.pos.File != d.Pos.File {
@@ -555,16 +557,24 @@ func levelName(l model.Level) string {
 	return "info"
 }
 
-func toIssues(m *model.Model, root string, diags model.Diagnostics) []vIssue {
+// toIssues는 진단을 화면용으로 바꾼다. code에 든 진단은 위치와 상관없이 코드 대조로 분류한다.
+func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIssue {
 	out := []vIssue{}
 	var nodes []nodePos
 	if m != nil {
 		nodes = nodePositions(m)
 	}
+	fromCode := map[model.Diagnostic]bool{}
+	for _, d := range code {
+		fromCode[d] = true
+	}
 	for _, d := range diags {
 		key, origin := "", "design"
 		if m != nil {
 			key, origin = issueKey(m, nodes, root, d)
+		}
+		if fromCode[d] {
+			origin = "code"
 		}
 		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin})
 	}

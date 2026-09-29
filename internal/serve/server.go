@@ -49,14 +49,15 @@ type Server struct {
 }
 
 func New(design, root string) *Server {
-	return &Server{design: design, root: root, subs: map[chan int]bool{}}
+	// 첫 Poll이 반드시 상태를 만들도록 서명을 어떤 실제 서명과도 다른 값으로 둔다.
+	return &Server{design: design, root: root, subs: map[chan int]bool{}, sig: "\x00"}
 }
 
 // Refresh는 설계를 다시 읽고 상태를 새로 만든 뒤 구독자에게 알린다.
 func (s *Server) Refresh() {
 	r := workspace.Run(s.design, s.root)
 	st := state{Design: s.design, Root: s.root, Model: toView(r.Model), Fatal: r.Fatal, Updated: time.Now()}
-	st.Issues = toIssues(r.Model, s.root, r.Diags)
+	st.Issues = toIssues(r.Model, s.root, r.Diags, r.Code)
 	st.Files = toFiles(r.Model, r.Files)
 	if files, ok, err := gitbase.Files(s.design); err == nil && ok {
 		base, _ := model.LoadSources(files)
@@ -91,18 +92,35 @@ func (s *Server) Version() int {
 	return s.version
 }
 
-// signature는 설계 디렉토리의 *.yaml 이름·크기·수정 시각이다. 파일 추가·삭제·수정을 잡는다.
+// signature는 설계 디렉토리의 *.yaml과 코드 루트의 .go 파일의 이름·크기·수정 시각이다.
+// 파일 추가·삭제·수정을 잡는다. 코드 쪽은 생성 파일 범위와 같은 디렉토리만 본다.
 func (s *Server) signature() string {
+	var b strings.Builder
 	paths, _ := filepath.Glob(filepath.Join(s.design, "*.yaml"))
 	sort.Strings(paths)
-	var b strings.Builder
 	for _, p := range paths {
-		st, err := os.Stat(p)
-		if err != nil {
-			continue
+		if st, err := os.Stat(p); err == nil {
+			fmt.Fprintf(&b, "d|%s|%d|%d\n", filepath.Base(p), st.Size(), st.ModTime().UnixNano())
 		}
-		fmt.Fprintf(&b, "%s|%d|%d\n", filepath.Base(p), st.Size(), st.ModTime().UnixNano())
 	}
+	filepath.WalkDir(s.root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if p != s.root && workspace.SkipDir(d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(p, ".go") {
+			return nil
+		}
+		if info, err := d.Info(); err == nil {
+			fmt.Fprintf(&b, "c|%s|%d|%d\n", p, info.Size(), info.ModTime().UnixNano())
+		}
+		return nil
+	})
 	return b.String()
 }
 

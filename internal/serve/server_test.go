@@ -152,3 +152,85 @@ func TestIndexServed(t *testing.T) {
 		t.Fatalf("%d", rec.Code)
 	}
 }
+
+func TestFirstStateWithoutDesignFiles(t *testing.T) {
+	root := t.TempDir()
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	if s.Version() != 1 {
+		t.Fatal("설계 파일이 없어도 첫 상태를 만들어야 한다")
+	}
+	if st := getState(t, s); st["fatal"] != true {
+		t.Fatalf("%v", st)
+	}
+}
+
+func TestPollSeesCodeChanges(t *testing.T) {
+	s, dir := setup(t, design)
+	root := filepath.Dir(dir)
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "x.go"), []byte("package core\n"), 0o644)
+	if !s.Poll() {
+		t.Fatal("코드 파일 추가를 감지하지 못했다")
+	}
+	os.MkdirAll(filepath.Join(root, "testdata"), 0o755)
+	os.WriteFile(filepath.Join(root, "testdata", "y.go"), []byte("package y\n"), 0o644)
+	if s.Poll() {
+		t.Fatal("범위 밖 디렉토리 변경으로 갱신했다")
+	}
+}
+
+func TestGroupWithoutMembersHasEmptyList(t *testing.T) {
+	s, _ := setup(t, design+"groups:\n  g: { tier: a, kind: k, members: {} }\n")
+	for _, g := range getState(t, s)["model"].(map[string]any)["groups"].([]any) {
+		if _, ok := g.(map[string]any)["members"].([]any); !ok {
+			t.Fatalf("members가 배열이 아니다: %v", g)
+		}
+	}
+}
+
+func TestQueryPackageDiagHasModuleKey(t *testing.T) {
+	src := `version: 0.4
+go_module: example.com/x
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  vm:   { tier: b, depends_on: [core] }
+  api:  { tier: b, needs: [reader] }
+contracts:
+  reader: { in: core, kind: query, methods: { get: { errors: [] } } }
+`
+	s, dir := setup(t, src)
+	root := filepath.Dir(dir)
+	os.MkdirAll(filepath.Join(root, "core", "query"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "query", "q.go"), []byte("package query\n\nimport _ \"example.com/x/vm\"\n"), 0o644)
+	s.Poll()
+	for _, it := range getState(t, s)["issues"].([]any) {
+		i := it.(map[string]any)
+		if strings.Contains(i["msg"].(string), "query 패키지가") {
+			if i["key"] != "mod:core" || i["origin"] != "code" {
+				t.Fatalf("%v", i)
+			}
+			return
+		}
+	}
+	t.Fatal("진단이 없다")
+}
+
+func TestCodeScanDiagOnDesignFileIsCodeOrigin(t *testing.T) {
+	s, dir := setup(t, design)
+	root := filepath.Dir(dir)
+	os.MkdirAll(filepath.Join(root, "api"), 0o755)
+	os.WriteFile(filepath.Join(root, "api", "api.go"), []byte("package api\n"), 0o644)
+	s.Poll()
+	for _, it := range getState(t, s)["issues"].([]any) {
+		i := it.(map[string]any)
+		if strings.Contains(i["msg"].(string), "설계상 의존하지만 import하지 않는다") {
+			if i["origin"] != "code" {
+				t.Fatalf("%v", i)
+			}
+			return
+		}
+	}
+	t.Fatal("진단이 없다")
+}

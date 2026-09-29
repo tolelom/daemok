@@ -48,6 +48,7 @@ type AssetMintedData struct {
 	Kind    MintKind `json:"kind"`
 	Memo    *string  `json:"memo,omitempty"`
 	Count   *int     `json:"count,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
 }
 
 // Map은 봉투의 map 본문으로 바꾼다. optional 필드는 값이 있을 때만 넣는다.
@@ -58,6 +59,9 @@ func (d AssetMintedData) Map() map[string]any {
 	}
 	if d.Count != nil {
 		m["count"] = *d.Count
+	}
+	if d.Tags != nil {
+		m["tags"] = d.Tags
 	}
 	return m
 }
@@ -89,6 +93,9 @@ func AssetMintedDataFrom(m map[string]any) (AssetMintedData, error) {
 	case MintKind:
 		d.Kind = v
 	case string:
+		if !MintKind(v).Valid() {
+			return d, fmt.Errorf("%s: %s: %T", "asset_minted", "kind", m["kind"])
+		}
 		d.Kind = MintKind(v)
 	default:
 		return d, fmt.Errorf("%s: %s: %T", "asset_minted", "kind", m["kind"])
@@ -110,6 +117,13 @@ func AssetMintedDataFrom(m map[string]any) (AssetMintedData, error) {
 			x = v
 		}
 		d.Count = &x
+	}
+	if raw, present := m["tags"]; present && raw != nil {
+		if v, err := daemokStrings(m, "asset_minted", "tags"); err != nil {
+			return d, err
+		} else {
+			d.Tags = v
+		}
 	}
 	return d, nil
 }

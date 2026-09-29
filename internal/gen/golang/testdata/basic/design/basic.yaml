@@ -78,7 +78,7 @@ events:
   asset_minted:
     kind: chain_event
     publishers: [asset]
-    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true }, kind: mint_kind, memo: { type: string, optional: true }, count: { type: int, optional: true } }
+    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true }, kind: mint_kind, memo: { type: string, optional: true }, count: { type: int, optional: true }, tags: { type: string, many: true, optional: true } }
 
 funcs:
   handle_transfer:

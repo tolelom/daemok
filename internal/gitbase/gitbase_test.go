@@ -50,3 +50,20 @@ func TestFiles(t *testing.T) {
 		t.Fatalf("빈 기준: ok=%v err=%v files=%v", ok, err, files)
 	}
 }
+
+func TestNonASCIIPath(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	repo := t.TempDir()
+	design := filepath.Join(repo, "d 설계")
+	os.MkdirAll(design, 0o755)
+	os.WriteFile(filepath.Join(design, "모듈.yaml"), []byte("version: 0.4\n"), 0o644)
+	run(t, repo, "init", "-q")
+	run(t, repo, "add", ".")
+	run(t, repo, "commit", "-q", "-m", "init")
+	files, ok, err := Files(design)
+	if !ok || err != nil || string(files["HEAD:d 설계/모듈.yaml"]) != "version: 0.4\n" {
+		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
+	}
+}

@@ -16,12 +16,13 @@ func Files(designDir string) (files map[string][]byte, ok bool, err error) {
 	if _, err := git(designDir, "rev-parse", "--verify", "--quiet", "HEAD"); err != nil {
 		return nil, false, nil
 	}
-	out, err := git(designDir, "ls-tree", "--full-name", "--name-only", "HEAD", ".")
+	// -z는 경로를 따옴표로 감싸지 않고 NUL로 구분한다. 비ASCII 경로도 그대로 받는다.
+	out, err := git(designDir, "ls-tree", "-z", "--full-name", "--name-only", "HEAD", ".")
 	if err != nil {
 		return nil, false, err
 	}
 	files = map[string][]byte{}
-	for _, p := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+	for _, p := range strings.Split(string(out), "\x00") {
 		if p == "" || !strings.HasSuffix(p, ".yaml") {
 			continue
 		}

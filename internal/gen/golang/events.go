@@ -91,6 +91,11 @@ func (g *gen) eventMap(e *model.Event, name, dir string, f *goFile) string {
 			opts = append(opts, fmt.Sprintf("\tif d.%s != nil {\n\t\tm[%q] = *d.%s\n\t}", field, fl.Name, field))
 			continue
 		}
+		if fl.Optional {
+			// ref·many·포인터 타입의 optional은 nil이 아닐 때만 넣는다
+			opts = append(opts, fmt.Sprintf("\tif d.%s != nil {\n\t\tm[%q] = d.%s\n\t}", field, fl.Name, field))
+			continue
+		}
 		pairs = append(pairs, fmt.Sprintf("%q: d.%s", fl.Name, field))
 	}
 	if len(opts) == 0 {
@@ -110,6 +115,10 @@ func (g *gen) eventFrom(e *model.Event, name, dir string, f *goFile, helpers eve
 		if g.optionalValue(fl, dir, f) {
 			fmt.Fprintf(&b, "\tif raw, present := m[%q]; present && raw != nil {\n\t\tvar x %s\n%s\t\t%s = &x\n\t}\n",
 				fl.Name, g.goType(fl.Type.Name, dir, f), indent(g.assign(e, fl, "x", dir, f, helpers)), field)
+			continue
+		}
+		if fl.Optional {
+			fmt.Fprintf(&b, "\tif raw, present := m[%q]; present && raw != nil {\n%s\t}\n", fl.Name, indent(g.assign(e, fl, field, dir, f, helpers)))
 			continue
 		}
 		b.WriteString(g.assign(e, fl, field, dir, f, helpers))
@@ -141,14 +150,15 @@ func (g *gen) assign(e *model.Event, fl *model.Field, target, dir string, f *goF
 		if prefix, _ := model.SplitType(fl.Type.Name); prefix == "" {
 			en := g.m.Enum(base)
 			gt := g.qualify(en.In.Name, en.GoType(), dir, f)
-			return fmt.Sprintf("\tswitch v := m[%q].(type) {\n\tcase %s:\n\t\t%s = v\n\tcase string:\n\t\t%s = %s(v)\n\tdefault:\n\t\t%s\n\t}\n", fl.Name, gt, target, target, gt, fail)
+			fromString := fmt.Sprintf("\t\t%s = %s(v)", target, gt)
+			if en.Gen {
+				// 생성한 enum이면 Valid()로 설계에 없는 값을 거른다
+				fromString = fmt.Sprintf("\t\tif !%s(v).Valid() {\n\t\t\t%s\n\t\t}\n%s", gt, fail, fromString)
+			}
+			return fmt.Sprintf("\tswitch v := m[%q].(type) {\n\tcase %s:\n\t\t%s = v\n\tcase string:\n%s\n\tdefault:\n\t\t%s\n\t}\n", fl.Name, gt, target, fromString, fail)
 		}
 	}
 	gt := g.fieldType(fl, dir, f)
-	if target != "x" && fl.Optional && strings.HasPrefix(gt, "*") && fl.RefType.Name == "" && !fl.Many {
-		// optional 포인터 타입: 없거나 nil이면 건너뛴다
-		return fmt.Sprintf("\tif raw, present := m[%q]; present && raw != nil {\n\t\tif v, ok := raw.(%s); ok {\n\t\t\t%s = v\n\t\t} else {\n\t\t\t%s\n\t\t}\n\t}\n", fl.Name, gt, target, fail)
-	}
 	if target == "x" {
 		gt = strings.TrimPrefix(gt, "*")
 	}

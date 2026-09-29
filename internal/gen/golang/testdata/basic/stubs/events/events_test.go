@@ -7,12 +7,12 @@ import (
 )
 
 func TestRoundTrip(t *testing.T) {
-	in := AssetMintedData{AssetID: "a1", Owner: "o", Amount: 1 << 60, Players: []string{"p", "q"}}
+	in := AssetMintedData{AssetID: "a1", Owner: "o", Amount: 1 << 60, Players: []string{"p", "q"}, Kind: MintKindNormal}
 	got, err := AssetMintedDataFrom(in.Map())
 	if err != nil || !reflect.DeepEqual(got, in) {
 		t.Fatalf("direct: %+v %v", got, err)
 	}
-	raw, _ := json.Marshal(AssetMintedData{AssetID: "a1", Owner: "o", Amount: 7, Players: []string{"p"}}.Map())
+	raw, _ := json.Marshal(AssetMintedData{AssetID: "a1", Owner: "o", Amount: 7, Players: []string{"p"}, Kind: MintKindBonus}.Map())
 	var m map[string]any
 	if err := json.Unmarshal(raw, &m); err != nil {
 		t.Fatal(err)
@@ -53,5 +53,25 @@ func TestOptionalEnumAndRange(t *testing.T) {
 	m["amount"] = 2.5
 	if _, err := AssetMintedDataFrom(m); err == nil {
 		t.Fatal("정수가 아닌 amount는 오류여야 한다")
+	}
+}
+
+func TestOptionalManyAndEnumValid(t *testing.T) {
+	in := AssetMintedData{AssetID: "a", Owner: "o", Players: []string{}, Kind: MintKindNormal}
+	m := in.Map()
+	if _, ok := m["tags"]; ok {
+		t.Fatal("nil인 optional many는 넣지 않는다")
+	}
+	got, err := AssetMintedDataFrom(m)
+	if err != nil || got.Tags != nil {
+		t.Fatalf("%+v %v", got, err)
+	}
+	m["tags"] = []any{"x"}
+	if got, err := AssetMintedDataFrom(m); err != nil || len(got.Tags) != 1 {
+		t.Fatalf("%+v %v", got, err)
+	}
+	m["kind"] = "bogus"
+	if _, err := AssetMintedDataFrom(m); err == nil {
+		t.Fatal("설계에 없는 enum 값은 오류여야 한다")
 	}
 }
