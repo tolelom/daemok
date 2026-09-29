@@ -1,0 +1,55 @@
+version: 0.4
+go_module: tolelom_api
+
+executables:
+  server: { composes: [router, config, middleware, utils] }
+
+tiers: [base, infra, domain, edge, app]
+
+modules:
+  model:      { tier: base, role: data, path: internal/model }
+  utils:      { tier: base, path: internal/utils, depends_on: [model] }
+  validate:   { tier: base, path: internal/validate }
+  dto:        { tier: base, role: data, path: internal/dto, depends_on: [model, utils] }
+  cache:      { tier: infra, role: infra, path: internal/cache }
+  upload:     { tier: infra, role: infra, path: internal/upload }
+  config:     { tier: infra, path: internal/config, depends_on: [model] }
+  httputil:   { tier: infra, path: internal/httputil, depends_on: [dto, validate] }
+  post:       { tier: domain, path: internal/post, depends_on: [dto, httputil, model], needs: [post_cache] }
+  comment:    { tier: domain, path: internal/comment, depends_on: [dto, httputil, model] }
+  series:     { tier: domain, path: internal/series, depends_on: [dto, model, validate] }
+  tag:        { tier: domain, path: internal/tag, depends_on: [dto] }
+  sitemap:    { tier: domain, path: internal/sitemap, depends_on: [model, utils] }
+  user:       { tier: domain, path: internal/user, depends_on: [dto, model, utils, validate], needs: [upload_store] }
+  image:      { tier: domain, path: internal/image, depends_on: [dto], needs: [upload_store] }
+  feed:
+    tier: edge
+    path: internal/feed
+    depends_on: [utils]
+    needs:
+      - { contract: post_reader, uses: [get_public_posts], why: "피드용 공개 글 목록" }
+  middleware: { tier: edge, path: internal/middleware, depends_on: [config, dto, utils] }
+  router:
+    tier: app
+    path: internal/router
+    depends_on: [cache, comment, config, dto, feed, image, middleware, post, series, sitemap, tag, user]
+
+contracts:
+  post_reader:
+    in: post
+    kind: query
+    methods:
+      get_public_posts: { errors: [] }
+  post_cache:
+    in: cache
+    kind: port
+    methods:
+      get: { errors: [] }
+      set: { errors: [] }
+      delete: { errors: [] }
+      delete_by_pattern: { errors: [] }
+  upload_store:
+    in: upload
+    kind: port
+    methods:
+      validate_and_generate_filename: { errors: [] }

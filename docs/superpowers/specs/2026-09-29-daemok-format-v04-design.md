@@ -68,7 +68,7 @@ contracts:
 - `query` 계약의 구현은 `<주는 모듈 path>/query` 패키지에, 나머지 종류는 주는 모듈 패키지에 둔다.
 - 생성자 호출과 배선 전체는 생성하지 않는다.
 - 주는 모듈의 `contracts.gen.go`에는 `kind: call` 계약만 interface로 나온다. 나머지 종류는 같은 이름의 구현 타입과 겹치므로 받는 쪽 interface만 생성한다.
-- `cmd/<실행 단위>/modules.gen.go`의 blank import는 실행 단위가 `composes`에 적은 그룹의 멤버다.
+- 실행 단위가 조립하는 모듈은 `composes`에서 `depends_on`, `needs`, 그룹 멤버를 따라 닿는 것이다(설계 검사의 도달 판정과 같다). `cmd/<실행 단위>/modules.gen.go`의 blank import는 그중 그룹의 멤버다.
 
 ### 검사
 

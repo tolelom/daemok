@@ -86,15 +86,7 @@ func (g *gen) needs() error {
 func (g *gen) executableContracts() error {
 	ids, needs := g.unitNeeds()
 	for _, e := range g.m.Executables {
-		units := map[string]bool{}
-		for _, r := range e.Composes {
-			units[r.Name] = true
-			if grp := g.m.Group(r.Name); grp != nil {
-				for _, mem := range grp.Members {
-					units[mem.ID] = true
-				}
-			}
-		}
+		units := g.reachable(e)
 		var f *goFile
 		var lines []string
 		for _, id := range ids {

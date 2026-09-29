@@ -3,6 +3,7 @@ package workspace
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -169,5 +170,36 @@ func TestMissingRootIsEmpty(t *testing.T) {
 	}
 	if err := Apply(root, r.Plan); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestFiberAPIServer는 fiber_api_server(de0b5b6)에 query·port 관계를 적은 설계로 check를 돌린다.
+// 코드는 바꾸지 않는다. 옆 디렉토리에 클론이 없으면 건너뛴다.
+func TestFiberAPIServer(t *testing.T) {
+	root := filepath.Join("..", "..", "..", "fiber_api_server")
+	if _, err := os.Stat(filepath.Join(root, "go.mod")); err != nil {
+		t.Skip("fiber_api_server 클론이 없다")
+	}
+	r := Run(filepath.Join("testdata", "fiber", "design"), root)
+	var got []string
+	for _, d := range r.Diags {
+		got = append(got, d.Level.String()+": "+d.Msg)
+	}
+	want := []string{
+		"오류: needs로만 이어진 모듈을 직접 import한다: feed → post",
+		"오류: 생성 파일이 없다: internal/feed/needs.gen.go (daemok gen)",
+		"오류: needs로만 이어진 모듈을 직접 import한다: image → upload",
+		"오류: 생성 파일이 없다: internal/image/needs.gen.go (daemok gen)",
+		"오류: 생성 파일이 없다: internal/post/needs.gen.go (daemok gen)",
+		"오류: needs로만 이어진 모듈을 직접 import한다: post → cache",
+		"정보: 관리하지 않는 패키지를 import한다: router → tolelom_api/docs",
+		"오류: needs로만 이어진 모듈을 직접 import한다: user → upload",
+		"오류: 생성 파일이 없다: internal/user/needs.gen.go (daemok gen)",
+		"오류: 생성 파일이 없다: cmd/server/contracts.gen.go (daemok gen)",
+	}
+	sort.Strings(got)
+	sort.Strings(want)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 }

@@ -154,3 +154,65 @@ func TestHandleTransfer(t *testing.T) {
 
 - 핸들러 18개의 이름은 모두 `handle<Value>` 규약과 같아서(`handleMintAsset`, `handleRegisterTemplate`) L4 함수 노드 없이 등록 코드가 생성된다.
 - `gen: false`를 하나씩 풀어 생성 파일로 바꾸는 것이 그다음 단계다.
+
+## 도입 결과
+
+tolchain `feat/daemok` 브랜치(기준 `main` `29c1d3a`)에 형식 v0.4 설계 파일 `design/tolchain.yaml`을 두고 도입했다.
+
+| 대상 | 전 | 후 |
+|---|---|---|
+| 트랜잭션 타입 | `core/transaction.go`의 `TxType`과 상수 18개 | `core/tx_type.gen.go`(`Valid()`, `TxTypeValues()` 포함) |
+| 핸들러 등록 | 모듈 9개 파일의 `init()` | 멤버마다 `register.gen.go`, 실행 단위의 blank import는 `cmd/node/modules.gen.go` |
+| 이벤트 타입 | `events/emitter.go`의 상수 20개와 손으로 맞추는 `AllEventTypes()` | `events/event_type.gen.go`의 상수와 `EventTypeValues()`. `EventTemplateReg`는 `EventTemplateRegistered`로 바뀌고 값 문자열은 그대로다 |
+| 이벤트 본문 | 발행 22곳의 `map[string]any` 리터럴 | `events.<이벤트>Data{...}.Map()`. 키 이름과 값 타입을 컴파일러가 확인한다 |
+| 블록 생성 | `consensus/poa.go`의 `ProduceBlock` 본문 | 흐름 `produce_block`(단계 18개). 단계 본문은 `consensus/produce_block.go` |
+| 블록 적용 | `network/sync.go`의 `handleBlocks`와 `handleBlock`에 같은 순서가 두 번 | 흐름 `apply_block`(단계 13개) 하나를 둘이 부른다. 단계 본문은 `network/apply_block.go` |
+
+- `daemok check`: 오류 0, 경고 2(보류 요구사항 `REQ-random`에 연결된 요소, 케이스가 없는 에러 `ErrBalanceOverflow`), 정보 1(그룹 예외 `reward → asset`). import 대조와 이벤트 상수 참조에서 어긋난 곳이 없다.
+- `go test ./...`는 `core`의 `TestHash_OnBehalfOf_BackwardCompatible` 하나만 실패한다. 이 실패는 도입 전 `29c1d3a`에서도 같다.
+- indexer는 이벤트 본문을 지금처럼 `ev.Data["키"]`로 읽는다. indexer 테스트가 키 일부가 빠진 이벤트를 건너뛰거나 처리하는 동작을 확인하고 있어, 키가 하나라도 없으면 오류를 내는 `<이벤트>DataFrom`으로 바꾸지 않았다.
+
+### 흐름으로 옮긴 뒤의 차이
+
+단계 순서와 되돌리기는 옮기기 전과 같다. `network/apply_block_test.go`가 실패 경로 다섯 가지의 호출 순서를 옮기기 전 코드와 대조한다.
+
+| 항목 | 전 | 후 |
+|---|---|---|
+| 되돌리기 중 emitter | 이미 복원된 뒤에는 다시 설정하지 않음 | `discard_events`가 같은 emitter를 한 번 더 설정 |
+| Fatal 로그 | 실패 지점마다 다른 문구(`revert failed after exec error` 등) | `block production cannot recover`·`block apply cannot recover`와 단계 이름, 원인 오류 |
+| `ProduceBlock`의 오류 | 단계별로 감싼 오류 | 같다. `FlowError`를 벗겨 단계의 오류를 돌려준다 |
+
+두 흐름 사이의 차이는 설계 파일에 그대로 드러난다.
+
+| 항목 | `produce_block` | `apply_block` |
+|---|---|---|
+| 잠금 해제와 이벤트 flush | `unlock` 뒤 `flush_events` | `flush_events` 뒤 `unlock` |
+| `block_commit` 발행 | `emit_block_commit` 단계 | 없음 |
+| 실패 뒤 호출하는 쪽 | 오류를 돌려준다 | `handleBlocks`는 스냅샷 실패면 다음 블록으로, 그 밖은 멈춘다 |
+
+### 설계 노드 대응 비율
+
+패키지 최상위 선언(type, const, var, 메서드가 아닌 func. `_test.go`, `init`, `main` 제외) 중 설계 노드에 대응하는 것의 수다. 대응은 생성 파일이 선언한 이름, `gen: false` 노드의 Go 이름(`DefaultMaxBlockTxs`, 에러 7개, `TransferPayload`, `Handler`), 그룹 멤버의 핸들러 함수다. 기준은 `feat/daemok`의 `a97cbb0`이다.
+
+| 패키지 | 최상위 선언 | 설계 대응 | 비율 |
+|---|---|---|---|
+| `cmd/backup` | 3 | 0 | 0% |
+| `cmd/node` | 2 | 0 | 0% |
+| `config` | 22 | 1 | 4% |
+| `consensus` | 8 | 4 | 50% |
+| `core` | 67 | 28 | 41% |
+| `crypto` | 9 | 0 | 0% |
+| `crypto/certgen` | 7 | 0 | 0% |
+| `events` | 75 | 68 | 90% |
+| `indexer` | 11 | 0 | 0% |
+| `internal/testutil` | 9 | 0 | 0% |
+| `metrics` | 17 | 0 | 0% |
+| `network` | 28 | 4 | 14% |
+| `rpc` | 31 | 0 | 0% |
+| `storage` | 25 | 0 | 0% |
+| `vm` | 12 | 1 | 8% |
+| `vm/modules/*`(8개) | 19 | 18 | 95% |
+| `wallet` | 10 | 0 | 0% |
+| 합계 | 355 | 124 | 34% |
+
+설계가 거의 덮는 곳은 이벤트와 tx 모듈이고, 덮지 않는 곳은 저장소(`storage`), 네트워크 프로토콜(`network`의 메시지·피어), RPC, 지갑, 설정이다.

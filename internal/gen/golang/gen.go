@@ -317,13 +317,56 @@ func (g *gen) registrations() error {
 	return nil
 }
 
-// executableModules는 실행 단위가 composes에 적은 그룹의 멤버를 blank import한다.
+// reachable은 실행 단위가 조립하는 모듈·그룹·멤버다. composes에서 depends_on, needs, 그룹 멤버를 따라간다.
+// 설계 검사의 도달 판정과 같은 규칙이다.
+func (g *gen) reachable(e *model.Executable) map[string]bool {
+	seen := map[string]bool{}
+	var visit func(id string)
+	visit = func(id string) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		var deps []model.Ref
+		var needs []model.Need
+		switch {
+		case g.m.Module(id) != nil:
+			deps, needs = g.m.Module(id).DependsOn, g.m.Module(id).Needs
+		case g.m.Group(id) != nil:
+			grp := g.m.Group(id)
+			deps, needs = grp.DependsOn, grp.Needs
+			for _, mem := range grp.Members {
+				visit(mem.ID)
+			}
+		case g.m.Member(id) != nil:
+			mem := g.m.Member(id)
+			needs = mem.Needs
+			for _, x := range mem.Exceptions {
+				deps = append(deps, x.DependsOn)
+			}
+		}
+		for _, d := range deps {
+			visit(d.Name)
+		}
+		for _, n := range needs {
+			if ct := g.m.Contract(n.Contract.Name); ct != nil {
+				visit(ct.In.Name)
+			}
+		}
+	}
+	for _, r := range e.Composes {
+		visit(r.Name)
+	}
+	return seen
+}
+
+// executableModules는 실행 단위가 조립하는 그룹의 멤버를 blank import한다.
 func (g *gen) executableModules() error {
 	for _, e := range g.m.Executables {
+		units := g.reachable(e)
 		var dirs []string
-		for _, r := range e.Composes {
-			grp := g.m.Group(r.Name)
-			if grp == nil || g.m.HandlerKind(grp.Kind.Name) == nil {
+		for _, grp := range g.m.Groups {
+			if !units[grp.ID] || g.m.HandlerKind(grp.Kind.Name) == nil {
 				continue
 			}
 			for _, mem := range grp.Members {
