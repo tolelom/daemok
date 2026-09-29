@@ -1,0 +1,154 @@
+package serve
+
+import (
+	"bufio"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+const design = `version: 0.4
+go_module: example.com/x
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  api:  { tier: b, depends_on: [core] }
+enums:
+  kind: { in: core, values: [x, y] }
+`
+
+func setup(t *testing.T, src string) (*Server, string) {
+	t.Helper()
+	root := t.TempDir()
+	dir := filepath.Join(root, "design")
+	os.MkdirAll(dir, 0o755)
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte(src), 0o644)
+	s := New(dir, root)
+	s.Poll()
+	return s, dir
+}
+
+func getState(t *testing.T, s *Server) map[string]any {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/state", nil))
+	if rec.Code != 200 {
+		t.Fatalf("status %d", rec.Code)
+	}
+	var st map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &st); err != nil {
+		t.Fatal(err)
+	}
+	return st
+}
+
+func TestState(t *testing.T) {
+	s, _ := setup(t, design)
+	st := getState(t, s)
+	mods := st["model"].(map[string]any)["mods"].([]any)
+	if len(mods) != 2 || mods[0].(map[string]any)["id"] != "core" || mods[1].(map[string]any)["id"] != "api" {
+		t.Fatalf("mods 순서: %v", mods)
+	}
+	files := st["files"].([]any)
+	if len(files) != 1 {
+		t.Fatalf("files %v", files)
+	}
+	f := files[0].(map[string]any)
+	if f["path"] != "core/kind.gen.go" || f["sources"].([]any)[0] != "enum:kind" {
+		t.Fatalf("file %v", f)
+	}
+	// 생성 파일이 없다는 진단이 enum 노드가 아니라 경로로 나온다
+	found := false
+	for _, it := range st["issues"].([]any) {
+		i := it.(map[string]any)
+		if strings.Contains(i["msg"].(string), "생성 파일이 없다") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("issues %v", st["issues"])
+	}
+	if st["hasBase"] != false {
+		t.Fatal("git 저장소가 아니면 기준이 없다")
+	}
+}
+
+func TestIssueKeyForDesignDiag(t *testing.T) {
+	s, _ := setup(t, strings.Replace(design, "depends_on: [core]", "depends_on: [nope]", 1))
+	for _, it := range getState(t, s)["issues"].([]any) {
+		i := it.(map[string]any)
+		if strings.Contains(i["msg"].(string), `없는 모듈 "nope"`) {
+			if i["key"] != "mod:api" || i["origin"] != "design" {
+				t.Fatalf("%v", i)
+			}
+			return
+		}
+	}
+	t.Fatal("진단이 없다")
+}
+
+func TestPollAndBrokenFile(t *testing.T) {
+	s, dir := setup(t, design)
+	v := s.Version()
+	if s.Poll() {
+		t.Fatal("바뀐 것이 없는데 갱신했다")
+	}
+	time.Sleep(10 * time.Millisecond)
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\nmodules: [\n"), 0o644)
+	if !s.Poll() || s.Version() != v+1 {
+		t.Fatal("수정을 감지하지 못했다")
+	}
+	st := getState(t, s)
+	if st["fatal"] != true || len(st["issues"].([]any)) == 0 {
+		t.Fatalf("문법 오류는 진단으로 보여야 한다: %v", st)
+	}
+	os.WriteFile(filepath.Join(dir, "e.yaml"), []byte("version: 0.4\n"), 0o644)
+	if !s.Poll() {
+		t.Fatal("파일 추가를 감지하지 못했다")
+	}
+}
+
+func TestEventsStream(t *testing.T) {
+	s, dir := setup(t, design)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	resp, err := http.Get(srv.URL + "/api/events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	lines := make(chan string, 10)
+	go func() {
+		sc := bufio.NewScanner(resp.Body)
+		for sc.Scan() {
+			if strings.HasPrefix(sc.Text(), "data: ") {
+				lines <- strings.TrimPrefix(sc.Text(), "data: ")
+			}
+		}
+	}()
+	<-lines // 연결 직후의 현재 버전
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte(design+"\n"), 0o644)
+	s.Poll()
+	select {
+	case got := <-lines:
+		if got == "" {
+			t.Fatal("빈 이벤트")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("변경 이벤트가 오지 않았다")
+	}
+}
+
+func TestIndexServed(t *testing.T) {
+	s, _ := setup(t, design)
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "daemok 설계 지도") {
+		t.Fatalf("%d", rec.Code)
+	}
+}

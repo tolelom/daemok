@@ -10,6 +10,7 @@ import (
 const usage = `사용법:
   daemok check [--design DIR] [--root DIR] [--strict]
   daemok gen   [--design DIR] [--root DIR] [--dry-run]
+  daemok serve [--design DIR] [--root DIR] [--addr HOST:PORT]
 `
 
 func main() {
@@ -26,6 +27,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runCheck(args[1:], stdout, stderr)
 	case "gen":
 		return runGen(args[1:], stdout, stderr)
+	case "serve":
+		return runServe(args[1:], stdout, stderr)
 	}
 	fmt.Fprintf(stderr, "알 수 없는 명령 %q\n%s", args[0], usage)
 	return 2

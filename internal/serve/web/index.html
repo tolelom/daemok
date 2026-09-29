@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>daemok 설계 지도</title>
+<link rel="icon" href="data:,">
+<style>
+:root {
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --ground: #ECEFEA; --surface: #FAFBF8; --surface-2: #E3E7E0; --band: #F1F3EE; --code-bg: #F4F6F2;
+  --ink: #18202B; --ink-2: #485362; --ink-3: #6F7985;
+  --line: #CDD2CA; --line-strong: #9CA59D; --edge: #8E978F;
+  --accent: #2B55C9; --accent-soft: #DCE4F9; --on-accent: #FFFFFF;
+  --add: #2A8753; --add-soft: #DCF0E3; --rem: #C0392F; --rem-soft: #F7DDDA; --chg: #A87210; --chg-soft: #F5EACB;
+  --err: #C0392F; --warn: #A87210; --info: #56687F; --ok: #2A8753;
+  --k-kw: #7A3EB1; --k-str: #2A8753; --k-com: #7A8490; --k-num: #A8560F;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #10141A; --surface: #171C24; --surface-2: #212833; --band: #141920; --code-bg: #13171E;
+    --ink: #E3E7ED; --ink-2: #A9B2BE; --ink-3: #828C99; --line: #2D3541; --line-strong: #4B5563; --edge: #5E6875;
+    --accent: #88A6FF; --accent-soft: #1F2C4E; --on-accent: #0E1422;
+    --add: #5CC08A; --add-soft: #163525; --rem: #EF7B72; --rem-soft: #3F1E1C; --chg: #DDAE48; --chg-soft: #3A2E13;
+    --err: #EF7B72; --warn: #DDAE48; --info: #97A8BF; --ok: #5CC08A;
+    --k-kw: #C39BF0; --k-str: #7FD1A0; --k-com: #6F7A88; --k-num: #E8A869;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #10141A; --surface: #171C24; --surface-2: #212833; --band: #141920; --code-bg: #13171E;
+  --ink: #E3E7ED; --ink-2: #A9B2BE; --ink-3: #828C99; --line: #2D3541; --line-strong: #4B5563; --edge: #5E6875;
+  --accent: #88A6FF; --accent-soft: #1F2C4E; --on-accent: #0E1422;
+  --add: #5CC08A; --add-soft: #163525; --rem: #EF7B72; --rem-soft: #3F1E1C; --chg: #DDAE48; --chg-soft: #3A2E13;
+  --err: #EF7B72; --warn: #DDAE48; --info: #97A8BF; --ok: #5CC08A;
+  --k-kw: #C39BF0; --k-str: #7FD1A0; --k-com: #6F7A88; --k-num: #E8A869;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font-family: var(--sans); font-size: 14px; }
+button { font: inherit; color: inherit; }
+code, .mono { font-family: var(--mono); }
+
+.app { max-width: 1760px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 28px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand h1 { font: 600 17px var(--mono); margin: 0; letter-spacing: -0.01em; }
+.tag { font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; padding: 6px 11px; cursor: pointer; font-size: 13px; color: var(--ink-2); border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button b { font-family: var(--mono); font-weight: 600; margin-right: 5px; color: var(--ink-3); }
+.seg button[aria-current="true"] { background: var(--accent); color: var(--on-accent); }
+.seg button[aria-current="true"] b { color: var(--on-accent); }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.seg.sample button { font-family: var(--mono); }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-family: var(--mono); font-size: 13px; }
+.crumbs button { border: 0; background: none; padding: 3px 6px; border-radius: 4px; cursor: pointer; color: var(--accent); }
+.crumbs button:hover { background: var(--accent-soft); }
+.crumbs button[aria-current="true"] { color: var(--ink); cursor: default; background: none; font-weight: 600; }
+.crumbs .sep { color: var(--ink-3); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 14px; margin-top: 14px; align-items: start; }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; min-width: 0; }
+.pane-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+.pane-h strong { color: var(--ink); font-weight: 600; font-size: 13px; }
+.editor textarea { display: block; width: 100%; height: calc(100vh - 230px); min-height: 440px; resize: vertical; border: 0; outline: 0; padding: 12px; background: var(--code-bg); color: var(--ink); font-family: var(--mono); font-size: 12px; line-height: 1.6; tab-size: 2; white-space: pre; }
+.editor textarea:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.editor.bad textarea { box-shadow: inset 3px 0 0 var(--err); }
+.parse-err { margin: 0; padding: 8px 12px; font-family: var(--mono); font-size: 12px; color: var(--err); border-top: 1px solid var(--line); white-space: pre-wrap; }
+.try { margin: 0; padding: 10px 12px; font-size: 12px; color: var(--ink-2); border-top: 1px solid var(--line); line-height: 1.6; }
+.try code { background: var(--surface-2); padding: 1px 4px; border-radius: 3px; font-size: 11.5px; }
+.linkbtn { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 12px; }
+.linkbtn:hover { text-decoration: underline; }
+
+.map-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; padding: 12px 14px 8px; }
+.map-h h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.map-h h2 .lv { font-family: var(--mono); color: var(--accent); margin-right: 6px; }
+.map-h p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; color: var(--ink-3); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { display: inline-block; width: 16px; height: 0; border-top: 2px solid var(--edge); }
+.legend i.bad { border-color: var(--err); } .legend i.exc { border-top: 2px dashed var(--warn); }
+.legend i.add { border-color: var(--add); } .legend i.rem { border-top: 2px dashed var(--rem); } .legend i.chg { border-color: var(--chg); }
+.canvas { overflow-x: auto; padding: 0 6px 6px; }
+.canvas svg { display: block; width: 100%; min-width: 760px; height: auto; }
+.hint { margin: 0; padding: 8px 14px 12px; font-size: 12px; color: var(--ink-3); border-top: 1px solid var(--line); }
+
+.band rect { fill: var(--band); }
+.band text { font: 500 11px var(--sans); fill: var(--ink-3); letter-spacing: .08em; }
+.frame rect { fill: none; stroke: var(--ink-3); stroke-dasharray: 3 4; stroke-width: 1.2; }
+.frame text { font: 500 12px var(--mono); fill: var(--ink-2); }
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.3; transition: opacity .15s; }
+.edge.k-bad { stroke: var(--err); stroke-width: 2; }
+.edge.k-exc { stroke: var(--warn); stroke-width: 1.8; stroke-dasharray: 6 4; }
+.edge.e-add { stroke: var(--add); stroke-width: 2.2; }
+.edge.e-rem { stroke: var(--rem); stroke-width: 1.6; stroke-dasharray: 4 4; }
+.edge.hi { stroke: var(--accent); stroke-width: 2.2; opacity: 1; }
+.ah-dep { fill: var(--edge); } .ah-hi { fill: var(--accent); } .ah-bad { fill: var(--err); } .ah-exc { fill: var(--warn); } .ah-add { fill: var(--add); } .ah-rem { fill: var(--rem); }
+.node { cursor: pointer; outline: none; transition: opacity .15s; }
+.node .box { fill: var(--surface); stroke: var(--line-strong); stroke-width: 1.2; }
+.node .stack { fill: var(--surface-2); stroke: var(--line-strong); stroke-width: 1; }
+.node .lbl { font: 600 13px var(--mono); fill: var(--ink); }
+.node .sub { font: 400 11.5px var(--sans); fill: var(--ink-2); }
+.t-actor .box { fill: var(--surface-2); }
+.t-iface .box { stroke: var(--accent); } .t-iface .lbl { fill: var(--accent); }
+.t-sys .box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; } .t-sys .lbl { font-size: 15px; }
+.drill rect { fill: var(--accent); } .drill text { font: 600 11px var(--sans); fill: var(--on-accent); } .drill:hover rect { opacity: .85; }
+.node.sel .box, .node:focus-visible .box { stroke: var(--accent); stroke-width: 2.6; }
+.st-add .box { fill: var(--add-soft); stroke: var(--add); stroke-width: 2; }
+.st-chg .box { fill: var(--chg-soft); stroke: var(--chg); stroke-width: 2; }
+.st-rem .box { fill: var(--rem-soft); stroke: var(--rem); stroke-dasharray: 5 4; }
+.st-rem .lbl { text-decoration: line-through; fill: var(--rem); }
+.stmark { font: 700 11px var(--mono); }
+.st-add .stmark { fill: var(--add); } .st-chg .stmark { fill: var(--chg); } .st-rem .stmark { fill: var(--rem); }
+.dot-err { fill: var(--err); } .dot-warn { fill: var(--warn); }
+svg.focus .edge:not(.hi) { opacity: .1; }
+svg.focus .node:not(.near) { opacity: .42; }
+
+/* HTML views (R, L3) */
+.hview { padding: 4px 14px 14px; display: grid; gap: 10px; }
+.summary-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.req { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; background: var(--surface); cursor: pointer; text-align: left; }
+.req:hover { border-color: var(--line-strong); }
+.req.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.req-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.req-top b { font-family: var(--mono); font-size: 13px; }
+.req p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.st-ind { font: 700 11px var(--mono); }
+.req.st-add, .l3item.st-add { background: var(--add-soft); }
+.req.st-chg, .l3item.st-chg { background: var(--chg-soft); }
+.modcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.modcard { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
+.modcard-h { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; padding: 9px 11px; border-bottom: 1px solid var(--line); background: var(--band); border-radius: 8px 8px 0 0; }
+.modcard-h button { border: 0; background: none; padding: 0; cursor: pointer; font: 600 13px var(--mono); color: var(--ink); }
+.modcard-h button:hover { color: var(--accent); }
+.modcard-h span { font-size: 11px; color: var(--ink-3); font-family: var(--mono); }
+.l3sec { padding: 6px 11px 8px; display: grid; gap: 3px; }
+.l3sec + .l3sec { border-top: 1px dashed var(--line); }
+.l3sec h4 { margin: 2px 0; font-size: 10.5px; font-weight: 600; color: var(--ink-3); letter-spacing: .08em; }
+.l3item { display: flex; align-items: baseline; gap: 6px; border: 0; background: none; padding: 3px 5px; border-radius: 4px; cursor: pointer; text-align: left; min-width: 0; }
+.l3item:hover { background: var(--band); }
+.l3item.sel { background: var(--accent-soft); }
+.l3item b { font: 500 12.5px var(--mono); overflow-wrap: anywhere; }
+.l3item small { font-size: 11.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.l3item .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; }
+.dot.err { background: var(--err); } .dot.warn { background: var(--warn); }
+.focus-link:focus-visible, .req:focus-visible, .l3item:focus-visible, .modcard-h button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* side */
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.card h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--ink-3); letter-spacing: .06em; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -2px -12px 10px; padding-inline: 8px; }
+.tabs button { border: 0; background: none; padding: 7px 9px; font-size: 12.5px; color: var(--ink-3); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.tabs button .n { font-family: var(--mono); font-size: 11px; margin-left: 3px; color: var(--ink-3); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.diff-counts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-family: var(--mono); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.add, .pill.ok { background: var(--add-soft); color: var(--add); }
+.pill.rem, .pill.err { background: var(--rem-soft); color: var(--rem); }
+.pill.chg, .pill.warn { background: var(--chg-soft); color: var(--chg); }
+.pill.mute { background: var(--surface-2); color: var(--ink-2); }
+.diff-list { margin: 0 0 10px; padding: 0; list-style: none; font-family: var(--mono); font-size: 12px; display: grid; gap: 2px; }
+.diff-list .add { color: var(--add); } .diff-list .rem { color: var(--rem); } .diff-list .chg { color: var(--chg); }
+.muted { color: var(--ink-3); font-size: 12px; line-height: 1.55; margin: 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 6px; padding: 6px 12px; font-size: 12.5px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.btn:hover { filter: brightness(1.05); }
+.btn:focus-visible, .ref:focus-visible, .issue:focus-visible, .filebtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.insp-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.insp-title b { font-family: var(--mono); font-size: 15px; overflow-wrap: anywhere; }
+.kind { font-size: 11px; color: var(--ink-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.insp-sum { margin: 0 0 10px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+dl.kv { margin: 0; display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px 8px; font-size: 12.5px; }
+dl.kv dt { color: var(--ink-3); }
+dl.kv dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; align-items: baseline; }
+.ref { border: 1px solid var(--line); background: var(--code-bg); border-radius: 4px; padding: 1px 6px; font-family: var(--mono); font-size: 12px; cursor: pointer; color: var(--accent); }
+.ref:hover { border-color: var(--accent); }
+.ref.plain { cursor: default; color: var(--ink-2); }
+.codepath { font-family: var(--mono); font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+.none { color: var(--ink-3); }
+.drill-btn { margin-top: 12px; width: 100%; }
+.tbl-wrap { overflow-x: auto; margin-top: 10px; }
+table.mini { border-collapse: collapse; font-size: 12px; width: 100%; }
+table.mini th, table.mini td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.mini th { font-weight: 600; color: var(--ink-3); font-size: 11px; }
+table.mini td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.mini td.bad { color: var(--err); font-weight: 600; }
+.files { display: grid; gap: 8px; }
+.filebtn { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; width: 100%; border: 1px solid var(--line); background: var(--band); border-radius: 6px 6px 0 0; padding: 6px 9px; cursor: pointer; text-align: left; }
+.filebtn span { font: 500 12px var(--mono); overflow-wrap: anywhere; }
+.filebtn em { font-style: normal; font-size: 11px; color: var(--ink-3); font-family: var(--mono); flex: none; }
+.filebtn[aria-expanded="false"] { border-radius: 6px; }
+pre.code { margin: 0; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 6px 6px; background: var(--code-bg); padding: 10px; font: 11.5px/1.55 var(--mono); overflow-x: auto; white-space: pre; color: var(--ink); max-height: 420px; }
+.tok-kw { color: var(--k-kw); } .tok-str { color: var(--k-str); } .tok-com { color: var(--k-com); font-style: italic; } .tok-num { color: var(--k-num); }
+.issues { display: grid; gap: 3px; }
+.issue { display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 8px; align-items: start; text-align: left; border: 0; background: none; padding: 5px 4px; border-radius: 5px; cursor: pointer; font-size: 12.5px; line-height: 1.45; }
+.issue:hover { background: var(--band); }
+.issue.static { cursor: default; }
+.issue.static:hover { background: none; }
+.issue code { font-size: 11.5px; overflow-wrap: anywhere; }
+.sev { font-size: 10.5px; font-weight: 600; text-align: center; border-radius: 4px; padding: 1px 0; }
+.sev.err { background: var(--rem-soft); color: var(--err); }
+.sev.warn { background: var(--chg-soft); color: var(--warn); }
+.sev.info { background: var(--surface-2); color: var(--info); }
+.sev.ok { background: var(--add-soft); color: var(--ok); }
+.note { font-size: 11.5px; color: var(--ink-3); margin: 0 0 8px; line-height: 1.5; }
+
+@media (max-width: 1240px) {
+  .grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); }
+  .editor { grid-column: 1 / -1; order: 3; }
+  .editor textarea { height: 480px; }
+}
+@media (max-width: 780px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .side { order: 2; }
+}
+@media (prefers-reduced-motion: reduce) { .edge, .node { transition: none; } }
+.edge.k-need { stroke: var(--accent); stroke-width: 1.4; stroke-dasharray: 2 4; }
+.ah-need { fill: var(--accent); }
+.legend i.need { border-top: 2px dotted var(--accent); }
+.status { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+.status.bad { color: var(--err); }
+.steps { margin: 10px 0 0; padding-left: 1.4em; font-size: 12.5px; display: grid; gap: 3px; }
+.steps code { font-size: 12px; }
+.steps .flag { font-size: 10.5px; border-radius: 3px; padding: 0 4px; margin-left: 4px; background: var(--surface-2); color: var(--ink-2); }
+.steps .flag.commit { background: var(--add-soft); color: var(--add); }
+.steps .flag.fatal { background: var(--rem-soft); color: var(--rem); }
+
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M2 8 L13 3 L24 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><rect x="4" y="9" width="18" height="3" rx="1" fill="currentColor"/><rect x="6" y="13" width="2.4" height="10" fill="currentColor"/><rect x="17.6" y="13" width="2.4" height="10" fill="currentColor"/><rect x="11.8" y="13" width="2.4" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+      <h1>daemok</h1>
+      <span class="status" id="status"></span>
+    </div>
+    <nav class="seg" id="levels" aria-label="계층"></nav>
+    <nav class="crumbs" id="crumbs" aria-label="경로"></nav>
+  </header>
+  <main class="grid">
+    <section class="pane map">
+      <div class="map-h">
+        <div><h2 id="viewTitle"></h2><p id="viewDesc"></p></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="canvas" id="canvas"></div>
+      <p class="hint" id="hint"></p>
+    </section>
+    <aside class="side">
+      <div class="card" id="diffBox"></div>
+      <div class="card" id="inspector"></div>
+      <div class="card" id="issuesBox"></div>
+    </aside>
+  </main>
+</div>
+<script>
+const W = 1000;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+const arr = v => Array.isArray(v) ? v.map(String) : (v == null ? [] : [String(v)]);
+const camel = s => String(s).split(/[_\-]/).filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join('');
+const lcamel = s => { const c = camel(s); return c ? c[0].toLowerCase() + c.slice(1) : c; };
+const goIdent = s => { const c = lcamel(s); return c.replace(/Id$/, 'ID').replace(/Id([A-Z])/g, 'ID$1'); };
+const goExport = s => camel(s).replace(/Id$/, 'ID').replace(/Id([A-Z])/g, 'ID$1');
+
+/* ---------- model ---------- */
+const unit = (m, id) => m.mods[id] || m.groups[id];
+const ukey = (m, id) => (m.groups[id] ? 'grp:' : 'mod:') + id;
+const owner = (m, id) => m.mods[id] || m.members[id] || null;
+const ownerKey = (m, id) => m.mods[id] ? 'mod:' + id : m.members[id] ? 'mem:' + id : null;
+const pkgOf = (m, id) => { const o = owner(m, id); return o ? o.path.split('/').pop() : id; };
+const pathOf = (m, id) => { const o = owner(m, id); return o ? o.path : id; };
+
+const KINDS = [['req', 'reqs'], ['actor', 'actors'], ['iface', 'ifaces'], ['exe', 'exes'], ['mod', 'mods'], ['grp', 'groups'], ['mem', 'members'], ['enum', 'enums'], ['const', 'consts'], ['err', 'errors'], ['type', 'types'], ['contract', 'contracts'], ['hk', 'hks'], ['ek', 'eks'], ['ev', 'events'], ['func', 'funcs'], ['flow', 'flows']];
+const L3KINDS = ['enum', 'const', 'err', 'type', 'contract', 'hk', 'ek', 'ev', 'func', 'flow'];
+const KLABEL = { req: '요구사항 · R', actor: '외부 액터 · L0', iface: '인터페이스 · L0', sys: '시스템 · L0', exe: '실행 단위 · L1', mod: '모듈 · L2', grp: '그룹 · L2', mem: '그룹 모듈 · L2', enum: 'enum · L3', const: '상수 · L3', err: '에러 · L3', type: '타입 · L3', contract: '계약 · L3', hk: '핸들러 종류 · L3', ek: '이벤트 종류 · L3', ev: '이벤트 · L3', func: '함수 계약 · L4', flow: '흐름 · L4' };
+function getNode(m, key) {
+  const i = key.indexOf(':'); const t = key.slice(0, i), id = key.slice(i + 1);
+  if (t === 'sys') return m.system.id === id ? m.system : null;
+  const k = KINDS.find(x => x[0] === t);
+  return k ? m[k[1]][id] || null : null;
+}
+function allSatisfiers(m, rid) {
+  const out = [];
+  for (const [t, col] of KINDS) if (t !== 'req') for (const n of Object.values(m[col])) if (arr(n.satisfies).includes(rid)) out.push(t + ':' + n.id);
+  return out;
+}
+
+function closure(m, exeId) {
+  const start = exeId ? (m.exes[exeId]?.composes || []) : [...Object.keys(m.mods), ...Object.keys(m.groups)];
+  const seen = new Set(), st = [...start];
+  while (st.length) { const id = st.pop(); const u = unit(m, id); if (!u || seen.has(id)) continue; seen.add(id); st.push(...u.depends_on, ...(u.needs || []).map(n => n.target).filter(Boolean)); }
+  return seen;
+}
+const usedBy = (m, id) => [...Object.values(m.mods), ...Object.values(m.groups)].filter(u => u.depends_on.includes(id)).map(u => u.id);
+function canUse(m, from, to) {
+  if (from === to) return true;
+  if (m.mods[from]) return m.mods[from].depends_on.includes(to);
+  const x = m.members[from];
+  if (x) { const g = m.groups[x.group]; return g.depends_on.includes(to) || x.exceptions.some(e => e.to === to); }
+  return false;
+}
+
+/* ---------- type resolution ---------- */
+const BUILTIN = { string: 'string', int: 'int', uint: 'uint', int64: 'int64', uint64: 'uint64', bool: 'bool', float64: 'float64', duration: 'time.Duration', time: 'time.Time', address: 'string', bytes: '[]byte', error: 'error' };
+const TSB = { string: 'string', int: 'number', uint: 'number', int64: 'number', uint64: 'number', float64: 'number', bool: 'boolean', duration: 'string', address: 'string' };
+function splitType(t) { let pre = ''; t = String(t || ''); while (t.startsWith('*') || t.startsWith('[]')) { const p = t.startsWith('*') ? '*' : '[]'; pre += p; t = t.slice(p.length); } return [pre, t]; }
+function resolveType(m, t) {
+  const [, base] = splitType(t);
+  if (BUILTIN[base]) return { kind: 'builtin', base };
+  if (m.enums[base]) return { kind: 'enum', base, node: m.enums[base] };
+  if (m.types[base]) return { kind: 'type', base, node: m.types[base] };
+  if (/^[A-Z]/.test(base) || base.includes('.')) return { kind: 'external', base };
+  return { kind: 'unknown', base };
+}
+const enumGoName = e => String(e.go.type || camel(e.id));
+const typeGoName = t => String(t.go.name || goExport(t.id));
+function goType(m, t, fromMod, ctx) {
+  const [pre, base] = splitType(t);
+  const r = resolveType(m, t);
+  let name;
+  if (r.kind === 'builtin') { name = BUILTIN[base]; if (name.startsWith('time.')) ctx.imports.add('time'); }
+  else if (r.kind === 'enum' || r.kind === 'type') {
+    const nm = r.kind === 'enum' ? enumGoName(r.node) : typeGoName(r.node);
+    name = r.node.in === fromMod ? nm : pkgOf(m, r.node.in) + '.' + nm;
+    if (r.node.in !== fromMod) ctx.imports.add(m.goModule + '/' + pathOf(m, r.node.in));
+  } else { name = base; if (base.startsWith('json.')) ctx.imports.add('encoding/json'); }
+  return pre + name;
+}
+
+function hl(code, lang) {
+  const kw = lang === 'ts' ? 'export|const|type|as|typeof' : 'package|import|func|type|const|var|return|struct|interface|switch|case|for|range|if|map|any|string|int|uint|uint64|int64|bool|error|nil|true|false';
+  const re = new RegExp('(\\/\\/[^\\n]*)|("(?:[^"\\\\\\n]|\\\\.)*")|(`[^`]*`)|\\b(' + kw + ')\\b|\\b(\\d+)\\b', 'g');
+  let out = '', last = 0, mm;
+  while ((mm = re.exec(code))) {
+    out += esc(code.slice(last, mm.index));
+    const cls = mm[1] ? 'com' : (mm[2] || mm[3]) ? 'str' : mm[4] ? 'kw' : 'num';
+    out += `<span class="tok-${cls}">${esc(mm[0])}</span>`;
+    last = re.lastIndex;
+  }
+  return out + esc(code.slice(last));
+}
+
+/* ---------- SVG views (L0, L1, L2, group) ---------- */
+function ifaceSub(i) { return i.protocol + (i.port ? ' :' + i.port : i.path ? ' ' + i.path : ''); }
+function graphFor(m, nav) {
+  const g = { nodes: [], edges: [], bands: [], frame: null };
+  const band = (id, label) => g.bands.push({ id, label });
+  const node = n => g.nodes.push(n);
+  const edge = (key, from, to, kind = 'dep') => g.edges.push({ key, from, to, kind });
+  const ifaceNodes = () => { for (const i of Object.values(m.ifaces)) node({ key: 'iface:' + i.id, id: i.id, type: 'iface', band: 'ifaces', label: i.id, sub: ifaceSub(i), sig: JSON.stringify(i) }); };
+  if (nav.level === 'L0') {
+    band('actors', '외부 액터'); band('ifaces', '인터페이스'); band('system', '시스템');
+    for (const a of Object.values(m.actors)) node({ key: 'actor:' + a.id, id: a.id, type: 'actor', band: 'actors', label: a.id, sub: a.summary, sig: a.summary });
+    ifaceNodes();
+    for (const i of Object.values(m.ifaces)) { for (const a of i.used_by) edge(`use:${a}>${i.id}`, 'actor:' + a, 'iface:' + i.id); edge(`srv:${i.id}`, 'iface:' + i.id, 'sys:' + m.system.id); }
+    node({ key: 'sys:' + m.system.id, id: m.system.id, type: 'sys', band: 'system', label: m.system.id, sub: m.system.summary, wide: true, drill: { level: 'L1' }, sig: m.system.summary });
+  } else if (nav.level === 'L1') {
+    band('ifaces', '인터페이스'); band('exes', '실행 단위');
+    ifaceNodes();
+    for (const e of Object.values(m.exes)) { node({ key: 'exe:' + e.id, id: e.id, type: 'exe', band: 'exes', label: e.id, sub: e.summary, drill: { level: 'L2', exe: e.id }, sig: JSON.stringify(e) }); for (const i of e.exposes) edge(`exp:${e.id}>${i}`, 'exe:' + e.id, 'iface:' + i); }
+  } else if (nav.level === 'L2') {
+    const ids = closure(m, nav.exe);
+    for (const t of [...m.tiers].reverse()) band('tier:' + t, t);
+    band('tier:?', 'tier 없음');
+    const ti = t => m.tiers.indexOf(t);
+    for (const id of ids) {
+      const u = unit(m, id), key = u.type + ':' + id;
+      let sub;
+      if (u.type === 'grp') { const exc = u.members.reduce((s, x) => s + m.members[x].exceptions.length, 0); sub = `모듈 ${u.members.length}개 · ${u.kind || 'group'}${exc ? ` · 예외 ${exc}` : ''}`; }
+      else sub = u.implements.length ? '구현: ' + u.implements.join(', ') : u.summary;
+      node({ key, id, type: u.type, band: ti(u.tier) >= 0 ? 'tier:' + u.tier : 'tier:?', label: id, sub, drill: u.type === 'grp' ? { level: 'G', group: id } : null, sig: JSON.stringify(u) });
+      for (const d of u.depends_on) if (ids.has(d)) edge(`dep:${id}>${d}`, key, ukey(m, d), ti(unit(m, d).tier) > ti(u.tier) ? 'bad' : 'dep');
+      for (const n of (u.needs || [])) if (n.target && ids.has(n.target) && unit(m, n.target)) edge(`need:${id}>${n.target}:${n.contract}`, key, ukey(m, n.target), 'need');
+    }
+  } else if (nav.level === 'G') {
+    const grp = m.groups[nav.group];
+    if (!grp) return g;
+    band('members', '그룹 모듈'); band('deps', '공통 의존');
+    g.frame = { band: 'members', label: `${grp.id} · ${grp.kind || 'group'}${grp.rule ? ' · ' + grp.rule : ''}` };
+    for (const mid of grp.members) { const x = m.members[mid]; node({ key: 'mem:' + mid, id: mid, type: 'mem', band: 'members', label: mid, sub: x.handles.length ? `${x.handles.length}개 처리: ${x.handles.join(', ')}` : x.summary, sig: JSON.stringify(x) }); for (const e of x.exceptions) edge(`exc:${mid}>${e.to}`, 'mem:' + mid, 'mem:' + e.to, 'exc'); }
+    for (const d of grp.depends_on) { const t = unit(m, d); if (!t) continue; node({ key: ukey(m, d), id: d, type: t.type, band: 'deps', label: d, sub: t.tier, sig: JSON.stringify(t) }); edge(`dep:${grp.id}>${d}`, '__frame', ukey(m, d)); }
+  }
+  return g;
+}
+function merged(nav) {
+  const cur = graphFor(model, nav), base = graphFor(baseModel, nav);
+  const bmap = new Map(base.nodes.map(n => [n.key, n])), cmap = new Map(cur.nodes.map(n => [n.key, n]));
+  for (const n of cur.nodes) { const b = bmap.get(n.key); n.st = !b ? 'add' : b.sig !== n.sig ? 'chg' : ''; }
+  for (const b of base.nodes) if (!cmap.has(b.key)) { cur.nodes.push({ ...b, st: 'rem', drill: null }); if (!cur.bands.some(x => x.id === b.band)) cur.bands.push(base.bands.find(x => x.id === b.band) || { id: b.band, label: b.band }); }
+  const ck = new Set(cur.edges.map(e => e.key)), bk = new Set(base.edges.map(e => e.key));
+  for (const e of cur.edges) e.st = bk.has(e.key) ? '' : 'add';
+  for (const e of base.edges) if (!ck.has(e.key)) cur.edges.push({ ...e, st: 'rem' });
+  if (!cur.frame && base.frame) cur.frame = base.frame;
+  return cur;
+}
+const LEFT = 132, RIGHT = W - 24;
+const nodeH = n => n.type === 'iface' ? 44 : 60;
+function layout(g) {
+  const pos = new Map(), bands = [];
+  let y = 26;
+  for (const b of g.bands) {
+    const ns = g.nodes.filter(n => n.band === b.id);
+    if (!ns.length) continue;
+    const per = b.id === 'members' ? 4 : 5, top = y;
+    for (let i = 0; i < ns.length; i += per) {
+      const row = ns.slice(i, i + per), h = Math.max(...row.map(nodeH)), slot = (RIGHT - LEFT) / row.length;
+      row.forEach((n, j) => { const w = Math.min(n.wide ? 300 : n.type === 'iface' ? 150 : 170, slot - 18); const cx = LEFT + slot * (j + 0.5), nh = nodeH(n); pos.set(n.key, { x: cx - w / 2, y: y + (h - nh) / 2, w, h: nh, cx }); });
+      y += h + 40;
+    }
+    bands.push({ ...b, y0: top - 14, y1: y - 40 + 14 });
+    y += 58;
+  }
+  if (g.frame) { const fb = bands.find(b => b.id === g.frame.band); if (fb) pos.set('__frame', { x: LEFT - 16, y: fb.y0 - 10, w: RIGHT - LEFT + 32, h: fb.y1 - fb.y0 + 20, cx: (LEFT + RIGHT) / 2 }); }
+  return { pos, bands, height: y - 30 };
+}
+function routes(g, pos) {
+  const ports = new Map(), dirs = new Map();
+  const put = (k, side, e, otherX) => { const id = k + '|' + side; if (!ports.has(id)) ports.set(id, []); ports.get(id).push({ e, otherX }); };
+  for (const e of g.edges) {
+    const s = pos.get(e.from), t = pos.get(e.to);
+    if (!s || !t) continue;
+    const dir = t.y > s.y + 5 ? 'down' : t.y < s.y - 5 ? 'up' : 'same';
+    dirs.set(e, dir);
+    const [ss, ts] = dir === 'down' ? ['b', 't'] : dir === 'up' ? ['t', 'b'] : ['b', 'b'];
+    put(e.from, ss, e, t.cx); put(e.to, ts, e, s.cx);
+  }
+  const at = new Map();
+  for (const [id, list] of ports) {
+    const [k, side] = id.split('|'), p = pos.get(k);
+    list.sort((a, b) => a.otherX - b.otherX);
+    const spread = k === '__frame' ? 0.3 : 0.6;
+    list.forEach((it, i) => at.set(it.e.key + (it.e.from === k ? '>s' : '>t'), { x: p.cx + p.w * spread * ((i + 0.5) / list.length - 0.5), y: side === 't' ? p.y : p.y + p.h }));
+  }
+  const out = [];
+  for (const e of g.edges) {
+    const dir = dirs.get(e); if (!dir) continue;
+    const a = at.get(e.key + '>s'), b = at.get(e.key + '>t');
+    let d;
+    if (dir === 'down') { const dy = Math.max(26, (b.y - a.y) / 2); d = `M${a.x},${a.y} C${a.x},${a.y + dy} ${b.x},${b.y - dy - 6} ${b.x},${b.y - 6}`; }
+    else if (dir === 'up') { const dy = Math.max(26, (a.y - b.y) / 2); d = `M${a.x},${a.y} C${a.x},${a.y - dy} ${b.x},${b.y + dy + 6} ${b.x},${b.y + 6}`; }
+    else d = `M${a.x},${a.y} C${a.x},${a.y + 42} ${b.x},${b.y + 48} ${b.x},${b.y + 6}`;
+    out.push({ e, d });
+  }
+  return out;
+}
+function fit(str, px, ascii) {
+  str = String(str || ''); let w = 0, out = '';
+  for (const ch of str) { const cw = ch.charCodeAt(0) > 0x2e80 ? ascii * 1.65 : ascii; if (w + cw > px) return out.replace(/\s+$/, '') + '…'; w += cw; out += ch; }
+  return out;
+}
+
+function fixNav() {
+  const out = [];
+  for (const n of nav) {
+    if (n.level === 'L2' && n.exe && !model.exes[n.exe] && !baseModel.exes[n.exe]) { out.push({ level: 'L2' }); continue; }
+    if (n.level === 'G' && !model.groups[n.group]) break;
+    out.push(n);
+  }
+  nav = out.length ? out : [{ level: 'L0' }];
+}
+const curNav = () => nav[nav.length - 1];
+
+/* ---------- diff ---------- */
+function entities(m) {
+  const e = new Map();
+  e.set('sys:' + m.system.id, m.system.summary);
+  for (const [k, col] of KINDS) for (const [id, v] of Object.entries(m[col])) e.set(k + ':' + id, JSON.stringify(v));
+  return e;
+}
+function diffList() {
+  const a = entities(baseModel), b = entities(model), list = [];
+  for (const [k, v] of b) if (!a.has(k)) list.push(['add', k]); else if (a.get(k) !== v) list.push(['chg', k]);
+  for (const k of a.keys()) if (!b.has(k)) list.push(['rem', k]);
+  return list;
+}
+let stMap = new Map();
+
+/* ---------- render ---------- */
+const LEVELS = [['R', '요구사항'], ['L0', '시스템'], ['L1', '실행 단위'], ['L2', '모듈'], ['L3', '타입·계약']];
+function renderChrome() {
+  const lv = curNav().level === 'G' ? 'L2' : curNav().level;
+  $('#levels').innerHTML = LEVELS.map(([k, t]) => `<button type="button" data-level="${k}" aria-current="${k === lv}"><b>${k}</b>${t}</button>`).join('');
+  $('#crumbs').innerHTML = (lv === 'R' || lv === 'L3') ? '' : nav.map((n, i) => {
+    const label = n.level === 'L0' ? model.system.id : n.level === 'L1' ? '실행 단위' : n.level === 'L2' ? (n.exe || '모든 모듈') : n.group;
+    return (i ? '<span class="sep">›</span>' : '') + `<button type="button" data-crumb="${i}" aria-current="${i === nav.length - 1}">${esc(label)}</button>`;
+  }).join('');
+  const t = curNav();
+  let title, desc, hint = '클릭하면 선택, 더블클릭이나 <b>열기</b>를 누르면 한 계층 아래로 내려가요. 마우스를 올리면 연결된 의존만 강조돼요.';
+  if (t.level === 'R') { title = ['R', '요구사항']; desc = '요구사항 본문은 자연어로 두고, 설계 요소가 satisfies로 연결돼요. 요구사항 값은 예시예요'; hint = '요구사항을 누르면 오른쪽에 연결된 설계 요소가 보여요. 칩을 누르면 그 요소로 이동해요.'; }
+  else if (t.level === 'L0') { title = ['L0', '시스템']; desc = `누가 어떤 인터페이스로 ${model.system.id}를 쓰는지`; }
+  else if (t.level === 'L1') { title = ['L1', '실행 단위']; desc = '따로 실행되는 프로그램과 각각이 노출하는 인터페이스'; }
+  else if (t.level === 'L2') { title = ['L2', t.exe ? `${t.exe}의 모듈` : '모든 모듈']; desc = `모듈 ${closure(model, t.exe).size}개 · 위 tier는 아래 tier에만 의존할 수 있어요`; }
+  else if (t.level === 'G') { const g = model.groups[t.group]; title = ['L2', `${t.group} 내부`]; desc = g?.kind ? `모든 멤버가 ${g.kind} 형태로 ${model.hks[g.kind]?.key || '키'} 값을 처리해요. 멤버끼리는 의존할 수 없어요` : '그룹 안의 모듈과 공통 의존'; }
+  else { title = ['L3', '타입·계약']; desc = '모듈별로 묶은 enum, 상수, 에러, 타입, 계약, 이벤트, 함수 계약, 흐름. 여기서 *.gen.go가 생성된다'; hint = '항목을 누르고 오른쪽 <b>생성 코드</b> 탭을 본다. 설계 파일을 저장하면 다시 그려진다.'; }
+  $('#viewTitle').innerHTML = `<span class="lv">${title[0]}</span>${esc(title[1])}`;
+  $('#viewDesc').textContent = desc;
+  $('#hint').innerHTML = hint;
+  const svgLegend = '<span><i></i>의존</span><span><i class="need"></i>needs</span><span><i class="exc"></i>규칙 예외</span><span><i class="bad"></i>규칙 위반</span><span><i class="add"></i>추가</span><span><i class="chg"></i>수정</span><span><i class="rem"></i>삭제</span>';
+  $('#legend').innerHTML = (t.level === 'R' || t.level === 'L3') ? '<span class="pill add">+ 추가</span><span class="pill chg">~ 수정</span><span><span class="dot err" style="display:inline-block"></span> 오류</span><span><span class="dot warn" style="display:inline-block"></span> 경고</span>' : svgLegend;
+}
+function issueLevel(key) { let lv = null; for (const i of issues) if (i.key === key && i.lv !== 'info') lv = lv === 'err' ? 'err' : i.lv; return lv; }
+
+function renderMap() {
+  stMap = new Map(diffList().map(([t, k]) => [k, t]));
+  const t = curNav();
+  if (t.level === 'R') return renderReqs();
+  if (t.level === 'L3') return renderL3();
+  const g = merged(t);
+  const { pos, bands, height } = layout(g);
+  const marker = id => `<marker id="ar-${id}" viewBox="0 0 8 8" refX="1" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L8,4 L0,8 z" class="ah-${id}"/></marker>`;
+  let s = `<svg id="diagram" viewBox="0 0 ${W} ${height}" role="img" aria-label="설계 지도"><defs>${['dep', 'hi', 'bad', 'exc', 'add', 'rem', 'need'].map(marker).join('')}</defs>`;
+  for (const b of bands) s += `<g class="band"><rect x="8" y="${b.y0}" width="${W - 16}" height="${b.y1 - b.y0}" rx="6"/><text x="22" y="${b.y0 + 20}">${esc(fit(b.label, 96, 6.6))}</text></g>`;
+  if (g.frame && pos.get('__frame')) { const f = pos.get('__frame'); s += `<g class="frame"><rect x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" rx="10"/><text x="${f.x + 12}" y="${f.y - 6}">${esc(g.frame.label)}</text></g>`; }
+  for (const { e, d } of routes(g, pos)) { const mk = e.st === 'rem' ? 'rem' : e.st === 'add' ? 'add' : e.kind; s += `<path class="edge k-${e.kind} ${e.st ? 'e-' + e.st : ''}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-m="${mk}" marker-end="url(#ar-${mk})"/>`; }
+  for (const n of g.nodes) {
+    const p = pos.get(n.key); if (!p) continue;
+    const iface = n.type === 'iface', drillW = n.drill ? 44 : 0;
+    const cls = ['node', 't-' + n.type, n.st ? 'st-' + n.st : '', sel === n.key ? 'sel' : ''].join(' ');
+    s += `<g class="${cls}" data-key="${esc(n.key)}" tabindex="0" role="button" aria-label="${esc(n.label)}${n.drill ? ', 열기 가능' : ''}"><title>${esc(n.label)}${n.sub ? ': ' + esc(n.sub) : ''}</title>`;
+    if (n.type === 'grp') s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${p.w}" height="${p.h}" rx="6"/>`;
+    s += `<rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="${iface ? 22 : 6}"/>`;
+    const tx = p.x + (iface ? 16 : 12);
+    s += `<text class="lbl" x="${tx}" y="${p.y + (iface ? 19 : 25)}">${esc(fit(n.label, p.w - 26 - drillW, n.type === 'sys' ? 9 : 7.9))}</text>`;
+    if (n.sub) s += `<text class="sub" x="${tx}" y="${p.y + (iface ? 34 : 44)}">${esc(fit(n.sub, p.w - 24, 6.4))}</text>`;
+    if (n.drill) s += `<g class="drill" data-drill="1"><rect x="${p.x + p.w - 46}" y="${p.y + 9}" width="38" height="21" rx="4"/><text x="${p.x + p.w - 38}" y="${p.y + 24}">열기</text></g>`;
+    if (n.st) s += `<text class="stmark" x="${p.x + p.w - (n.drill ? 58 : 16)}" y="${p.y + 24}">${n.st === 'add' ? '+' : n.st === 'rem' ? '−' : '~'}</text>`;
+    const il = issueLevel(n.key);
+    if (il && n.st !== 'rem') s += `<circle class="dot-${il}" cx="${p.x + 2}" cy="${p.y + 2}" r="5"/>`;
+    s += `</g>`;
+  }
+  $('#canvas').innerHTML = s + '</svg>';
+  highlight(hover || sel);
+}
+const stmark = k => { const st = stMap.get(k); return st ? `<span class="st-ind" style="color:var(--${st})">${st === 'add' ? '+' : '~'}</span>` : ''; };
+function renderReqs() {
+  const reqs = Object.values(model.reqs);
+  const act = reqs.filter(r => r.status === 'active'), covered = act.filter(r => allSatisfiers(model, r.id).length);
+  let h = `<div class="hview"><div class="summary-row"><span class="pill mute">요구사항 ${reqs.length}</span><span class="pill ok">충족 ${covered.length}</span><span class="pill warn">미충족 ${act.length - covered.length}</span><span class="pill mute">보류·폐기 ${reqs.length - act.length}</span></div>`;
+  for (const r of reqs) {
+    const key = 'req:' + r.id, s = allSatisfiers(model, r.id), il = issueLevel(key), st = stMap.get(key);
+    const pill = r.status === 'active' ? '<span class="pill ok">active</span>' : `<span class="pill mute">${esc(r.status)}</span>`;
+    h += `<div class="req ${sel === key ? 'sel' : ''} ${st ? 'st-' + st : ''}" role="button" tabindex="0" data-sel="${esc(key)}"><div class="req-top">${il ? `<span class="dot ${il}" style="width:8px;height:8px;border-radius:50%;display:inline-block"></span>` : ''}<b>${esc(r.id)}</b>${pill}${stmark(key)}</div><p>${esc(r.text)}</p><div class="chips">${s.length ? s.map(k => `<button type="button" class="ref" data-go="${esc(k)}">${esc(k.split(':')[1])}</button>`).join('') : '<span class="none" style="font-size:12px">연결된 설계 요소 없음</span>'}</div></div>`;
+  }
+  $('#canvas').innerHTML = h + '</div>';
+}
+function renderL3() {
+  const groups = new Map();
+  const put = (mod, sec, key, label, sub) => { if (!groups.has(mod)) groups.set(mod, {}); const g = groups.get(mod); (g[sec] = g[sec] || []).push({ key, label, sub }); };
+  for (const e of Object.values(model.enums)) put(e.in, 'enum', 'enum:' + e.id, e.id, `${e.values.length}개 값${e.export.length ? ' · TS' : ''}`);
+  for (const c of Object.values(model.consts)) put(c.in, '상수', 'const:' + c.id, c.id, `${c.value}${c.export.length ? ' · TS' : ''}`);
+  for (const e of Object.values(model.errors)) put(e.in, '에러', 'err:' + e.id, e.id, e.http != null ? String(e.http) : '');
+  for (const t of Object.values(model.types)) put(t.in, '타입', 'type:' + t.id, t.id, `필드 ${t.fields.length}`);
+  for (const c of Object.values(model.contracts)) put(c.in, '계약', 'contract:' + c.id, c.id, `메서드 ${c.methods.length}`);
+  for (const k of Object.values(model.hks)) put(k.in, '핸들러 종류', 'hk:' + k.id, k.id, `키 ${k.key}`);
+  for (const k of Object.values(model.eks)) put(k.in, '이벤트 종류', 'ek:' + k.id, k.id, `키 ${k.key} · ${k.encoding}`);
+  for (const e of Object.values(model.events)) put(e.in, '이벤트', 'ev:' + e.id, e.id, `발행 ${e.publishers.join(', ')}`);
+  for (const f of Object.values(model.funcs)) put(f.in, '함수 계약 · L4', 'func:' + f.id, f.id, `케이스 ${f.cases.length}`);
+  for (const f of Object.values(model.flows)) put(f.in, '흐름 · L4', 'flow:' + f.id, f.id, `단계 ${f.steps.length}${f.on ? ' · on ' + f.on : ''}`);
+  const order = ['enum', '상수', '에러', '타입', '계약', '핸들러 종류', '이벤트 종류', '이벤트', '함수 계약 · L4', '흐름 · L4'];
+  let h = '<div class="hview"><div class="modcards">';
+  const mods = [...groups.keys()].sort((a, b) => { const ta = model.tiers.indexOf((owner(model, a) || {}).tier || (model.groups[(model.members[a] || {}).group] || {}).tier), tb = model.tiers.indexOf((owner(model, b) || {}).tier || (model.groups[(model.members[b] || {}).group] || {}).tier); return ta - tb || a.localeCompare(b); });
+  for (const mod of mods) {
+    const o = owner(model, mod), ok = ownerKey(model, mod);
+    const tier = o ? (o.tier || model.groups[o.group]?.tier || '') : '';
+    h += `<section class="modcard"><div class="modcard-h">${ok ? `<button type="button" data-sel="${esc(ok)}">${esc(mod)}</button>` : `<b class="mono" style="color:var(--err)">${esc(mod)}</b>`}<span>${esc(o ? o.path : '없는 모듈')}${tier ? ' · ' + esc(tier) : ''}</span></div>`;
+    const g = groups.get(mod);
+    for (const sec of order) if (g[sec]) {
+      h += `<div class="l3sec"><h4>${sec}</h4>`;
+      for (const it of g[sec]) { const il = issueLevel(it.key), st = stMap.get(it.key); h += `<button type="button" class="l3item ${sel === it.key ? 'sel' : ''} ${st ? 'st-' + st : ''}" data-sel="${esc(it.key)}"><span class="dot ${il || ''}" ${il ? '' : 'style="visibility:hidden"'}></span><b>${esc(it.label)}</b><small>${esc(it.sub)}</small>${stmark(it.key)}</button>`; }
+      h += '</div>';
+    }
+    h += '</section>';
+  }
+  $('#canvas').innerHTML = h + '</div></div>';
+}
+function highlight(key) {
+  const svg = $('#diagram'); if (!svg) return;
+  const near = new Set(key ? [key] : []);
+  svg.querySelectorAll('.edge').forEach(p => { const hi = !!key && (p.dataset.from === key || p.dataset.to === key); p.classList.toggle('hi', hi); p.setAttribute('marker-end', `url(#ar-${hi ? 'hi' : p.dataset.m})`); if (hi) { near.add(p.dataset.from); near.add(p.dataset.to); } });
+  svg.classList.toggle('focus', !!key && !!svg.querySelector(`.node[data-key="${CSS.escape(key)}"]`));
+  svg.querySelectorAll('.node').forEach(n => n.classList.toggle('near', near.has(n.dataset.key)));
+}
+
+/* ---------- inspector ---------- */
+const refKey = (m, id, kinds) => { for (const [t, col] of KINDS) if ((!kinds || kinds.includes(t)) && m[col][id]) return t + ':' + id; return null; };
+const ref = (key, label) => key ? `<button type="button" class="ref" data-go="${esc(key)}">${esc(label)}</button>` : `<span class="ref plain">${esc(label)}</span>`;
+const refs = (list, mk) => list.length ? list.map(mk).join('') : '<span class="none">없음</span>';
+const idref = (id, kinds) => ref(refKey(model, id, kinds), id);
+const errref = id => idref(id, ['err']);
+function filesFor(key) {
+  if (!key) return files;
+  const [t, ...r] = key.split(':'), id = r.join(':');
+  if (t === 'mod' || t === 'mem') { const p = pathOf(model, id); return files.filter(f => f.sources.has(key) || f.path.slice(0, f.path.lastIndexOf('/')) === p); }
+  if (t === 'grp') { const g = model.groups[id]; return g ? files.filter(f => f.path.startsWith(g.path + '/')) : []; }
+  return files.filter(f => f.sources.has(key));
+}
+function typeLabel(t) { const [pre, base] = splitType(t); const k = refKey(model, base, ['enum', 'type']); return (pre ? `<span class="none">${esc(pre)}</span>` : '') + ref(k, base); }
+function overviewRows(type, id, m) {
+  let sum = '', rows = [], drill = null, extra = '';
+  const n = type === 'sys' ? m.system : getNode(m, type + ':' + id);
+  const U = x => ref(ukey(m, x), x);
+  if (!n) return null;
+  if (type === 'req') { sum = n.text; rows.push(['상태', esc(n.status)], ['충족', refs(allSatisfiers(m, id), k => ref(k, k.split(':')[1]))]); }
+  if (type === 'actor') { sum = n.summary; rows.push(['사용', refs(Object.values(m.ifaces).filter(i => i.used_by.includes(id)).map(i => i.id), x => ref('iface:' + x, x))]); }
+  if (type === 'iface') { sum = ifaceSub(n); const impl = [...Object.values(m.mods), ...Object.values(m.groups)].filter(u => u.implements.includes(id)).map(u => u.id); rows.push(['사용자', refs(n.used_by, x => ref('actor:' + x, x))], ['노출', refs(Object.values(m.exes).filter(e => e.exposes.includes(id)).map(e => e.id), x => ref('exe:' + x, x))], ['구현', refs(impl, U)]); if (n.spec) rows.push(['계약', `<span class="codepath">${esc(n.spec)}</span> <span class="none">(참조만)</span>`]); }
+  if (type === 'sys') { sum = n.summary; rows.push(['규모', `액터 ${Object.keys(m.actors).length} · 인터페이스 ${Object.keys(m.ifaces).length} · 실행 단위 ${Object.keys(m.exes).length}`]); drill = { level: 'L1' }; }
+  if (type === 'exe') { sum = n.summary; rows.push(['노출', refs(n.exposes, x => ref('iface:' + x, x))], ['조립', refs(n.composes, U)], ['전체 모듈', closure(m, id).size + '개 (의존 포함)']); drill = { level: 'L2', exe: id }; }
+  if (type === 'mod' || type === 'grp') { sum = n.summary; rows.push(['tier', esc(n.tier || '없음')], ['의존', refs(n.depends_on, U)], ['사용처', refs(usedBy(m, id), U)], ['구현', refs(n.implements, x => ref('iface:' + x, x))]); if (type === 'grp') { rows.push(['종류', n.kind ? idref(n.kind, ['hk']) : '-'], ['규칙', esc(n.rule || '-')], ['멤버', refs(n.members, x => ref('mem:' + x, x))]); drill = { level: 'G', group: id }; } rows.push(['경로', `<span class="codepath">${esc(n.path)}/</span>`]); if (n.role) rows.push(['role', esc(n.role)]); if ((n.needs || []).length) rows.push(['needs', n.needs.map(x => ref('contract:' + x.contract, x.contract) + (x.why ? ` <span class="muted">${esc(x.why)}</span>` : '')).join('')]); }
+  if (type === 'mem') { const g = m.groups[n.group]; sum = n.summary; rows.push(['그룹', ref('grp:' + g.id, g.id)], ['처리', refs(n.handles, x => `<span class="ref plain">${esc(x)}</span>`)], ['의존', refs(g.depends_on, U) + ' <span class="none">(그룹 공통)</span>']); if (n.exceptions.length) rows.push(['예외', n.exceptions.map(e => ref('mem:' + e.to, e.to) + ` <span class="muted">${esc(e.reason)}</span>`).join('')]); rows.push(['경로', `<span class="codepath">${esc(n.path)}/</span>`]); }
+  if (L3KINDS.includes(type)) rows.push(['모듈', ownerKey(m, n.in) ? ref(ownerKey(m, n.in), n.in) : `<span class="none">${esc(n.in || '없음')}</span>`]);
+  if (type === 'enum') {
+    rows.push(['Go 타입', `<code>${esc(enumGoName(n))}</code>`], ['TS', n.export.includes('ts') ? '내보냄' : '<span class="none">아니오</span>']);
+    const hk = Object.values(m.hks).find(k => k.key === id);
+    if (hk) {
+      const holder = {}; for (const g of Object.values(m.groups).filter(g => g.kind === hk.id)) for (const mid of g.members) for (const v of m.members[mid].handles) (holder[v] = holder[v] || []).push(mid);
+      extra = `<div class="tbl-wrap"><table class="mini"><thead><tr><th>값</th><th>처리 모듈</th></tr></thead><tbody>${n.values.map(v => { const h = holder[v] || []; return `<tr><td>${esc(v)}</td><td class="${h.length === 1 ? '' : 'bad'}">${h.length ? esc(h.join(', ')) : '없음'}</td></tr>`; }).join('')}</tbody></table></div>`;
+    } else rows.push(['값', refs(n.values, x => `<span class="ref plain">${esc(x)}</span>`)]);
+  }
+  if (type === 'const') rows.push(['값', `<code>${esc(n.value)}</code> <span class="none">${esc(n.type)}</span>`], ['Go 이름', `<code>${esc(n.go.name || goExport(n.id))}</code>`], ['TS', n.export.includes('ts') ? `<code>${esc(n.id.toUpperCase())}</code>` : '<span class="none">아니오</span>'], ['쓰는 곳', refs(Object.values(m.types).filter(t => t.fields.some(f => f.max === id)).map(t => t.id), x => ref('type:' + x, x))]);
+  if (type === 'err') rows.push(['메시지', `<code>${esc(n.message)}</code>`], ['HTTP', n.http != null ? `<code>${esc(n.http)}</code>` : '<span class="none">없음</span>'], ['쓰는 곳', refs([...Object.values(m.funcs).filter(f => f.errors.includes(id)).map(f => 'func:' + f.id), ...Object.values(m.contracts).filter(c => c.methods.some(x => x.errors.includes(id))).map(c => 'contract:' + c.id)], k => ref(k, k.split(':')[1]))]);
+  if (type === 'type') extra = `<div class="tbl-wrap"><table class="mini"><thead><tr><th>필드</th><th>타입</th><th>제약</th></tr></thead><tbody>${n.fields.map(f => `<tr><td>${esc(f.name)}</td><td>${f.ref ? (f.many ? '<span class="none">[]</span>' : '<span class="none">*</span>') + ref(refKey(m, f.ref, ['type']), f.ref) : typeLabel(f.type)}</td><td>${[f.optional ? 'optional' : '', f.max ? 'max ' + (m.consts[f.max] ? ref('const:' + f.max, f.max) : esc(f.max)) : ''].filter(Boolean).join(' ') || '<span class="none">-</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+  if (type === 'contract') { rows.push(['종류', esc(n.kind)], ['Go 이름', `<code>${esc(n.go.name || goExport(n.id))}</code>`]); extra = n.methods.map(mm => `<div class="tbl-wrap"><table class="mini"><thead><tr><th colspan="2">${esc(mm.name)}</th></tr></thead><tbody><tr><td class="none">params</td><td>${mm.params.map(p => esc(p.name) + ' ' + typeLabel(p.type)).join('<br>') || '-'}</td></tr><tr><td class="none">returns</td><td>${mm.returns.map(typeLabel).join(', ') || '-'}</td></tr><tr><td class="none">errors</td><td>${mm.errors.map(errref).join(' ') || '-'}</td></tr></tbody></table></div>`).join(''); }
+  if (type === 'hk') { rows.push(['시그니처', `<code>func(${esc(n.params.map(p => p.name + ' ' + p.type).join(', '))}) ${esc(n.returns.join(', '))}</code>`], ['등록 키', idref(n.key, ['enum'])], ['그룹', refs(Object.values(m.groups).filter(g => g.kind === id).map(g => g.id), x => ref('grp:' + x, x))]); }
+  if (type === 'func') {
+    if (n.kind) rows.push(['형태', idref(n.kind, ['hk'])], ['처리', `<code>${esc(n.handles)}</code>`]);
+    if (n.of) rows.push(['계약', ref('contract:' + n.of.split('.')[0], n.of)]);
+    rows.push(['에러', refs(n.errors, errref)]);
+    extra = `<div class="tbl-wrap"><table class="mini"><thead><tr><th>케이스</th><th>주어진 상태</th><th>기대</th></tr></thead><tbody>${n.cases.map(c => `<tr><td style="font-family:var(--sans)">${esc(c.name)}</td><td>${esc(JSON.stringify(c.given))}</td><td>${c.error ? esc(c.error) : esc(JSON.stringify(c.expect ?? '성공'))}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (type === 'ek') rows.push(['키', idref(n.key, ['enum'])], ['encoding', esc(n.encoding)], ['전체 구독', refs(n.subscribers, x => ref(refKey(m, x, ['mod', 'mem']), x))], ['이벤트', refs(Object.values(m.events).filter(e => e.kind === id).map(e => e.id), x => ref('ev:' + x, x))]);
+  if (type === 'ev') {
+    rows.push(['종류', ref('ek:' + n.kind, n.kind)], ['발행', refs(n.publishers, x => ref(refKey(m, x, ['mod', 'mem']), x))], ['구독', refs(n.subscribers, x => ref(refKey(m, x, ['mod', 'mem']), x))]);
+    extra = `<div class="tbl-wrap"><table class="mini"><thead><tr><th>필드</th><th>타입</th><th>제약</th></tr></thead><tbody>${n.data.map(f => `<tr><td>${esc(f.name)}</td><td>${f.ref ? ref(refKey(m, f.ref, ['type']), f.ref) : typeLabel(f.type)}${f.many ? ' <span class="none">many</span>' : ''}</td><td>${f.optional ? 'optional' : '<span class="none">-</span>'}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+  if (type === 'flow') {
+    if (n.on) rows.push(['시작', ref('ev:' + n.on, n.on)]);
+    sum = n.summary || sum;
+    extra = `<ol class="steps">${n.steps.map(s => `<li><code>${esc(s.id)}</code>${s.commit ? '<span class="flag commit">commit</span>' : ''}${s.fatal ? '<span class="flag fatal">fatal</span>' : ''}${s.undo ? ` <span class="none">되돌리기</span> <code>${esc(s.undo)}</code>` : ''}${s.calls.map(c => ' ' + ref('contract:' + c.split('.')[0], c)).join('')}${s.emits.map(e => ' ' + ref('ev:' + e, e)).join('')}${s.summary ? ` <span class="muted">${esc(s.summary)}</span>` : ''}</li>`).join('')}</ol>`;
+  }
+  if (type !== 'req' && type !== 'sys' && arr(n.satisfies).length) rows.push(['요구사항', refs(n.satisfies, x => ref('req:' + x, x))]);
+  return { sum, rows, drill, extra };
+}
+function renderInspector() {
+  const box = $('#inspector');
+  const fl = filesFor(sel);
+  const mine = sel ? issues.filter(i => i.key === sel) : [];
+  const tabs = `<div class="tabs" role="tablist">${[['overview', '개요', ''], ['code', '생성 코드', fl.length], ['checks', '검사', sel ? mine.length : '']].map(([k, l, n]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}${n !== '' ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab === 'code') {
+    body = fl.length ? `<p class="note">${sel ? '선택한 요소에서 나오는 파일' : '설계 전체에서 나오는 파일'}이에요. 손으로 고치지 않고 설계를 고쳐서 다시 만들어요.</p><div class="files">${fl.map(f => { const open = openFiles.has(f.path) || fl.length <= 2; return `<div><button type="button" class="filebtn" data-file="${esc(f.path)}" aria-expanded="${open}"><span>${esc(f.path)}</span><em>${f.lang === 'ts' ? 'TS' : 'Go'} · ${f.code.split('\n').length}줄</em></button>${open ? `<pre class="code">${hl(f.code, f.lang)}</pre>` : ''}</div>`; }).join('')}</div>` : '<p class="muted">이 요소에서 직접 생성되는 파일은 없어요. 모듈이나 L3 항목을 선택해 보세요.</p>';
+  } else if (tab === 'checks') {
+    const list = sel ? mine : issues;
+    body = list.length ? `<div class="issues">${list.map(issueRow).join('')}</div>` : '<p class="muted">이 요소에는 걸린 검사가 없어요.</p>';
+  } else if (!sel) {
+    body = `<h3>선택한 요소</h3><p class="muted">지도에서 요소를 누르면 요약, 연결, 생성 코드가 보인다. 선택하지 않은 상태의 <b>생성 코드</b> 탭에는 설계 전체에서 나오는 파일 ${files.length}개가 있다.</p>`;
+  } else {
+    const [type, ...rest] = sel.split(':'); const id = rest.join(':');
+    let r = overviewRows(type, id, model), removed = false;
+    if (!r) { r = overviewRows(type, id, baseModel); removed = true; }
+    if (!r) { sel = null; return renderInspector(); }
+    body = `<div class="insp-title"><b>${esc(id)}</b><span class="kind">${KLABEL[type] || type}${removed ? ' · 삭제됨' : ''}</span></div>${r.sum ? `<p class="insp-sum">${esc(r.sum)}</p>` : ''}<dl class="kv">${r.rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>${r.extra}${r.drill && !removed ? `<button type="button" class="btn primary drill-btn" data-drillto='${esc(JSON.stringify(r.drill))}'>한 계층 아래로 열기</button>` : ''}`;
+  }
+  box.innerHTML = tabs + body;
+}
+const LV = { err: '오류', warn: '경고', info: '예외', ok: '일치' };
+const issueRow = i => `<button type="button" class="issue" data-issue="${issues.indexOf(i)}"><span class="sev ${i.lv}">${LV[i.lv]}</span><span>${esc(i.msg)}</span></button>`;
+function renderIssues() {
+  const list = issues.filter(i => i.origin === issueTab);
+  const count = o => { const c = { err: 0, warn: 0, info: 0 }; issues.filter(i => i.origin === o).forEach(i => c[i.lv]++); return `${c.err}·${c.warn}·${c.info}`; };
+  const tabs = `<div class="tabs" role="tablist"><button type="button" role="tab" data-itab="design" aria-selected="${issueTab === 'design'}">설계 검사<span class="n">${count('design')}</span></button><button type="button" role="tab" data-itab="code" aria-selected="${issueTab === 'code'}">코드 대조<span class="n">${count('code')}</span></button></div>`;
+  const body = list.length ? `<div class="issues">${list.map(issueRow).join('')}</div>` : '<p class="muted">진단이 없다.</p>';
+  $('#issuesBox').innerHTML = tabs + body;
+}
+function renderDiff() {
+  const box = $('#diffBox');
+  if (!meta.hasBase) { box.innerHTML = `<h3>기준 대비 변경</h3><p class="muted">git 저장소가 아니거나 커밋이 없어 기준이 없다. 생성 파일 ${files.length}개.</p>`; return; }
+  const list = diffList();
+  const n = t => list.filter(x => x[0] === t).length;
+  const sym = { add: '+', rem: '−', chg: '~' };
+  box.innerHTML = `<h3>기준 대비 변경</h3><div class="diff-counts"><span class="pill add">+${n('add')} 추가</span><span class="pill rem">−${n('rem')} 삭제</span><span class="pill chg">~${n('chg')} 수정</span><span class="pill mute">생성 파일 ${files.length}</span></div>${list.length ? `<ul class="diff-list">${list.slice(0, 12).map(([t, k]) => `<li class="${t}">${sym[t]} ${esc(k)}</li>`).join('')}${list.length > 12 ? `<li class="none">외 ${list.length - 12}개</li>` : ''}</ul>` : '<p class="muted">git HEAD의 설계와 같다.</p>'}<p class="note">기준은 git HEAD의 설계 파일이다. 승인은 설계 파일을 커밋하는 것이다.</p>`;
+}
+function renderAll() { renderChrome(); renderMap(); renderInspector(); renderIssues(); renderDiff(); }
+
+/* ---------- navigation ---------- */
+/* ---------- navigation ---------- */
+function drill(d) { if (!d) return; nav = nav.concat(d); sel = null; hover = null; renderAll(); }
+function goto(key) {
+  const [type, ...rest] = key.split(':'); const id = rest.join(':');
+  const l2 = nav.find(n => n.level === 'L2') || { level: 'L2' };
+  if (type === 'req') nav = [{ level: 'R' }];
+  else if (L3KINDS.includes(type)) nav = [{ level: 'L3' }];
+  else if (type === 'actor' || type === 'iface' || type === 'sys') nav = [{ level: 'L0' }];
+  else if (type === 'exe') nav = [{ level: 'L0' }, { level: 'L1' }];
+  else if (type === 'mod' || type === 'grp') nav = [{ level: 'L0' }, { level: 'L1' }, closure(model, l2.exe).has(id) ? l2 : { level: 'L2' }];
+  else if (type === 'mem') { const x = model.members[id] || baseModel.members[id]; if (x) nav = [{ level: 'L0' }, { level: 'L1' }, l2, { level: 'G', group: x.group }]; }
+  sel = key; hover = null; renderAll();
+  const el = document.querySelector(`[data-key="${CSS.escape(key)}"], [data-sel="${CSS.escape(key)}"]`);
+  if (el) { el.focus({ preventScroll: true }); el.scrollIntoView({ block: 'nearest' }); }
+}
+
+/* ---------- events ---------- */
+const canvas = $('#canvas');
+const nodeOf = t => t.closest && t.closest('.node');
+const findNode = key => merged(curNav()).nodes.find(n => n.key === key);
+canvas.addEventListener('click', e => {
+  if (e.target.closest('[data-go]')) return;
+  const s = e.target.closest('[data-sel]');
+  if (s) { sel = s.dataset.sel; renderMap(); renderInspector(); const again = document.querySelector(`[data-sel="${CSS.escape(sel)}"]`); if (again) again.focus({ preventScroll: true }); return; }
+  const n = nodeOf(e.target);
+  if (!n) { if (e.target.closest('svg')) { sel = null; renderMap(); renderInspector(); } return; }
+  if (e.target.closest('[data-drill]')) return drill(findNode(n.dataset.key)?.drill);
+  sel = n.dataset.key; renderMap(); renderInspector();
+  const again = document.querySelector(`.node[data-key="${CSS.escape(sel)}"]`); if (again) again.focus({ preventScroll: true });
+});
+canvas.addEventListener('dblclick', e => { const n = nodeOf(e.target); if (n) drill(findNode(n.dataset.key)?.drill); });
+canvas.addEventListener('keydown', e => {
+  const s = e.target.closest && e.target.closest('.req[data-sel]');
+  if (s && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); sel = s.dataset.sel; renderMap(); renderInspector(); return; }
+  const n = nodeOf(e.target); if (!n) return;
+  if (e.key === 'Enter') { e.preventDefault(); const d = findNode(n.dataset.key)?.drill; if (d) drill(d); else { sel = n.dataset.key; renderMap(); renderInspector(); } }
+  if (e.key === ' ') { e.preventDefault(); sel = n.dataset.key; renderMap(); renderInspector(); }
+  if (e.key === 'Backspace' && nav.length > 1) { e.preventDefault(); nav = nav.slice(0, -1); sel = null; renderAll(); }
+});
+canvas.addEventListener('mouseover', e => { const n = nodeOf(e.target); const k = n ? n.dataset.key : null; if (k !== hover) { hover = k; highlight(hover || sel); } });
+canvas.addEventListener('mouseleave', () => { hover = null; highlight(sel); });
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const lv = t.closest('[data-level]');
+  if (lv) { const k = lv.dataset.level, l2 = nav.find(n => n.level === 'L2'); nav = k === 'R' ? [{ level: 'R' }] : k === 'L3' ? [{ level: 'L3' }] : k === 'L0' ? [{ level: 'L0' }] : k === 'L1' ? [{ level: 'L0' }, { level: 'L1' }] : [{ level: 'L0' }, { level: 'L1' }, l2 || { level: 'L2' }]; sel = null; renderAll(); return; }
+  const cr = t.closest('[data-crumb]'); if (cr) { nav = nav.slice(0, +cr.dataset.crumb + 1); sel = null; renderAll(); return; }
+  const go = t.closest('[data-go]'); if (go) { goto(go.dataset.go); return; }
+  const dt = t.closest('[data-drillto]'); if (dt) { drill(JSON.parse(dt.dataset.drillto)); return; }
+  const tb = t.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; renderInspector(); return; }
+  const it = t.closest('[data-itab]'); if (it) { issueTab = it.dataset.itab; renderIssues(); return; }
+  const fb = t.closest('[data-file]'); if (fb) { const p = fb.dataset.file; if (openFiles.has(p)) openFiles.delete(p); else openFiles.add(p); renderInspector(); return; }
+  const is = t.closest('[data-issue]'); if (is) { const i = issues[+is.dataset.issue]; if (i && i.key) { tab = 'checks'; goto(i.key); } return; }
+});
+
+/* ---------- 서버 상태 ---------- */
+let model = null, baseModel = null, issues = [], files = [], nav = [{ level: 'L0' }], sel = null, hover = null, tab = 'overview', issueTab = 'design', openFiles = new Set(), meta = { version: 0, hasBase: false };
+const EMPTY = { goModule: '', system: { id: 'system', summary: '' }, tiers: [] };
+function toMaps(v) {
+  const m = { ...EMPTY, ...(v || {}) };
+  for (const [, col] of KINDS) m[col] = Object.fromEntries(((v || {})[col] || []).map(x => [x.id, x]));
+  return m;
+}
+async function load() {
+  let st;
+  try { st = await (await fetch('/api/state', { cache: 'no-store' })).json(); } catch (e) { $('#status').textContent = '서버에 연결할 수 없다'; $('#status').classList.add('bad'); return; }
+  meta = { version: st.version, hasBase: !!st.hasBase, design: st.design, fatal: st.fatal, updated: st.updated };
+  model = toMaps(st.model);
+  baseModel = st.hasBase ? toMaps(st.base) : model;
+  issues = st.issues || [];
+  files = (st.files || []).map(f => ({ ...f, sources: new Set(f.sources) }));
+  fixNav();
+  const t = new Date(st.updated);
+  $('#status').textContent = `${st.design} · ${t.toLocaleTimeString()}${st.fatal ? ' · 설계 파일을 읽지 못했다' : ''}`;
+  $('#status').classList.toggle('bad', !!st.fatal);
+  renderAll();
+}
+// 주소 해시(#R, #L0 ~ #L3)로 처음 열 계층을 정한다.
+{
+  const h = location.hash.slice(1);
+  const byHash = { R: [{ level: 'R' }], L0: [{ level: 'L0' }], L1: [{ level: 'L0' }, { level: 'L1' }], L2: [{ level: 'L0' }, { level: 'L1' }, { level: 'L2' }], L3: [{ level: 'L3' }] };
+  if (byHash[h]) nav = byHash[h];
+}
+const es = new EventSource('/api/events');
+es.onmessage = e => { if (+e.data !== meta.version) load(); };
+load();
+
+</script>
+</body>
+</html>
