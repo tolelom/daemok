@@ -432,12 +432,15 @@ func TestContractRole(t *testing.T) {
 func TestNeedsTypeDependency(t *testing.T) {
 	// crypto가 store를 받으면 반환 타입 payload(core)에 의존하지 않으므로 오류
 	ds := run(t, replace(t, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [store] }"))
-	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: crypto → core.payload")
+	d := want(t, ds, model.Error, "받는 계약의 타입이 속한 모듈에 의존하지 않는다: crypto → core.payload (계약 store)")
+	if d.Pos.Line != 15 {
+		t.Fatalf("위치는 받는 쪽 needs 항목이어야 한다: %v", d.Pos)
+	}
 	// uses로 고른 메서드의 타입만 본다
 	src := strings.Replace(base, "contracts:\n", "contracts:\n  keys: { in: core, methods: { plain: { returns: [int] }, typed: { returns: [payload] } } }\n", 1)
 	ds = run(t, strings.Replace(src, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [{ contract: keys, uses: [plain] }] }", 1))
 	for _, d := range ds {
-		if strings.Contains(d.Msg, "의존하지 않는 모듈의 타입") {
+		if strings.Contains(d.Msg, "모듈에 의존하지 않는다") || strings.Contains(d.Msg, "의존하지 않는 모듈의 타입") {
 			t.Fatalf("unexpected %s", d)
 		}
 	}
@@ -470,7 +473,6 @@ func TestFlows(t *testing.T) {
 		{"{ id: unlock }", "{ id: fatal }", "Fatal과 겹치는 단계 이름: fatal"},
 		{"{ id: unlock }", "{ id: unlock, commit: true }", "commit 단계가 둘 이상이다: unlock"},
 		{"{ id: unlock }", "{ id: unlock, undo: relock }", "커밋 뒤 단계에 undo가 있다: unlock"},
-		{"{ id: commit, commit: true, fatal: true }", "{ id: commit, commit: true, fatal: true, undo: rollback }", "커밋 뒤 단계에 undo가 있다: commit"},
 		{"{ id: lock, undo: unlock }", "{ id: lock, undo: Unlock }", `undo는 소문자 snake_case여야 한다: "Unlock"`},
 		{"in: core\n    steps", "in: vm\n    steps", "흐름의 모듈이 받지 않는 계약: vm → store"},
 		{"{ id: unlock }", "{ id: unlock, emits: [minted] }", "흐름의 모듈이 발행자가 아닌 이벤트: core → minted"},
@@ -487,4 +489,51 @@ func TestFlows(t *testing.T) {
 	src := replace(t, "in: core\n    steps", "in: vm\n    on: minted\n    steps")
 	ds = run(t, strings.Replace(src, "calls: [store.get]", "calls: []", 1))
 	wantNone(t, ds, model.Error)
+}
+
+func TestQAFixes(t *testing.T) {
+	// 멤버 needs가 만드는 순환
+	src := strings.Replace(base, "  crypto:  { tier: foundation }", "  crypto:  { tier: foundation }\n  helper:  { tier: execution, depends_on: [tx_modules] }", 1)
+	src = strings.Replace(src, "asset:   { handles: [mint] }", "asset:   { handles: [mint], needs: [hc] }", 1)
+	src = strings.Replace(src, "contracts:\n", "contracts:\n  hc: { in: helper, methods: { x: { errors: [] } } }\n", 1)
+	want(t, run(t, src), model.Error, "의존 순환: helper → tx_modules → helper")
+
+	// 형제 멤버 needs 순환
+	src = strings.Replace(base, "economy: { handles: [transfer] }", "economy: { handles: [transfer], needs: [c_asset] }", 1)
+	src = strings.Replace(src, "asset:   { handles: [mint] }", "asset:   { handles: [mint], needs: [c_econ] }", 1)
+	src = strings.Replace(src, "contracts:\n", "contracts:\n  c_asset: { in: asset, methods: { x: { errors: [] } } }\n  c_econ: { in: economy, methods: { y: { errors: [] } } }\n", 1)
+	want(t, run(t, src), model.Error, "의존 순환: economy → asset → economy")
+
+	// 흐름 calls가 uses 밖의 메서드
+	src = strings.Replace(base, "contracts:\n", "contracts:\n  keys: { in: core, methods: { a: { errors: [] }, b: { errors: [] } } }\n", 1)
+	src = strings.Replace(src, "needs: [store]", "needs: [store, { contract: keys, uses: [a] }]", 1)
+	src = strings.Replace(src, "in: core\n    steps", "in: rpc_mod\n    steps", 1)
+	src = strings.Replace(src, "calls: [store.get]", "calls: [store.get, keys.b]", 1)
+	want(t, run(t, src), model.Error, "받는 계약의 uses에 없는 메서드: rpc_mod → keys.b")
+
+	// 단계 이름
+	want(t, run(t, replace(t, "{ id: unlock }", "{ id: unlock }\n      - { id: x_id }\n      - { id: x_i_d }")), model.Error, "메서드 이름이 겹치는 단계: x_i_d (x_id)")
+	want(t, run(t, replace(t, "{ id: unlock }", "{ id: a__b }")), model.Error, `단계 ID는 소문자 snake_case여야 한다: "a__b"`)
+	want(t, run(t, replace(t, "{ id: unlock }", "{ id: ab_ }")), model.Error, `단계 ID는 소문자 snake_case여야 한다: "ab_"`)
+	want(t, run(t, replace(t, "{ id: commit, commit: true, fatal: true }", "{ id: commit, commit: true, fatal: true, undo: rollback }")), model.Error, "commit 단계에 undo가 있다: commit")
+	d := want(t, run(t, replace(t, "{ id: lock, undo: unlock }", "{ id: lock, undo: fatal }")), model.Error, "Fatal과 겹치는 단계 이름: fatal")
+	if d.Pos.Col < 20 {
+		t.Fatalf("undo 위치여야 한다: %v", d.Pos)
+	}
+	want(t, run(t, replace(t, "    steps:\n      - { id: lock, undo: unlock }\n      - { id: load, calls: [store.get] }\n      - { id: commit, commit: true, fatal: true }\n      - { id: unlock }\n", "    steps: []\n")), model.Error, "단계가 없는 흐름: run_block")
+
+	// 자기 계약 needs
+	want(t, run(t, replace(t, "core:    { tier: domain, depends_on: [crypto]", "core:    { tier: domain, depends_on: [crypto], needs: [store]")), model.Error, "자기 자신에 의존: core")
+
+	// 두 이벤트 종류가 같은 enum
+	src = strings.Replace(base, "event_kinds:\n", "event_kinds:\n  other: { in: core, key: event_type }\n", 1)
+	want(t, run(t, src), model.Error, "여러 이벤트 종류가 쓰는 enum: event_type (other, chain_event)")
+
+	// 그룹은 발행자·구독자가 아니다
+	want(t, run(t, replace(t, "publishers: [asset]", "publishers: [tx_modules]")), model.Error, "모듈이나 그룹 멤버가 아니다: publishers tx_modules")
+	want(t, run(t, replace(t, "subscribers: [rpc_mod]", "subscribers: [tx_modules]")), model.Error, "모듈이나 그룹 멤버가 아니다: subscribers tx_modules")
+
+	// 중복 needs, 빈 uses
+	want(t, run(t, replace(t, "needs: [store]", "needs: [store, store]")), model.Warning, "같은 계약을 두 번 받는다: rpc_mod → store")
+	want(t, run(t, replace(t, "needs: [store]", "needs: [{ contract: store, uses: [] }]")), model.Error, "uses가 비어 있다: store")
 }

@@ -5,7 +5,13 @@ import "github.com/tolelom/daemok/internal/model"
 // events는 key enum 값마다 이벤트가 있는지, 발행자·구독자가 이벤트 종류의 모듈에 의존하는지 본다.
 func (c *checker) events() {
 	m := c.m
+	usedBy := map[string]string{} // key enum → 처음 쓴 이벤트 종류
 	for _, ek := range m.EventKinds {
+		if first, ok := usedBy[ek.Key.Name]; ok && ek.Key.Name != "" {
+			c.errorf(ek.Key.Pos, "여러 이벤트 종류가 쓰는 enum: %s (%s, %s)", ek.Key.Name, first, ek.ID)
+			continue
+		}
+		usedBy[ek.Key.Name] = ek.ID
 		if en := m.Enum(ek.Key.Name); en != nil {
 			for _, v := range en.Values {
 				if e := m.Event(v.Name); e == nil || e.Kind.Name != ek.ID {

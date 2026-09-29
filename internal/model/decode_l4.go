@@ -101,7 +101,7 @@ func (mg *merger) steps(n *yaml.Node) []*Step {
 		d.diags.Errorf(n.Pos, "목록이어야 한다: %q", "steps")
 		return nil
 	}
-	var out []*Step
+	out := []*Step{} // 빈 목록과 형식 오류(nil)를 구분한다
 	for _, it := range n.Items {
 		if !d.mapping(it, "단계") {
 			continue

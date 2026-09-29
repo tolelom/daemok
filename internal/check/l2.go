@@ -60,6 +60,11 @@ func (c *checker) selfDependency() {
 				report(mod.ID, d)
 			}
 		}
+		for _, d := range c.needTargets(mod.Needs) {
+			if d.Name == mod.ID {
+				report(mod.ID, d)
+			}
+		}
 	}
 	for _, g := range c.m.Groups {
 		for _, d := range g.DependsOn {
@@ -71,6 +76,11 @@ func (c *checker) selfDependency() {
 			for _, e := range mem.Exceptions {
 				if e.DependsOn.Name == mem.ID || e.DependsOn.Name == g.ID {
 					report(mem.ID, e.DependsOn)
+				}
+			}
+			for _, d := range c.needTargets(mem.Needs) {
+				if d.Name == mem.ID {
+					report(mem.ID, d)
 				}
 			}
 		}
@@ -112,6 +122,9 @@ func (c *checker) cycles() {
 				for _, e := range mem.Exceptions {
 					add(e.DependsOn.Name)
 				}
+				for _, r := range c.needTargets(mem.Needs) {
+					add(r.Name)
+				}
 			}
 		}
 		return out
@@ -128,8 +141,16 @@ func (c *checker) siblingCycles() {
 		}
 		edges := func(id string) []string {
 			var out []string
-			for _, e := range c.m.Member(id).Exceptions {
-				if d := e.DependsOn.Name; d != id && slices.Contains(ids, d) {
+			mem := c.m.Member(id)
+			var targets []string
+			for _, e := range mem.Exceptions {
+				targets = append(targets, e.DependsOn.Name)
+			}
+			for _, r := range c.needTargets(mem.Needs) {
+				targets = append(targets, r.Name)
+			}
+			for _, d := range targets {
+				if d != id && slices.Contains(ids, d) {
 					out = append(out, d)
 				}
 			}

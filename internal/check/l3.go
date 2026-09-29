@@ -52,14 +52,36 @@ func (c *checker) typeDeps() {
 					continue
 				}
 				for _, p := range me.Params {
-					c.useType(id, p.Type)
+					c.useNeededType(id, p.Type, n, ct.ID)
 				}
 				for _, r := range me.Returns {
-					c.useType(id, r)
+					c.useNeededType(id, r, n, ct.ID)
 				}
 			}
 		}
 	}
+}
+
+// useNeededType은 받은 계약의 시그니처 타입에 받는 쪽이 의존하는지 본다. 위치는 받는 쪽의 needs 항목이다.
+func (c *checker) useNeededType(owner string, r model.Ref, n model.Need, contract string) {
+	if typeOwner, base := c.typeOwner(r); typeOwner != "" && !c.m.CanDepend(owner, typeOwner) {
+		c.errorf(n.Contract.Pos, "받는 계약의 타입이 속한 모듈에 의존하지 않는다: %s → %s.%s (계약 %s)", owner, typeOwner, base, contract)
+	}
+}
+
+// typeOwner는 r이 설계 enum·struct면 그 모듈과 이름을 준다.
+func (c *checker) typeOwner(r model.Ref) (string, string) {
+	if r.Name == "" {
+		return "", ""
+	}
+	kind, base := c.m.ResolveType(r.Name)
+	switch kind {
+	case model.EnumType:
+		return c.m.Enum(base).In.Name, base
+	case model.StructType:
+		return c.m.Type(base).In.Name, base
+	}
+	return "", base
 }
 
 // useType은 owner가 r이 가리키는 enum·타입의 모듈에 의존하는지 본다.

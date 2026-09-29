@@ -42,7 +42,7 @@ func (c *checker) refs() {
 		for _, r := range mod.Implements {
 			c.iface(r)
 		}
-		c.needRefs(mod.Needs)
+		c.needRefs(mod.ID, mod.Needs)
 	}
 	for _, g := range m.Groups {
 		c.tier(g.Tier)
@@ -52,9 +52,9 @@ func (c *checker) refs() {
 		for _, r := range g.DependsOn {
 			c.dep(r)
 		}
-		c.needRefs(g.Needs)
+		c.needRefs(g.ID, g.Needs)
 		for _, mem := range g.Members {
-			c.needRefs(mem.Needs)
+			c.needRefs(mem.ID, mem.Needs)
 			for _, r := range mem.Handles {
 				c.handleValue(g.Kind, r)
 			}
@@ -119,7 +119,7 @@ func (c *checker) refs() {
 			c.errorf(ek.Key.Pos, "없는 enum %q", ek.Key.Name)
 		}
 		for _, r := range ek.Subscribers {
-			c.dep(r)
+			c.pubSub(r, "subscribers")
 		}
 	}
 	for _, e := range m.Events {
@@ -127,10 +127,10 @@ func (c *checker) refs() {
 			c.errorf(e.Kind.Pos, "없는 이벤트 종류 %q", e.Kind.Name)
 		}
 		for _, r := range e.Publishers {
-			c.dep(r)
+			c.pubSub(r, "publishers")
 		}
 		for _, r := range e.Subscribers {
-			c.dep(r)
+			c.pubSub(r, "subscribers")
 		}
 		c.fieldRefs(e.Data)
 	}
@@ -167,8 +167,25 @@ func (c *checker) fieldRefs(fields []*model.Field) {
 	}
 }
 
-func (c *checker) needRefs(ns []model.Need) {
+// pubSub은 발행자·구독자가 모듈이나 그룹 멤버인지 본다.
+func (c *checker) pubSub(r model.Ref, field string) {
+	if c.m.Group(r.Name) != nil {
+		c.errorf(r.Pos, "모듈이나 그룹 멤버가 아니다: %s %s", field, r.Name)
+		return
+	}
+	c.dep(r)
+}
+
+func (c *checker) needRefs(owner string, ns []model.Need) {
+	seen := map[string]bool{}
 	for _, n := range ns {
+		if seen[n.Contract.Name] {
+			c.warnf(n.Contract.Pos, "같은 계약을 두 번 받는다: %s → %s", owner, n.Contract.Name)
+		}
+		seen[n.Contract.Name] = true
+		if n.Uses != nil && len(n.Uses) == 0 {
+			c.errorf(n.Pos, "uses가 비어 있다: %s", n.Contract.Name)
+		}
 		ct := c.m.Contract(n.Contract.Name)
 		if ct == nil {
 			c.errorf(n.Contract.Pos, "없는 계약 %q", n.Contract.Name)
