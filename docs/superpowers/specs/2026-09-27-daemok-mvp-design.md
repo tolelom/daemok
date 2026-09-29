@@ -114,17 +114,7 @@ Go 표준 라이브러리만 쓴다. MVP의 지도는 `embed`로 넣는 로컬 �
 
 ## 구현 순서
 
-| 단계 | 결과 |
-|---|---|
-| 1 | `internal/yaml` |
-| 2 | `internal/model`: 두 샘플을 읽는다 |
-| 3 | `internal/check`, `daemok check`의 설계 검사 |
-| 4 | `internal/gen/golang`, `daemok gen`, 생성 파일 최신 여부 |
-| 5 | `internal/codescan` |
-| 6 | `internal/gitbase`, `internal/serve`, 웹 화면 이식 |
-| 7 | tolchain 도입과 완료 조건 확인 |
-
-3단계부터 tolchain 설계 파일에 `daemok check`를 돌려볼 수 있다.
+구현 순서는 [형식 v0.4 설계](2026-09-29-daemok-format-v04-design.md#구현-순서)에 있다. v0.4의 완료 조건도 이 문서의 완료 조건에 더해진다.
 
 ## 위험
 
