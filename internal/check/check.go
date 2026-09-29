@@ -28,6 +28,7 @@ func Run(m *model.Model) model.Diagnostics {
 		}
 	})
 	c.refs()
+	c.names()
 	c.l0()
 	c.l2()
 	c.l3()

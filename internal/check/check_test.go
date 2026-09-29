@@ -13,7 +13,7 @@ import (
 func run(t *testing.T, src string) model.Diagnostics {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\n"+src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ngo_module: example.com/t\n"+src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	m, ds := model.Load(dir)
@@ -433,7 +433,7 @@ func TestNeedsTypeDependency(t *testing.T) {
 	// crypto가 store를 받으면 반환 타입 payload(core)에 의존하지 않으므로 오류
 	ds := run(t, replace(t, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [store] }"))
 	d := want(t, ds, model.Error, "받는 계약의 타입이 속한 모듈에 의존하지 않는다: crypto → core.payload (계약 store)")
-	if d.Pos.Line != 15 {
+	if d.Pos.Line != 16 {
 		t.Fatalf("위치는 받는 쪽 needs 항목이어야 한다: %v", d.Pos)
 	}
 	// uses로 고른 메서드의 타입만 본다
@@ -545,4 +545,38 @@ func TestQualifiedExternalType(t *testing.T) {
 	// any는 내장 타입이다
 	src = strings.Replace(base, "types:\n", "types:\n  wrap: { in: core, fields: { x: any } }\n", 1)
 	wantNone(t, run(t, src), model.Error)
+}
+
+func TestGoNames(t *testing.T) {
+	cases := []struct{ old, new, msg string }{
+		{"crypto:  { tier: foundation }", "crypto:  { tier: foundation, path: my-mod }", "Go 패키지 경로로 쓸 수 없는 path: my-mod"},
+		{"crypto:  { tier: foundation }", "crypto:  { tier: foundation, path: internal/testdata/fx }", "생성 파일 범위에서 빠지는 path: internal/testdata/fx"},
+		{"crypto:  { tier: foundation }", "crypto:  { tier: foundation, path: vendor/x }", "생성 파일 범위에서 빠지는 path: vendor/x"},
+		{"crypto:  { tier: foundation }", "crypto:  { tier: foundation, path: .hidden/x }", "생성 파일 범위에서 빠지는 path: .hidden/x"},
+		{"values: [transfer, mint]", "values: [transfer, mint, a-b]", "Go 이름으로 바꿀 수 없는 enum 값: tx_type.a-b"},
+		{"values: [transfer, mint]", "values: [transfer, mint, Mint]", "Go 상수 이름이 겹치는 enum 값: tx_type.Mint (mint)"},
+		{"ErrLow:      { in: core", "not_low:      { in: core", "Go 이름으로 쓸 수 없는 에러 ID: not_low"},
+		{"fields: { to: address, kind: tx_type }", "fields: { to: address, kind: tx_type, a_b: int, a__b: int }", "Go 필드 이름이 겹친다: payload.a__b (a_b)"},
+		{"fields: { to: address, kind: tx_type }", "fields: { to: address, kind: tx_type, x-y: int }", "Go 이름으로 바꿀 수 없는 필드: payload.x-y"},
+		{"data: { to: address }", "data: { to: address, map: string }", "Map 메서드와 겹치는 필드: minted.map"},
+		{"event_type: { in: core, values: [minted] }", "event_type: { in: core, values: [minted] }\n  Tx_Type: { in: core, values: [z] }", "Go 이름으로 바꿀 수 없는 ID: enum Tx_Type"},
+	}
+	for _, c := range cases {
+		want(t, run(t, replace(t, c.old, c.new)), model.Error, c.msg)
+	}
+	// 같은 패키지의 생성 이름 충돌: enum 상수 TxMint와 상수 tx_mint
+	src := strings.Replace(base, "errors:\n", "consts:\n  tx_type_mint: { in: core, value: 1 }\nerrors:\n", 1)
+	want(t, run(t, src), model.Error, "같은 패키지에서 생성 이름이 겹친다: core 패키지의 TxTypeMint (enum tx_type, 상수 tx_type_mint)")
+}
+
+func TestGoModuleAndDuration(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ntiers: [a]\nmodules:\n  core: { tier: a }\nconsts:\n  wait: { in: core, type: duration, value: 1.5h }\n"), 0o644)
+	m, ds := model.Load(dir)
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	ds = Run(m)
+	want(t, ds, model.Error, `필요한 키가 없다: "go_module"`)
+	want(t, ds, model.Error, `duration 형식이 아니다: 상수 wait "1.5h"`)
 }

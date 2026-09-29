@@ -94,10 +94,7 @@ func (g *gen) consts() error {
 		f := g.file(dir + "/consts.gen.go")
 		var lines []string
 		for _, c := range b.nodes[dir] {
-			name := c.Go.Name
-			if name == "" {
-				name = model.GoName(c.ID)
-			}
+			name := c.GoName()
 			val := c.Value
 			switch c.Type {
 			case "string":
@@ -151,7 +148,7 @@ func (g *gen) types() error {
 	for _, dir := range b.dirs {
 		f := g.file(dir + "/types.gen.go")
 		for _, t := range b.nodes[dir] {
-			f.add("type %s struct {\n%s\n}", typeName(t), strings.Join(g.structFields(t.Fields, dir, f, true), "\n"))
+			f.add("type %s struct {\n%s\n}", t.GoName(), strings.Join(g.structFields(t.Fields, dir, f, true), "\n"))
 		}
 	}
 	return nil
@@ -239,17 +236,10 @@ func (g *gen) contracts() error {
 			for _, me := range c.Methods {
 				lines = append(lines, g.methodSig(me, dir, f))
 			}
-			f.add("type %s interface {\n%s\n}", contractName(c), strings.Join(lines, "\n"))
+			f.add("type %s interface {\n%s\n}", c.GoName(), strings.Join(lines, "\n"))
 		}
 	}
 	return nil
-}
-
-func handlerName(hk *model.HandlerKind) string {
-	if hk.Go.Name != "" {
-		return hk.Go.Name
-	}
-	return model.GoName(hk.ID)
 }
 
 func returnList(rs []string) string {
@@ -276,7 +266,7 @@ func (g *gen) handlerKinds() error {
 		for _, r := range hk.Returns {
 			rs = append(rs, g.goType(r.Name, dir, f))
 		}
-		f.add("type %s func(%s)%s", handlerName(hk), strings.Join(ps, ", "), returnList(rs))
+		f.add("type %s func(%s)%s", hk.GoName(), strings.Join(ps, ", "), returnList(rs))
 	}
 	return nil
 }
@@ -318,7 +308,7 @@ func (g *gen) registrations() error {
 				}
 				fn := g.handlerFunc(mem.ID, hk.ID, v.Name)
 				calls = append(calls, fmt.Sprintf("\t%s.%s(%s, %s)", hp, register, key, fn))
-				checks = append(checks, fmt.Sprintf("\t_ %s.%s = %s", hp, handlerName(hk), fn))
+				checks = append(checks, fmt.Sprintf("\t_ %s.%s = %s", hp, hk.GoName(), fn))
 			}
 			f.add("func init() {\n%s\n}", strings.Join(calls, "\n"))
 			f.add("// 본문은 손으로 쓰는 파일에 있다. 시그니처가 다르면 여기서 컴파일이 깨진다.\nvar (\n%s\n)", strings.Join(checks, "\n"))

@@ -15,6 +15,17 @@ type Pos struct {
 
 func (p Pos) String() string { return fmt.Sprintf("%s:%d:%d", p.File, p.Line, p.Col) }
 
+// Less는 파일, 줄, 열 순으로 p가 q보다 앞인지다.
+func (p Pos) Less(q Pos) bool {
+	if p.File != q.File {
+		return p.File < q.File
+	}
+	if p.Line != q.Line {
+		return p.Line < q.Line
+	}
+	return p.Col < q.Col
+}
+
 type Error struct {
 	Pos Pos
 	Msg string

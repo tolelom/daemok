@@ -337,3 +337,35 @@ func (m *Model) ImportPath(ownerID string) string {
 	}
 	return m.GoModule + "/" + o.Path
 }
+
+// GoName은 타입의 Go 이름이다.
+func (t *Type) GoName() string {
+	if t.Go.Name != "" {
+		return t.Go.Name
+	}
+	return GoName(t.ID)
+}
+
+// GoName은 계약 interface의 Go 이름이다.
+func (c *Contract) GoName() string {
+	if c.Go.Name != "" {
+		return c.Go.Name
+	}
+	return GoName(c.ID)
+}
+
+// GoName은 핸들러 함수 타입의 Go 이름이다.
+func (hk *HandlerKind) GoName() string {
+	if hk.Go.Name != "" {
+		return hk.Go.Name
+	}
+	return GoName(hk.ID)
+}
+
+// GoName은 상수의 Go 이름이다.
+func (c *Const) GoName() string {
+	if c.Go.Name != "" {
+		return c.Go.Name
+	}
+	return GoName(c.ID)
+}

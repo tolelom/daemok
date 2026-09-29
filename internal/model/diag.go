@@ -69,14 +69,5 @@ func (ds Diagnostics) Count(level Level) int {
 }
 
 func (ds Diagnostics) Sort() {
-	sort.SliceStable(ds, func(i, j int) bool {
-		a, b := ds[i].Pos, ds[j].Pos
-		if a.File != b.File {
-			return a.File < b.File
-		}
-		if a.Line != b.Line {
-			return a.Line < b.Line
-		}
-		return a.Col < b.Col
-	})
+	sort.SliceStable(ds, func(i, j int) bool { return ds[i].Pos.Less(ds[j].Pos) })
 }

@@ -71,11 +71,11 @@ func (g *gen) needs() error {
 					lines = append(lines, g.methodSig(me, dir, f))
 				}
 			}
-			doc := fmt.Sprintf("// %s는 %s 계약(%s)에서 이 패키지가 쓰는 메서드다.", contractName(ct), ct.ID, ct.Kind)
+			doc := fmt.Sprintf("// %s는 %s 계약(%s)에서 이 패키지가 쓰는 메서드다.", ct.GoName(), ct.ID, ct.Kind)
 			if n.Why != "" {
 				doc += " " + n.Why
 			}
-			f.add("%s\ntype %s interface {\n%s\n}", doc, contractName(ct), strings.Join(lines, "\n"))
+			f.add("%s\ntype %s interface {\n%s\n}", doc, ct.GoName(), strings.Join(lines, "\n"))
 		}
 	}
 	return nil
@@ -115,7 +115,7 @@ func (g *gen) executableContracts() error {
 				}
 				consumer := f.use(g.importPath(g.ownerPath(id)))
 				impl := f.use(g.importPath(implDir))
-				lines = append(lines, fmt.Sprintf("\t_ %s.%s = (*%s.%s)(nil)", consumer, contractName(ct), impl, contractName(ct)))
+				lines = append(lines, fmt.Sprintf("\t_ %s.%s = (*%s.%s)(nil)", consumer, ct.GoName(), impl, ct.GoName()))
 			}
 		}
 		if f != nil {

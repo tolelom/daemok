@@ -48,19 +48,6 @@ func lowerFirst(s string) string {
 	return strings.ToLower(s[:1]) + s[1:]
 }
 
-func typeName(t *model.Type) string {
-	if t.Go.Name != "" {
-		return t.Go.Name
-	}
-	return model.GoName(t.ID)
-}
-
-func contractName(c *model.Contract) string {
-	if c.Go.Name != "" {
-		return c.Go.Name
-	}
-	return model.GoName(c.ID)
-}
 
 // goType은 설계 타입 문자열을 from 디렉토리의 파일 f에서 쓸 Go 타입으로 바꾼다.
 func (g *gen) goType(t string, fromDir string, f *goFile) string {
@@ -78,7 +65,7 @@ func (g *gen) goType(t string, fromDir string, f *goFile) string {
 		return prefix + g.qualify(e.In.Name, e.GoType(), fromDir, f)
 	case model.StructType:
 		st := g.m.Type(base)
-		return prefix + g.qualify(st.In.Name, typeName(st), fromDir, f)
+		return prefix + g.qualify(st.In.Name, st.GoName(), fromDir, f)
 	}
 	if pkg, name, ok := strings.Cut(base, "."); ok {
 		if _, isOwner := g.m.Owner(pkg); isOwner {
