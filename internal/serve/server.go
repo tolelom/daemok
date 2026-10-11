@@ -3,7 +3,9 @@ package serve
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -26,6 +28,8 @@ var webFS embed.FS
 
 // state는 /api/state의 본문이다.
 type state struct {
+	designSum string // 설계 파일 내용 요약. 내보내지 않는다.
+
 	Version   int         `json:"version"`
 	Design    string      `json:"design"`
 	Root      string      `json:"root"`
@@ -63,6 +67,13 @@ type Server struct {
 	opts    Options
 	mode    string // 마지막으로 낸 상태의 모드
 	editMu  sync.Mutex
+
+	// 설계 파일 내용의 요약과, 그 내용이 처음 나간 상태 버전. 편집의 409 판정에 쓴다.
+	designSum   string
+	designSince int
+
+	// refreshMu는 상태 만들기를 한 번에 하나로 한다. 늦게 끝난 옛 상태가 새 버전 번호로 나가지 않게 한다.
+	refreshMu sync.Mutex
 }
 
 func New(design, root string) *Server {
@@ -77,8 +88,14 @@ func New(design, root string) *Server {
 // Refresh는 설계나 코드를 다시 읽고 상태를 새로 만든 뒤 구독자에게 알린다.
 // 설계 파일이 있으면 대조 모드, 없고 코드 루트가 Go 모듈이면 분석 모드다.
 func (s *Server) Refresh() {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+	s.refresh()
+}
+
+func (s *Server) refresh() {
 	design, root := s.paths()
-	st := state{Design: design, Root: root, Updated: time.Now()}
+	st := state{Design: design, Root: root, Updated: time.Now(), designSum: designSum(design)}
 	if infer.HasDesignFiles(design) {
 		st.Mode = "check"
 		fill(&st, workspace.Run(design, root), root)
@@ -96,6 +113,26 @@ func (s *Server) Refresh() {
 	}
 	st.CanEdit = st.Mode == "check" && s.options().Local
 	s.publish(st)
+}
+
+// designSum은 설계 디렉토리 *.yaml의 이름과 내용 요약이다.
+func designSum(design string) string {
+	h := sha256.New()
+	paths, _ := filepath.Glob(filepath.Join(design, "*.yaml"))
+	sort.Strings(paths)
+	for _, p := range paths {
+		b, _ := os.ReadFile(p)
+		fmt.Fprintf(h, "%s\x00%d\x00", filepath.Base(p), len(b))
+		h.Write(b)
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// designVersions는 지금 설계 내용이 처음 나간 버전과 마지막 버전이다.
+func (s *Server) designVersions() (since, now int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.designSince, s.version
 }
 
 func (s *Server) currentMode() string {
@@ -135,6 +172,9 @@ func (s *Server) publish(st state) {
 	}
 	s.version++
 	s.mode = st.Mode
+	if st.designSum != s.designSum {
+		s.designSum, s.designSince = st.designSum, s.version
+	}
 	st.Version = s.version
 	body, err := json.Marshal(st)
 	if err != nil {
@@ -196,6 +236,8 @@ func signature(design, root string) string {
 
 // Poll은 설계나 코드가 바뀌었으면 Refresh하고 true를 준다. 도중에 프로젝트가 바뀌면 아무것도 하지 않는다.
 func (s *Server) Poll() bool {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
 	design, root := s.paths()
 	sig := signature(design, root)
 	s.mu.Lock()
@@ -207,7 +249,7 @@ func (s *Server) Poll() bool {
 	s.sig = sig
 	s.mu.Unlock()
 	if changed {
-		s.Refresh()
+		s.refresh()
 	}
 	return changed
 }

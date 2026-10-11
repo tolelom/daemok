@@ -60,8 +60,9 @@ func TestEditDepsAndAddModule(t *testing.T) {
 func TestEditRejects(t *testing.T) {
 	s, dir := setup(t, design)
 	local(t, s)
-	if code, _ := editReq(t, s, "tier", "api", "a", s.Version()-1); code != 409 {
-		t.Fatalf("버전이 다르면 409: %d", code)
+	// 설계가 바뀐 뒤의 옛 버전은 TestEditRejectsAfterDesignChange가 본다.
+	if code, _ := editReq(t, s, "tier", "api", "a", s.Version()+1); code != 409 {
+		t.Fatalf("서버가 낸 적 없는 버전은 409: %d", code)
 	}
 	if code, _ := editReq(t, s, "tier", "nope", "a", s.Version()); code != 400 {
 		t.Fatalf("없는 모듈은 400: %d", code)

@@ -4,6 +4,7 @@ package edit
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -11,6 +12,16 @@ import (
 )
 
 var snakeName = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
+
+// plainID는 따옴표 없이 YAML에 그대로 쓸 수 있는 ID다. 모델은 모듈 ID를 snake_case로 강제하지 않는다.
+var plainID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
+
+var (
+	// ErrModuleNotInFile은 고칠 모듈이 이 파일에 없다는 뜻이다. 다른 설계 파일에 있을 수 있다.
+	ErrModuleNotInFile = errors.New("이 파일에 모듈이 없다")
+	// ErrNoModuleBlock은 이 파일에 모듈을 더할 modules 블록이 없다는 뜻이다. 다른 설계 파일에 있을 수 있다.
+	ErrNoModuleBlock = errors.New("모듈을 더할 modules 블록이 없다")
+)
 
 // SetTier는 모듈의 tier 값을 바꾼다.
 func SetTier(src []byte, file, module, tier string) ([]byte, error) {
@@ -25,6 +36,10 @@ func SetTier(src []byte, file, module, tier string) ([]byte, error) {
 	if n == nil || n.Kind != yaml.Scalar {
 		return nil, fmt.Errorf("tier가 없다: 모듈 %s", module)
 	}
+	if n.Value == "" && !n.Quoted {
+		at := t.afterColon(entry(t.val, "tier"))
+		return splice(src, at, at, " "+tier), nil
+	}
 	s := t.off(n.Pos)
 	return splice(src, s, t.tokenEnd(s), tier), nil
 }
@@ -35,13 +50,16 @@ func AddDep(src []byte, file, module, dep string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !snakeName.MatchString(dep) {
+	if !plainID.MatchString(dep) {
 		return nil, fmt.Errorf("모듈 ID가 아니다: %q", dep)
 	}
 	e := entry(t.val, "depends_on")
 	if e == nil {
 		if t.flow(t.val) {
 			end := t.closing(t.off(t.val.Pos))
+			if len(t.val.Entries) == 0 {
+				return splice(src, end, end, "depends_on: ["+dep+"]"), nil
+			}
 			i := end
 			for i > 0 && t.src[i-1] == ' ' {
 				i--
@@ -52,6 +70,14 @@ func AddDep(src []byte, file, module, dep string) ([]byte, error) {
 		return t.insertLine(at, spaces(t.val.Pos.Col-1)+"depends_on: ["+dep+"]"), nil
 	}
 	seq := e.Value
+	if seq.IsNull() {
+		if seq.Value == "" {
+			at := t.afterColon(e)
+			return splice(src, at, at, " ["+dep+"]"), nil
+		}
+		s := t.off(seq.Pos)
+		return splice(src, s, t.tokenEnd(s), "["+dep+"]"), nil
+	}
 	for _, it := range seq.Items {
 		if it.Value == dep {
 			return nil, fmt.Errorf("이미 있는 의존: %s → %s", module, dep)
@@ -111,9 +137,10 @@ func RemoveDep(src []byte, file, module, dep string) ([]byte, error) {
 	}
 	itemLine := items[idx].Pos.Line
 	if len(items) == 1 {
-		start := t.lineStart(e.Pos.Line)
-		key := t.off(e.Pos)
-		return splice(src, start, t.lineEnd(itemLine), string(src[start:key])+"depends_on: []"+t.nl), nil
+		// 항목 줄만 지우고 키 뒤에 []를 넣는다. 키 줄과 사이의 주석은 그대로 둔다.
+		at := t.afterColon(e)
+		out := splice(src, t.lineStart(itemLine), t.lineEnd(itemLine), "")
+		return splice(out, at, at, " []"), nil
 	}
 	return splice(src, t.lineStart(itemLine), t.lineEnd(itemLine), ""), nil
 }
@@ -131,10 +158,10 @@ func AddModule(src []byte, file, id, tier string) ([]byte, error) {
 		return nil, err
 	}
 	if t.mods == nil {
-		return nil, fmt.Errorf("modules가 없다: %s", file)
+		return nil, fmt.Errorf("%w: %s", ErrNoModuleBlock, file)
 	}
 	if t.mods.Kind != yaml.Map || t.flow(t.mods) || len(t.mods.Entries) == 0 {
-		return nil, fmt.Errorf("modules가 모듈이 있는 블록 형식이 아니다: %s", file)
+		return nil, fmt.Errorf("%w(모듈이 하나 이상 있는 블록 형식이어야 한다): %s", ErrNoModuleBlock, file)
 	}
 	if t.mods.Get(id) != nil {
 		return nil, fmt.Errorf("이미 있는 모듈: %s", id)
@@ -146,8 +173,7 @@ func AddModule(src []byte, file, id, tier string) ([]byte, error) {
 
 type text struct {
 	src    []byte
-	starts []int // 줄마다 시작 바이트
-	nl     string
+	starts []int // 줄마다 시작 바이트. BOM이 있으면 첫 줄은 BOM 뒤에서 시작한다(파서가 BOM을 떼고 열을 센다).
 	mods   *yaml.Node
 	val    *yaml.Node // 고칠 모듈의 값
 }
@@ -157,9 +183,9 @@ func parse(src []byte, file string) (*text, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &text{src: src, starts: []int{0}, nl: "\n", mods: root.Get("modules")}
-	if bytes.Contains(src, []byte("\r\n")) {
-		t.nl = "\r\n"
+	t := &text{src: src, starts: []int{0}, mods: root.Get("modules")}
+	if bytes.HasPrefix(src, []byte("\xef\xbb\xbf")) {
+		t.starts[0] = 3
 	}
 	for i, b := range src {
 		if b == '\n' {
@@ -176,7 +202,7 @@ func open(src []byte, file, module string) (*text, error) {
 	}
 	t.val = t.mods.Get(module)
 	if t.val == nil || t.val.Kind != yaml.Map {
-		return nil, fmt.Errorf("이 파일에 모듈이 없다: %s", module)
+		return nil, fmt.Errorf("%w: %s", ErrModuleNotInFile, module)
 	}
 	return t, nil
 }
@@ -270,11 +296,30 @@ func (t *text) blockEnd(first, indent int) int {
 }
 
 // insertLine은 at에 한 줄을 넣는다. 파일 끝에 줄바꿈이 없으면 먼저 줄을 바꾼다.
+// 줄바꿈은 넣는 자리 앞줄의 것을 따른다.
 func (t *text) insertLine(at int, line string) []byte {
-	if at == len(t.src) && len(t.src) > 0 && t.src[len(t.src)-1] != '\n' {
-		line = t.nl + line
+	nl := "\n"
+	if i := bytes.LastIndexByte(t.src[:at], '\n'); i > 0 && t.src[i-1] == '\r' {
+		nl = "\r\n"
 	}
-	return splice(t.src, at, at, line+t.nl)
+	if at == len(t.src) && len(t.src) > 0 && t.src[len(t.src)-1] != '\n' {
+		line = nl + line
+	}
+	return splice(t.src, at, at, line+nl)
+}
+
+// afterColon은 항목 키 뒤 콜론의 바로 다음 위치다.
+func (t *text) afterColon(e *yaml.Entry) int {
+	i := t.off(e.Pos)
+	if t.src[i] == '"' {
+		i = t.tokenEnd(i)
+	} else {
+		i += len(e.Key)
+	}
+	for i < len(t.src) && t.src[i] != ':' {
+		i++
+	}
+	return i + 1
 }
 
 func splice(src []byte, s, e int, repl string) []byte {

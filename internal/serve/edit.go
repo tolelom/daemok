@@ -16,8 +16,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-var errNoFile = errors.New("이 파일에 모듈이 없다")
-
 // editFile은 설계 파일 하나에 작업을 적용한다.
 func editFile(op string, src []byte, file, id, value string) ([]byte, error) {
 	switch op {
@@ -54,7 +52,8 @@ func (s *Server) editDesign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Poll()
-	if req.Version != s.Version() {
+	// 화면이 본 상태 뒤로 설계 파일 내용이 바뀌었을 때만 거부한다. 코드만 바뀐 버전은 받는다.
+	if since, now := s.designVersions(); req.Version < since || req.Version > now {
 		writeErr(w, http.StatusConflict, "그사이 설계가 바뀌었다. 화면을 새로 고친 뒤 다시 한다")
 		return
 	}
@@ -70,7 +69,7 @@ func (s *Server) editDesign(w http.ResponseWriter, r *http.Request) {
 		}
 		files[p] = b
 	}
-	target, lastErr := "", error(errNoFile)
+	target, lastErr := "", errors.New("설계 파일이 없다")
 	var patched []byte
 	for _, p := range paths {
 		out, err := editFile(req.Op, files[p], p, req.ID, req.Value)
@@ -78,26 +77,28 @@ func (s *Server) editDesign(w http.ResponseWriter, r *http.Request) {
 			target, patched = p, out
 			break
 		}
+		lastErr = err
 		// 다른 파일에 있을 수 있는 경우만 다음 파일을 본다.
-		if !strings.Contains(err.Error(), "이 파일에 모듈이 없다") && !strings.Contains(err.Error(), "modules가") {
-			lastErr = err
+		if !errors.Is(err, edit.ErrModuleNotInFile) && !errors.Is(err, edit.ErrNoModuleBlock) {
 			break
 		}
-		lastErr = err
 	}
 	if target == "" {
 		writeErr(w, http.StatusBadRequest, lastErr.Error())
 		return
 	}
+	before := loadErrors(files)
 	files[target] = patched
-	if _, diags := model.LoadSources(files); diags.HasErrors() {
-		var msgs []string
-		for _, d := range diags {
-			if d.Level == model.Error {
-				msgs = append(msgs, d.Msg)
-			}
+	// 편집 전부터 있던 읽기 오류는 빼고, 편집이 새로 만든 오류만 본다.
+	var added []string
+	for msg, n := range loadErrors(files) {
+		if n > before[msg] {
+			added = append(added, msg)
 		}
-		writeErr(w, http.StatusUnprocessableEntity, "고치면 설계를 읽을 수 없게 된다: "+strings.Join(msgs, "; "))
+	}
+	sort.Strings(added)
+	if len(added) > 0 {
+		writeErr(w, http.StatusUnprocessableEntity, "고치면 설계를 읽을 수 없게 된다: "+strings.Join(added, "; "))
 		return
 	}
 	if err := writeAtomic(target, patched); err != nil {
@@ -108,8 +109,24 @@ func (s *Server) editDesign(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int{"version": s.Version()})
 }
 
+// loadErrors는 설계 파일들을 읽을 때 나는 오류 메시지와 그 수다.
+func loadErrors(files map[string][]byte) map[string]int {
+	_, diags := model.LoadSources(files)
+	out := map[string]int{}
+	for _, d := range diags {
+		if d.Level == model.Error {
+			out[d.Msg]++
+		}
+	}
+	return out
+}
+
 // writeAtomic은 같은 디렉토리의 임시 파일에 쓴 뒤 이름을 바꾼다.
+// 심볼릭 링크면 링크는 두고 가리키는 파일을 바꾼다.
 func writeAtomic(path string, b []byte) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
 	mode := os.FileMode(0o644)
 	if st, err := os.Stat(path); err == nil {
 		mode = st.Mode().Perm()
@@ -123,11 +140,19 @@ func writeAtomic(path string, b []byte) error {
 		os.Remove(tmp.Name())
 		return err
 	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmp.Name())
 		return err
 	}
-	os.Chmod(tmp.Name(), mode)
+	if err := os.Chmod(tmp.Name(), mode); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
 	if err := renameRetry(tmp.Name(), path); err != nil {
 		os.Remove(tmp.Name())
 		return err
