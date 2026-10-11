@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -166,5 +167,41 @@ events:
 	}
 	if !strings.Contains(joined, "설계에 없는 의존을 import한다: tagged → dot") {
 		t.Errorf("OS 조건 파일은 읽어야 한다:\n%s", joined)
+	}
+}
+
+func TestAdHocErrors(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"design/d.yaml": `version: 0.4
+go_module: example.com/e
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  api:  { tier: b, depends_on: [core] }
+  free: { tier: b }
+errors:
+  ErrNotFound: { in: core, message: "not found", gen: false }
+`,
+		"core/errors.go": "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"not found\")\n",
+		"api/api.go":     "package api\n\nimport (\n\tstderr \"errors\"\n\t\"fmt\"\n\n\t_ \"example.com/e/core\"\n)\n\nfunc Get() error {\n\tif true {\n\t\treturn stderr.New(\"missing\")\n\t}\n\treturn fmt.Errorf(\"wrap: %w\", nil)\n}\n",
+		"free/free.go":   "package free\n\nimport \"errors\"\n\nfunc F() error { return errors.New(\"x\") }\n",
+	}
+	for p, c := range files {
+		writeFile(t, filepath.Join(root, p), c)
+	}
+	m, ds := model.Load(filepath.Join(root, "design"))
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	var got []string
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "즉석") {
+			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
+		}
+	}
+	want := []string{"정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api @api.go:12"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("%q", got)
 	}
 }

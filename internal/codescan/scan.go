@@ -119,6 +119,7 @@ func (s *scanner) scanUnit(u unit) {
 		}
 		if !generated(f) {
 			s.collectRefs(u.id, f)
+			s.adHocErrors(u.id, f)
 		}
 	}
 }
@@ -286,4 +287,50 @@ func (s *scanner) eventRefs(us []unit) {
 func (s *scanner) ownerDir(id string) string {
 	o, _ := s.m.Owner(id)
 	return o.Path
+}
+
+// adHocErrors는 쓸 수 있는 설계 에러가 있는 모듈의 함수 본문에서 errors.New를 부르면 정보로 알린다.
+// 상황마다 메시지가 다른 정당한 경우가 섞여 있어 경고(--strict 실패)로 두지 않는다.
+// 패키지 수준 var 선언(설계 에러를 손으로 둔 gen: false 선언)과 fmt.Errorf의 감싸기는 보지 않는다.
+func (s *scanner) adHocErrors(id string, f *ast.File) {
+	visible := false
+	for _, e := range s.m.Errors {
+		if e.In.Name == id || s.m.CanDepend(id, e.In.Name) {
+			visible = true
+			break
+		}
+	}
+	if !visible {
+		return
+	}
+	name := ""
+	for _, im := range f.Imports {
+		if p, _ := strconv.Unquote(im.Path.Value); p == "errors" {
+			name = "errors"
+			if im.Name != nil {
+				name = im.Name.Name
+			}
+		}
+	}
+	if name == "" || name == "_" || name == "." {
+		return
+	}
+	for _, d := range f.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			call, ok := n.(*ast.CallExpr)
+			if !ok {
+				return true
+			}
+			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "New" {
+				if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == name {
+					s.diags.Infof(s.pos(call.Pos()), "설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 %s", id)
+				}
+			}
+			return true
+		})
+	}
 }
