@@ -355,6 +355,7 @@ function renderHeader() {
   const views = VIEWS[S.mode] || VIEWS.check;
   document.querySelectorAll('nav.tabs button').forEach(b => {
     b.hidden = !views.includes(b.dataset.view);
+    b.title = b.hidden ? '' : `단축키 ${views.indexOf(b.dataset.view) + 1}`;
     b.setAttribute('aria-current', String(b.dataset.view === view));
   });
   const c = { err: 0, warn: 0, info: 0 };
@@ -884,7 +885,13 @@ document.addEventListener('submit', e => {
   openProject($('#openpath').value.trim());
 });
 document.addEventListener('keydown', e => {
-  if (e.key === '/' && !drawerOpen && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  // 숫자 키는 보이는 탭을 왼쪽부터 고른다.
+  if (!typing && !drawerOpen && !e.ctrlKey && !e.metaKey && !e.altKey && /^[1-9]$/.test(e.key)) {
+    const tabs = [...document.querySelectorAll('nav.tabs button')].filter(b => !b.hidden);
+    const b = tabs[+e.key - 1]; if (b) { e.preventDefault(); go(b.dataset.view); }
+  }
+  if (e.key === '/' && !drawerOpen && !typing) {
     if (view !== 'map') go('map');
     const q = $('#mapq'); if (q) { e.preventDefault(); q.focus(); }
   }
