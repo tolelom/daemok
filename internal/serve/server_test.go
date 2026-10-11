@@ -50,6 +50,9 @@ func getState(t *testing.T, s *Server) map[string]any {
 func TestState(t *testing.T) {
 	s, _ := setup(t, design)
 	st := getState(t, s)
+	if st["mode"] != "check" {
+		t.Fatalf("mode %v", st["mode"])
+	}
 	mods := st["model"].(map[string]any)["mods"].([]any)
 	if len(mods) != 2 || mods[0].(map[string]any)["id"] != "core" || mods[1].(map[string]any)["id"] != "api" {
 		t.Fatalf("mods 순서: %v", mods)
@@ -318,5 +321,66 @@ func TestFlowFailurePaths(t *testing.T) {
 		if strings.Join(undo, ",") != want[i].undo || m["onFailFatal"].(bool) != want[i].fatal {
 			t.Errorf("step %s: undo %v fatal %v", m["id"], undo, m["onFailFatal"])
 		}
+	}
+}
+
+func goModule(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/demo\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "c.go"), []byte("package core\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, "api"), 0o755)
+	os.WriteFile(filepath.Join(root, "api", "a.go"), []byte("package api\nimport _ \"example.com/demo/core\"\n"), 0o644)
+	return root
+}
+
+func TestAnalyzeMode(t *testing.T) {
+	root := goModule(t)
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	st := getState(t, s)
+	if st["mode"] != "analyze" || st["fatal"] != false {
+		t.Fatalf("%v %v", st["mode"], st["fatal"])
+	}
+	mods := st["model"].(map[string]any)["mods"].([]any)
+	if len(mods) != 2 {
+		t.Fatalf("%v", mods)
+	}
+	d := st["draft"].(map[string]any)
+	if !strings.Contains(d["yaml"].(string), "api: { tier: tier1, depends_on: [core] }") {
+		t.Fatal(d["yaml"])
+	}
+	if d["report"].(map[string]any)["modules"].(float64) != 2 || !strings.HasPrefix(d["command"].(string), "daemok init --root ") {
+		t.Fatalf("%v", d)
+	}
+	for _, it := range st["issues"].([]any) {
+		if it.(map[string]any)["lv"] == "err" {
+			t.Fatalf("초안에 오류: %v", it)
+		}
+	}
+}
+
+func TestAnalyzeModeSeesCodeChange(t *testing.T) {
+	root := goModule(t)
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	os.MkdirAll(filepath.Join(root, "web"), 0o755)
+	os.WriteFile(filepath.Join(root, "web", "w.go"), []byte("package web\n"), 0o644)
+	if !s.Poll() {
+		t.Fatal("코드 변경을 감지하지 못했다")
+	}
+	if n := len(getState(t, s)["model"].(map[string]any)["mods"].([]any)); n != 3 {
+		t.Fatalf("%d", n)
+	}
+}
+
+func TestNoneMode(t *testing.T) {
+	root := t.TempDir()
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	st := getState(t, s)
+	if st["mode"] != "none" || st["fatal"] != true || !strings.Contains(st["problem"].(string), "Go 모듈이 아니다") {
+		t.Fatalf("%v", st)
 	}
 }

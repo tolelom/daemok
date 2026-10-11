@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/tolelom/daemok/internal/gitbase"
+	"github.com/tolelom/daemok/internal/infer"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/workspace"
 )
@@ -36,6 +37,17 @@ type state struct {
 	Files     []vFile     `json:"files"`
 	Fatal     bool        `json:"fatal"`
 	Updated   time.Time   `json:"updated"`
+	Mode      string      `json:"mode"` // check, analyze, none
+	Draft     *vDraft     `json:"draft,omitempty"`
+	Problem   string      `json:"problem,omitempty"`
+}
+
+// vDraft는 분석 모드의 초안이다.
+type vDraft struct {
+	Path    string       `json:"path"`
+	YAML    string       `json:"yaml"`
+	Report  infer.Report `json:"report"`
+	Command string       `json:"command"`
 }
 
 // Server는 설계 디렉토리 하나의 지도를 제공한다.
@@ -54,17 +66,52 @@ func New(design, root string) *Server {
 	return &Server{design: design, root: root, subs: map[chan int]bool{}, sig: "\x00"}
 }
 
-// Refresh는 설계를 다시 읽고 상태를 새로 만든 뒤 구독자에게 알린다.
+// Refresh는 설계나 코드를 다시 읽고 상태를 새로 만든 뒤 구독자에게 알린다.
+// 설계 파일이 있으면 대조 모드, 없고 코드 루트가 Go 모듈이면 분석 모드다.
 func (s *Server) Refresh() {
-	r := workspace.Run(s.design, s.root)
-	st := state{Design: s.design, Root: s.root, Model: toView(r.Model), Fatal: r.Fatal, Updated: time.Now()}
-	st.Issues = toIssues(r.Model, s.root, r.Diags, r.Code)
+	design, root := s.paths()
+	st := state{Design: design, Root: root, Updated: time.Now()}
+	if infer.HasDesignFiles(design) {
+		st.Mode = "check"
+		fill(&st, workspace.Run(design, root), root)
+		if files, ok, err := gitbase.Files(design); err == nil && ok {
+			base, _ := model.LoadSources(files)
+			st.Base, st.HasBase = toView(base), true
+		}
+	} else if a, err := infer.Analyze(root); err == nil {
+		st.Mode = "analyze"
+		name := filepath.Join(design, a.Draft.System+".yaml")
+		fill(&st, workspace.RunSources(map[string][]byte{name: a.YAML}, design, root), root)
+		st.Draft = &vDraft{Path: name, YAML: string(a.YAML), Report: a.Report, Command: "daemok init --root " + shellQuote(root)}
+	} else {
+		st.Mode, st.Fatal, st.Problem = "none", true, err.Error()
+	}
+	s.publish(st)
+}
+
+func fill(st *state, r workspace.Result, root string) {
+	st.Model, st.Fatal = toView(r.Model), r.Fatal
+	st.Issues = toIssues(r.Model, root, r.Diags, r.Code)
 	st.Files = toFiles(r.Model, r.Files)
 	st.Relations = toRelations(r.Model)
-	if files, ok, err := gitbase.Files(s.design); err == nil && ok {
-		base, _ := model.LoadSources(files)
-		st.Base, st.HasBase = toView(base), true
+}
+
+// shellQuote는 공백이 있는 경로를 큰따옴표로 감싼다.
+func shellQuote(p string) string {
+	if strings.ContainsAny(p, " 	") {
+		return `"` + p + `"`
 	}
+	return p
+}
+
+func (s *Server) paths() (design, root string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.design, s.root
+}
+
+// publish는 상태에 버전을 붙여 저장하고 구독자에게 알린다.
+func (s *Server) publish(st state) {
 	s.mu.Lock()
 	s.version++
 	st.Version = s.version
