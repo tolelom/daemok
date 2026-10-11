@@ -120,6 +120,7 @@ func (s *scanner) scanUnit(u unit) {
 		if !generated(f) {
 			s.collectRefs(u.id, f)
 			s.adHocErrors(u.id, f)
+			s.enumLiterals(u.id, f)
 		}
 	}
 }
@@ -329,6 +330,42 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 				if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == name {
 					s.diags.Infof(s.pos(call.Pos()), "설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 %s", id)
 				}
+			}
+			return true
+		})
+	}
+}
+
+// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문에서 쓰면 정보로 알린다.
+// enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
+func (s *scanner) enumLiterals(id string, f *ast.File) {
+	consts := map[string]string{} // 값 → 상수 이름
+	for _, en := range s.m.Enums {
+		if en.In.Name != id && !s.m.CanDepend(id, en.In.Name) {
+			continue
+		}
+		for _, v := range en.Values {
+			if _, dup := consts[v.Name]; !dup {
+				consts[v.Name] = en.ConstName(v.Name)
+			}
+		}
+	}
+	if len(consts) == 0 {
+		return
+	}
+	for _, d := range f.Decls {
+		fn, ok := d.(*ast.FuncDecl)
+		if !ok || fn.Body == nil {
+			continue
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			lit, ok := n.(*ast.BasicLit)
+			if !ok || lit.Kind != token.STRING {
+				return true
+			}
+			v, err := strconv.Unquote(lit.Value)
+			if c, hit := consts[v]; err == nil && hit {
+				s.diags.Infof(s.pos(lit.Pos()), "enum 상수 대신 문자열 리터럴을 쓴다: 모듈 %s, %q (%s)", id, v, c)
 			}
 			return true
 		})

@@ -205,3 +205,39 @@ errors:
 		t.Fatalf("%q", got)
 	}
 }
+
+func TestEnumLiterals(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"design/d.yaml": `version: 0.4
+go_module: example.com/l
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  api:  { tier: b, depends_on: [core] }
+  free: { tier: b }
+enums:
+  tx_type: { in: core, gen: false, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
+`,
+		"core/tx.go":   "package core\n\ntype TxType string\n\nconst (\n\tTxTransfer  TxType = \"transfer\"\n\tTxMintAsset TxType = \"mint_asset\"\n)\n",
+		"api/api.go":   "package api\n\nimport _ \"example.com/l/core\"\n\nfunc Kind(s string) bool {\n\treturn s == \"mint_asset\" || s == \"other\"\n}\n",
+		"free/free.go": "package free\n\nfunc F() string { return \"transfer\" }\n",
+	}
+	for p, c := range files {
+		writeFile(t, filepath.Join(root, p), c)
+	}
+	m, ds := model.Load(filepath.Join(root, "design"))
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	var got []string
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "리터럴") {
+			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
+		}
+	}
+	want := []string{`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @api.go:6`}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("%q", got)
+	}
+}
