@@ -229,4 +229,4 @@ tolchain `feat/daemok` 브랜치(기준 `main` `29c1d3a`)에 형식 v0.4 설계 
 | 초안에만 있는 모듈 | 손으로 쓴 설계에 없는 패키지 | 1 | `internal/testutil` |
 
 - 모듈의 `depends_on`은 13개 모두 손으로 쓴 설계와 같다.
-- tier가 다른 6개는 모두 초안 쪽이 같거나 낮은 층 수에 놓여 의존 방향은 어긋나지 않는다. 손으로 쓴 tier는 의존 깊이가 아니라 역할(persistence, execution, service)로 나뉜다.
+- 초안의 층은 의존 깊이이고, 손으로 쓴 tier는 역할(persistence, execution, service)이다. 차이 6개가 모두 이 기준 차이에서 나온다.
