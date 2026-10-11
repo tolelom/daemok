@@ -3,7 +3,6 @@ package codescan
 
 import (
 	"go/ast"
-	"go/build/constraint"
 	"go/parser"
 	"go/token"
 	"os"
@@ -13,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tolelom/daemok/internal/gosrc"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
 )
@@ -67,94 +67,13 @@ func (s *scanner) unitList() []unit {
 	return out
 }
 
-// goFiles는 디렉토리의 Go 파일을 문법 트리로 준다. _test.go와 //go:build ignore 파일은 뺀다.
-// OS·아키텍처 조건은 모두 참으로 보아 어느 플랫폼의 파일이든 읽는다. 디렉토리가 없으면 비어 있다.
+// goFiles는 모듈·멤버 디렉토리의 Go 파일이다. 파일 선택은 gosrc.Files를 따른다.
 func (s *scanner) goFiles(dir string) []*ast.File {
-	entries, err := os.ReadDir(filepath.Join(s.root, filepath.FromSlash(dir)))
-	if err != nil {
-		return nil
+	files, errs := gosrc.Files(s.fset, filepath.Join(s.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
+	for _, e := range errs {
+		s.diags.Errorf(yaml.Pos{File: e.Path}, "Go 파일을 읽을 수 없다: %v", e.Err)
 	}
-	var out []*ast.File
-	for _, e := range entries {
-		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
-			continue
-		}
-		p := filepath.Join(s.root, filepath.FromSlash(dir), name)
-		f, err := parser.ParseFile(s.fset, p, nil, parser.SkipObjectResolution|parser.ParseComments)
-		if err != nil {
-			s.diags.Errorf(yaml.Pos{File: p}, "Go 파일을 읽을 수 없다: %v", err)
-			continue
-		}
-		if ignored(f) {
-			continue
-		}
-		out = append(out, f)
-	}
-	return out
-}
-
-// ignored는 파일의 build 조건이 ignore 태그 없이는 참이 될 수 없는지다.
-func ignored(f *ast.File) bool {
-	for _, cg := range f.Comments {
-		if cg.Pos() >= f.Package {
-			break
-		}
-		for _, c := range cg.List {
-			if !constraint.IsGoBuild(c.Text) {
-				continue
-			}
-			expr, err := constraint.Parse(c.Text)
-			if err != nil {
-				return false
-			}
-			return !satisfiable(expr)
-		}
-	}
-	return false
-}
-
-// satisfiable은 ignore 태그를 거짓으로 두고 나머지 태그를 어떻게 정해 참이 될 수 있는지다.
-// 태그가 많으면 판단하지 않고 참으로 본다.
-func satisfiable(expr constraint.Expr) bool {
-	var tags []string
-	seen := map[string]bool{}
-	var walk func(e constraint.Expr)
-	walk = func(e constraint.Expr) {
-		switch x := e.(type) {
-		case *constraint.AndExpr:
-			walk(x.X)
-			walk(x.Y)
-		case *constraint.OrExpr:
-			walk(x.X)
-			walk(x.Y)
-		case *constraint.NotExpr:
-			walk(x.X)
-		case *constraint.TagExpr:
-			if x.Tag != "ignore" && !seen[x.Tag] {
-				seen[x.Tag] = true
-				tags = append(tags, x.Tag)
-			}
-		}
-	}
-	walk(expr)
-	if len(tags) > 12 {
-		return true
-	}
-	for mask := 0; mask < 1<<len(tags); mask++ {
-		ok := expr.Eval(func(tag string) bool {
-			for i, t := range tags {
-				if t == tag {
-					return mask&(1<<i) != 0
-				}
-			}
-			return false
-		})
-		if ok {
-			return true
-		}
-	}
-	return false
+	return files
 }
 
 // generated는 첫 줄이 daemok 생성 헤더인 파일인지다.

@@ -15,6 +15,7 @@ import (
 	"github.com/tolelom/daemok/internal/check"
 	"github.com/tolelom/daemok/internal/codescan"
 	"github.com/tolelom/daemok/internal/gen/golang"
+	"github.com/tolelom/daemok/internal/gosrc"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
 )
@@ -153,9 +154,7 @@ func hasHeader(p string) bool {
 }
 
 // SkipDir는 생성 파일 범위와 코드 감시에서 빼는 디렉토리다.
-func SkipDir(name string) bool {
-	return strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules"
-}
+func SkipDir(name string) bool { return gosrc.SkipDir(name) }
 
 // ScanGenerated는 root 아래에서 첫 줄이 생성 헤더인 .go 파일을 찾아
 // 슬래시 경로와 내용(CRLF를 LF로 바꾼 것)을 준다.
