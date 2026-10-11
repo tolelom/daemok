@@ -24,6 +24,7 @@ Go 1.27 이상. 외부 의존성은 없다.
 | `daemok gen` | 설계에서 Go 생성 파일을 쓰고, 설계에 없는 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
 | `daemok init` | 설계 파일이 없는 Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다 | `--root DIR`, `--design DIR`(기본 `<root>/design`), `--dry-run` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
+| `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 도구는 `design`, `check`, `draft`이고 모두 읽기 전용이다 | `--design DIR`, `--root DIR` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |
 
 `daemok version`은 버전과 빌드한 커밋을 출력한다. 종료 코드는 0 통과, 1 문제 있음, 2 진행할 수 없음이다.
@@ -36,6 +37,20 @@ Go 1.27 이상. 외부 의존성은 없다.
 - 머리의 프로젝트 이름을 누르면 다른 프로젝트를 연다. 경로를 입력하거나, 최근 목록이나 `--workspace` 아래의 Go 모듈 목록에서 고른다.
 - 설계 파일이 없는 Go 모듈을 열면 분석 모드다. 코드에서 추정한 초안을 지도로 보여 주고, 초안 탭에서 `design/`에 저장한다.
 - 프로젝트 열기와 초안 저장은 루프백 주소로 띄웠을 때만 된다.
+
+## AI 연동
+
+MCP를 지원하는 클라이언트의 서버 설정에 `daemok mcp`를 등록한다.
+
+```json
+{
+  "mcpServers": {
+    "daemok": { "command": "daemok", "args": ["mcp", "--root", "/path/to/project"] }
+  }
+}
+```
+
+`design`은 설계 파일이나 모듈 하나의 의존·소속 노드를, `check`는 진단 JSON을, `draft`는 코드에서 만든 초안을 준다. AI가 코드를 고친 뒤 `check`로 설계와 어긋나지 않았는지 확인하는 데 쓴다.
 
 ## 기존 프로젝트에 도입
 

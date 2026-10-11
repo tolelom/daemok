@@ -1,0 +1,300 @@
+// Package mcp는 표준 입출력으로 MCP(JSON-RPC 2.0, 한 줄에 메시지 하나)를 주고받아
+// AI가 설계를 읽고 검사를 돌리게 한다. 도구는 모두 읽기 전용이다.
+package mcp
+
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/tolelom/daemok/internal/infer"
+	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/workspace"
+)
+
+const defaultProtocol = "2025-06-18"
+
+// Server는 기본 설계 디렉토리와 코드 루트를 가진다. 도구 인자로 바꿀 수 있다.
+type Server struct {
+	design, root string
+	Version      string
+}
+
+func New(design, root string) *Server { return &Server{design: design, root: root, Version: "dev"} }
+
+type request struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id,omitempty"`
+	Method  string          `json:"method"`
+	Params  json.RawMessage `json:"params,omitempty"`
+}
+
+type rpcError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type response struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      json.RawMessage `json:"id"`
+	Result  any             `json:"result,omitempty"`
+	Error   *rpcError       `json:"error,omitempty"`
+}
+
+// Serve는 r가 끝날 때까지 한 줄에 하나씩 요청을 읽고 w에 응답을 쓴다. 알림(id 없음)에는 응답하지 않는다.
+func (s *Server) Serve(r io.Reader, w io.Writer) error {
+	sc := bufio.NewScanner(r)
+	sc.Buffer(make([]byte, 0, 64*1024), 16<<20)
+	enc := json.NewEncoder(w)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		var req request
+		if err := json.Unmarshal([]byte(line), &req); err != nil {
+			enc.Encode(response{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{-32700, "JSON을 읽을 수 없다"}})
+			continue
+		}
+		if len(req.ID) == 0 {
+			continue
+		}
+		result, rerr := s.handle(req)
+		resp := response{JSONRPC: "2.0", ID: req.ID, Result: result, Error: rerr}
+		if rerr == nil && result == nil {
+			resp.Result = struct{}{}
+		}
+		if err := enc.Encode(resp); err != nil {
+			return err
+		}
+	}
+	return sc.Err()
+}
+
+func (s *Server) handle(req request) (any, *rpcError) {
+	switch req.Method {
+	case "initialize":
+		var p struct {
+			ProtocolVersion string `json:"protocolVersion"`
+		}
+		json.Unmarshal(req.Params, &p)
+		if p.ProtocolVersion == "" {
+			p.ProtocolVersion = defaultProtocol
+		}
+		return map[string]any{
+			"protocolVersion": p.ProtocolVersion,
+			"capabilities":    map[string]any{"tools": map[string]any{}},
+			"serverInfo":      map[string]any{"name": "daemok", "version": s.Version},
+		}, nil
+	case "ping":
+		return struct{}{}, nil
+	case "tools/list":
+		return map[string]any{"tools": toolList()}, nil
+	case "tools/call":
+		var p struct {
+			Name      string          `json:"name"`
+			Arguments json.RawMessage `json:"arguments"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil {
+			return nil, &rpcError{-32602, "params를 읽을 수 없다"}
+		}
+		var args struct {
+			Module string `json:"module"`
+			Design string `json:"design"`
+			Root   string `json:"root"`
+		}
+		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
+			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
+		}
+		design, root := s.design, s.root
+		if args.Root != "" {
+			root = args.Root
+			if args.Design == "" {
+				design = filepath.Join(root, "design")
+			}
+		}
+		if args.Design != "" {
+			design = args.Design
+		}
+		var text string
+		var err error
+		switch p.Name {
+		case "design":
+			text, err = designTool(design, args.Module)
+		case "check":
+			text = string(workspace.ReportJSON(workspace.Run(design, root).Diags))
+		case "draft":
+			text, err = draftTool(root)
+		default:
+			return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
+		}
+		if err != nil {
+			return toolResult(err.Error(), true), nil
+		}
+		return toolResult(text, false), nil
+	}
+	return nil, &rpcError{-32601, fmt.Sprintf("지원하지 않는 메서드 %q", req.Method)}
+}
+
+func toolResult(text string, isErr bool) map[string]any {
+	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": isErr}
+}
+
+func toolList() []map[string]any {
+	str := func(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
+	paths := map[string]any{"design": str("설계 디렉토리. 기본은 서버의 --design"), "root": str("코드 루트. 기본은 서버의 --root")}
+	with := func(extra map[string]any) map[string]any {
+		props := map[string]any{}
+		for k, v := range paths {
+			props[k] = v
+		}
+		for k, v := range extra {
+			props[k] = v
+		}
+		return map[string]any{"type": "object", "properties": props}
+	}
+	return []map[string]any{
+		{"name": "design", "description": "설계를 읽는다. module이 없으면 설계 파일 원문, 있으면 그 모듈·그룹·멤버의 tier, 의존, 쓰는 쪽, 소속 노드를 JSON으로 준다",
+			"inputSchema": with(map[string]any{"module": str("모듈, 그룹, 그룹 멤버 ID")})},
+		{"name": "check", "description": "설계 검사, import 대조, 생성 파일 최신 여부를 돌려 진단을 JSON으로 준다(daemok check --format json과 같다)",
+			"inputSchema": with(nil)},
+		{"name": "draft", "description": "설계 파일이 없는 Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 파일은 쓰지 않는다(daemok init --dry-run과 같다)",
+			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"root": paths["root"]}}},
+	}
+}
+
+func designTool(design, module string) (string, error) {
+	if module == "" {
+		paths, _ := filepath.Glob(filepath.Join(design, "*.yaml"))
+		if len(paths) == 0 {
+			return "", fmt.Errorf("설계 파일(*.yaml)이 없다: %s", design)
+		}
+		sort.Strings(paths)
+		var b strings.Builder
+		for _, p := range paths {
+			src, err := os.ReadFile(p)
+			if err != nil {
+				return "", err
+			}
+			fmt.Fprintf(&b, "# %s\n%s\n", filepath.Base(p), src)
+		}
+		return b.String(), nil
+	}
+	m, diags := model.Load(design)
+	if diags.HasErrors() {
+		return "", fmt.Errorf("설계를 읽을 수 없다:\n%s", strings.Join(diagLines(diags), "\n"))
+	}
+	info, ok := unitInfo(m, module)
+	if !ok {
+		return "", fmt.Errorf("모듈, 그룹, 그룹 멤버가 아니다: %s", module)
+	}
+	b, _ := json.MarshalIndent(info, "", "  ")
+	return string(b), nil
+}
+
+func diagLines(ds model.Diagnostics) []string {
+	var out []string
+	for _, d := range ds {
+		out = append(out, d.String())
+	}
+	return out
+}
+
+type unit struct {
+	ID        string              `json:"id"`
+	Kind      string              `json:"kind"` // module, group, member
+	Tier      string              `json:"tier"`
+	Path      string              `json:"path"`
+	Summary   string              `json:"summary"`
+	DependsOn []string            `json:"depends_on"`
+	UsedBy    []string            `json:"used_by"`
+	Owned     map[string][]string `json:"owned"`
+}
+
+func names(rs []model.Ref) []string {
+	out := []string{}
+	for _, r := range rs {
+		out = append(out, r.Name)
+	}
+	return out
+}
+
+func unitInfo(m *model.Model, id string) (unit, bool) {
+	var u unit
+	switch {
+	case m.Module(id) != nil:
+		x := m.Module(id)
+		u = unit{ID: id, Kind: "module", Tier: x.Tier.Name, Path: x.Path, Summary: x.Summary, DependsOn: names(x.DependsOn)}
+	case m.Group(id) != nil:
+		x := m.Group(id)
+		u = unit{ID: id, Kind: "group", Tier: x.Tier.Name, Path: x.Path, Summary: x.Summary, DependsOn: names(x.DependsOn)}
+	case m.Member(id) != nil:
+		x := m.Member(id)
+		u = unit{ID: id, Kind: "member", Tier: x.Group.Tier.Name, Path: x.Path(), Summary: x.Summary, DependsOn: names(x.Group.DependsOn)}
+	default:
+		return u, false
+	}
+	u.UsedBy = []string{}
+	add := func(from string, deps []model.Ref) {
+		for _, d := range deps {
+			if d.Name == id {
+				u.UsedBy = append(u.UsedBy, from)
+			}
+		}
+	}
+	for _, x := range m.Modules {
+		add(x.ID, x.DependsOn)
+	}
+	for _, x := range m.Groups {
+		add(x.ID, x.DependsOn)
+	}
+	sort.Strings(u.UsedBy)
+	u.Owned = map[string][]string{}
+	own := func(kind, nodeID, in string) {
+		if in == id {
+			u.Owned[kind] = append(u.Owned[kind], nodeID)
+		}
+	}
+	for _, x := range m.Enums {
+		own("enums", x.ID, x.In.Name)
+	}
+	for _, x := range m.Consts {
+		own("consts", x.ID, x.In.Name)
+	}
+	for _, x := range m.Errors {
+		own("errors", x.ID, x.In.Name)
+	}
+	for _, x := range m.Types {
+		own("types", x.ID, x.In.Name)
+	}
+	for _, x := range m.Contracts {
+		own("contracts", x.ID, x.In.Name)
+	}
+	for _, x := range m.HandlerKinds {
+		own("handler_kinds", x.ID, x.In.Name)
+	}
+	for _, x := range m.EventKinds {
+		own("event_kinds", x.ID, x.In.Name)
+	}
+	for _, x := range m.Funcs {
+		own("funcs", x.ID, x.In.Name)
+	}
+	for _, x := range m.Flows {
+		own("flows", x.ID, x.In.Name)
+	}
+	return u, true
+}
+
+func draftTool(root string) (string, error) {
+	a, err := infer.Analyze(root)
+	if err != nil {
+		return "", err
+	}
+	rep, _ := json.MarshalIndent(a.Report, "", "  ")
+	return string(a.YAML) + "\n---\n" + string(rep), nil
+}
