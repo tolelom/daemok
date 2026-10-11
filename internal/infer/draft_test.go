@@ -76,3 +76,23 @@ func TestAssignIDs(t *testing.T) {
 		t.Fatalf("%v", got)
 	}
 }
+
+func TestBuildCycleSharesTier(t *testing.T) {
+	pkgs := []*pkg{
+		{dir: "a", imports: []string{"b"}},
+		{dir: "b", imports: []string{"a", "base"}},
+		{dir: "base"},
+		{dir: "c", imports: []string{"a"}},
+	}
+	d, rep := build("example.com/x", pkgs, nil)
+	tiers := map[string]int{}
+	for _, m := range d.Mods {
+		tiers[m.ID] = m.Tier
+	}
+	if tiers["base"] != 0 || tiers["a"] != 1 || tiers["b"] != 1 || tiers["c"] != 2 {
+		t.Fatalf("%v", tiers)
+	}
+	if !reflect.DeepEqual(rep.Cycles, [][]string{{"a", "b"}}) {
+		t.Fatalf("%v", rep.Cycles)
+	}
+}

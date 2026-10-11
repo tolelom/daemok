@@ -49,6 +49,16 @@ type Result struct {
 // Run은 designDir의 설계를 읽고 검사하고 생성해서 root의 파일과 대조한다.
 func Run(designDir, root string) Result {
 	m, diags := model.Load(designDir)
+	return run(m, diags, designDir, root)
+}
+
+// RunSources는 디스크가 아닌 설계 파일 내용으로 Run과 같은 일을 한다. 키는 진단 위치에 쓰는 파일 이름이다.
+func RunSources(files map[string][]byte, designDir, root string) Result {
+	m, diags := model.LoadSources(files)
+	return run(m, diags, designDir, root)
+}
+
+func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result {
 	if diags.HasErrors() {
 		diags.Sort()
 		return Result{Model: m, Diags: diags, Fatal: true}
