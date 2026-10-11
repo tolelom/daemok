@@ -26,7 +26,7 @@ Go 1.27 이상. 외부 의존성은 없다.
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |
 
-종료 코드는 0 통과, 1 문제 있음, 2 진행할 수 없음이다.
+`daemok version`은 버전과 빌드한 커밋을 출력한다. 종료 코드는 0 통과, 1 문제 있음, 2 진행할 수 없음이다.
 
 ## 화면
 
