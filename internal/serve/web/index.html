@@ -84,7 +84,9 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .k-event { --c: var(--k-event); } .k-register { --c: var(--k-register); }
 .kname { color: var(--c); font-weight: 600; font-size: 14px; }
 .legend { display: grid; gap: 2px; font-size: 13px; color: var(--ink-2); }
-.legend span { display: flex; align-items: center; gap: 8px; }
+.legend span, .legend label { display: flex; align-items: center; gap: 8px; }
+.kfilter label { cursor: pointer; }
+.kfilter input { margin: 0; accent-color: var(--accent); }
 .sw { display: inline-block; width: 24px; border-top: 2px solid var(--c); }
 .sw.dash { border-top-style: dashed; } .sw.dot { border-top-style: dotted; }
 
@@ -259,6 +261,7 @@ const COLS = ['reqs', 'actors', 'ifaces', 'exes', 'mods', 'groups', 'members', '
 const KEYKIND = { reqs: 'req', mods: 'mod', groups: 'grp', members: 'mem', enums: 'enum', consts: 'const', errors: 'err', types: 'type', contracts: 'contract', hks: 'hk', funcs: 'func', eks: 'ek', events: 'ev', flows: 'flow', actors: 'actor', ifaces: 'iface', exes: 'exe' };
 
 let S = null, M = null, B = null, meta = { version: 0 };
+const hiddenKinds = new Set();
 let view = 'map', current = '', flowSel = '', flowCompare = '', failAt = '', showAll = false, drawerOpen = null, mapFocus = '';
 
 function toMaps(v) {
@@ -358,8 +361,16 @@ function mapEdges() {
   }
   return [...out.values()];
 }
+// kindFilter는 이 설계에 있는 관계 종류만 개수와 함께 체크 상자로 보인다. 끈 종류는 지도에서 숨긴다.
+function kindFilter() {
+  const count = {};
+  mapEdges().forEach(e => { count[e.kind] = (count[e.kind] || 0) + 1; });
+  const kinds = Object.keys(KINDS).filter(k => count[k]);
+  if (!kinds.length) return '<p class="muted">관계선이 없다</p>';
+  return `<div class="legend kfilter">${kinds.map(k => `<label class="k-${k}"><input type="checkbox" data-kind="${k}" ${hiddenKinds.has(k) ? '' : 'checked'}><span class="sw ${KINDS[k].style}"></span>${KINDS[k].name} <span class="muted">${count[k]}</span></label>`).join('')}</div>`;
+}
 function mapPanel(id) {
-  const tail = `<hr>${legend(Object.keys(KINDS))}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 관계선 모두 보기</label>`;
+  const tail = `<hr>${kindFilter()}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 고른 종류의 관계선 모두 보기</label>`;
   const u = unitNode(id);
   if (!u) return `<p class="muted">모듈에 마우스를 올리면 연결이 여기 적힌다. 누르면 모듈 보기로 간다.</p>${tail}`;
   const es = mapEdges();
@@ -395,8 +406,8 @@ function renderMap() {
     const my = (y1 + y2) / 2;
     const d = Math.abs(y2 - y1) < 4 ? `M${x1},${y1} C${(x1 + x2) / 2},${y1 - 40} ${(x1 + x2) / 2},${y2 - 40} ${x2},${y2}` : `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
     const lbl = [...e.labels].slice(0, 2).join(', ') + (e.labels.size > 2 ? ` 외 ${e.labels.size - 2}` : '');
-    s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" marker-end="url(#ar-${e.kind})"/>`;
-    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}">${esc(lbl)}</text>`;
+    s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}" marker-end="url(#ar-${e.kind})"/>`;
+    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}">${esc(lbl)}</text>`;
   }
   for (const u of units) {
     const p = pos[u.id], st = unitSt(u.id), iss = worst(issuesFor(ownedKeys(u.id)));
@@ -415,7 +426,7 @@ function renderMap() {
     svg.classList.toggle('dim', !!id);
     const near = new Set();
     svg.querySelectorAll('.edge, .edge-label').forEach(el => {
-      const on = showAll || (id && (el.dataset.from === id || el.dataset.to === id));
+      const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id)));
       el.classList.toggle('show', !!on);
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
     });
@@ -425,6 +436,10 @@ function renderMap() {
     mapFocus = id || mapFocus;
     $('#mappanel').innerHTML = mapPanel(mapFocus);
     $('#showall').addEventListener('change', e => { showAll = e.target.checked; hi(null); });
+    $('#mappanel').querySelectorAll('[data-kind]').forEach(cb => cb.addEventListener('change', e => {
+      if (e.target.checked) hiddenKinds.delete(e.target.dataset.kind); else hiddenKinds.add(e.target.dataset.kind);
+      hi(null);
+    }));
   };
   svg.querySelectorAll('.unit').forEach(g => {
     const on = () => { hi(g.dataset.id); panel(g.dataset.id); };
