@@ -58,7 +58,15 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 	}
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return err
+			if p == root {
+				return err
+			}
+			// 하위 디렉토리 하나를 읽지 못해도 나머지는 분석한다.
+			skips = append(skips, Skip{rel(p), "읽을 수 없다: " + err.Error()})
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		if !d.IsDir() {
 			return nil

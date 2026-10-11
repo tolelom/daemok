@@ -2,8 +2,12 @@ package infer
 
 import (
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -49,5 +53,42 @@ func TestCollectRootPackage(t *testing.T) {
 	}
 	if len(pkgs) != 2 || pkgs[0].dir != "." || !pkgs[0].main || !reflect.DeepEqual(pkgs[0].imports, []string{"lib"}) {
 		t.Fatalf("%+v", pkgs[0])
+	}
+}
+
+func TestCollectSkipsUnreadableDir(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/u\n"), 0o644)
+	for _, d := range []string{"ok", "locked"} {
+		os.MkdirAll(filepath.Join(root, d), 0o755)
+		os.WriteFile(filepath.Join(root, d, "x.go"), []byte("package "+d+"\n"), 0o644)
+	}
+	lock(t, filepath.Join(root, "locked"))
+	pkgs, skips, err := collect(root, "example.com/u")
+	if err != nil {
+		t.Fatalf("폴더 하나 때문에 전체가 실패했다: %v", err)
+	}
+	if len(pkgs) != 1 || pkgs[0].dir != "ok" {
+		t.Fatalf("%+v", pkgs)
+	}
+	if len(skips) != 1 || skips[0].Path != "locked" || !strings.HasPrefix(skips[0].Reason, "읽을 수 없다") {
+		t.Fatalf("%+v", skips)
+	}
+}
+
+// lock은 dir을 읽을 수 없게 하고 테스트가 끝나면 되돌린다.
+func lock(t *testing.T, dir string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		if out, err := exec.Command("icacls", dir, "/deny", "*S-1-1-0:(RX)").CombinedOutput(); err != nil {
+			t.Skipf("icacls: %v %s", err, out)
+		}
+		t.Cleanup(func() { exec.Command("icacls", dir, "/remove:d", "*S-1-1-0").Run() })
+	} else {
+		os.Chmod(dir, 0)
+		t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	}
+	if _, err := os.ReadDir(dir); err == nil {
+		t.Skip("이 환경에서는 디렉토리를 읽을 수 없게 만들 수 없다")
 	}
 }
