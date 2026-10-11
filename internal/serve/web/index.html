@@ -39,6 +39,18 @@ nav.tabs button[aria-current="true"] { color: var(--ink); border-bottom-color: v
 .diagbtn { margin-left: auto; border: 0; background: none; cursor: pointer; font-size: 14px; color: var(--ink-3); display: flex; gap: 14px; padding: 4px 0; }
 .diagbtn:hover span { text-decoration: underline; text-underline-offset: 3px; }
 .diagbtn .e.on { color: var(--err); } .diagbtn .w.on { color: var(--warn); } .diagbtn .n.on { color: var(--info); }
+.projbtn { border: 0; background: none; padding: 0; cursor: pointer; font: 600 14px var(--mono); color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+.projbtn:hover { color: var(--accent); }
+.brand span.modebadge { color: var(--warn); }
+.toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; background: var(--bg-3); border: 1px solid var(--rule-2); padding: 10px 14px; border-radius: 6px; font-size: 14px; }
+pre.yaml { background: var(--bg-2); border: 1px solid var(--rule); padding: 14px 16px; overflow-x: auto; font: 13px/1.6 var(--mono); }
+.draftbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 8px; }
+.draftbar code { font: 13px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
+.draftbar button, #openform button { border: 1px solid var(--rule-2); background: var(--bg-3); padding: 4px 12px; border-radius: 4px; cursor: pointer; }
+.draftbar button.primary { border-color: var(--accent); color: var(--accent); }
+#openform { display: flex; gap: 8px; }
+#openform input { flex: 1; min-width: 0; font: 14px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule-2); padding: 5px 8px; border-radius: 4px; }
+#openerr { color: var(--err); margin: -8px 0 0; min-height: 1.2em; font-size: 13px; }
 
 /* 판 */
 .page { display: block; }
@@ -214,12 +226,13 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
 <body>
 <header class="top">
   <div class="bar">
-    <div class="brand"><b>daemok</b><span id="status">불러오는 중</span></div>
+    <div class="brand"><b>daemok</b><button type="button" class="projbtn" id="projbtn" aria-label="프로젝트 열기"></button><span id="modebadge" class="modebadge" hidden>분석 모드 · 설계 파일 없음</span><span id="status">불러오는 중</span></div>
     <nav class="tabs" aria-label="보기">
       <button type="button" data-view="map">지도</button>
       <button type="button" data-view="module">모듈</button>
       <button type="button" data-view="flow">흐름</button>
       <button type="button" data-view="reqs">요구사항</button>
+      <button type="button" data-view="draft" hidden>초안</button>
     </nav>
     <button type="button" class="diagbtn" id="issuesbtn" aria-label="진단 목록 열기"></button>
   </div>
@@ -298,9 +311,17 @@ function legend(kinds) {
 /* ---------- 머리 ---------- */
 function renderHeader() {
   const t = new Date(S.updated);
-  $('#status').textContent = [S.design, t.toLocaleTimeString(), S.fatal ? '설계 파일을 읽지 못했다' : '', meta.hasBase ? '' : '기준 없음'].filter(Boolean).join('  ');
+  $('#projbtn').textContent = (S.root || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '프로젝트 열기';
+  $('#projbtn').title = S.root || '';
+  $('#modebadge').hidden = S.mode !== 'analyze';
+  const status = S.mode === 'none' ? [S.problem] : [t.toLocaleTimeString(), S.fatal ? '설계 파일을 읽지 못했다' : '', S.mode === 'check' && !meta.hasBase ? '기준 없음' : ''];
+  $('#status').textContent = status.filter(Boolean).join('  ');
   $('#status').className = S.fatal ? 'bad' : '';
-  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-current', String(b.dataset.view === view)));
+  const views = VIEWS[S.mode] || VIEWS.check;
+  document.querySelectorAll('nav.tabs button').forEach(b => {
+    b.hidden = !views.includes(b.dataset.view);
+    b.setAttribute('aria-current', String(b.dataset.view === view));
+  });
   const c = { err: 0, warn: 0, info: 0 };
   S.issues.forEach(i => c[i.lv]++);
   $('#issuesbtn').innerHTML = [['e', 'err'], ['w', 'warn'], ['n', 'info']].map(([cl, lv]) => `<span class="${cl} ${c[lv] ? 'on' : ''}">${SEV[lv]} ${c[lv]}</span>`).join('');
@@ -651,10 +672,76 @@ function openIssues() {
 }
 function closeDrawer() { drawerOpen = null; $('#drawer').innerHTML = ''; }
 
+/* ---------- 초안 ---------- */
+function renderDraft() {
+  setSide('');
+  const d = S.draft, r = d.report;
+  const skipped = (r.skipped || []).map(x => `<li><span class="id">${esc(x.path)}</span> <span class="muted">${esc(x.reason)}</span></li>`).join('') || '<li class="muted">없음</li>';
+  const fan = (r.fanIn || []).map(x => `${unitLink(x.id)} ${x.count}`).join(', ') || '<span class="muted">없음</span>';
+  const cycles = (r.cycles || []).map(c => `<li>${c.map(unitLink).join(', ')}</li>`).join('');
+  $('#main').innerHTML = `<h1 class="plain">초안</h1>
+<p class="sub">설계 파일이 없어 코드의 패키지와 import에서 추정했다. tier 이름과 묶음은 사람이 정한다.</p>
+<dl class="facts"><dt>패키지</dt><dd>${r.packages}</dd><dt>모듈</dt><dd>${r.modules}</dd><dt>실행 단위</dt><dd>${r.executables}</dd><dt>많이 쓰이는 패키지</dt><dd>${fan}</dd></dl>
+${cycles ? `<h3 style="margin-top:22px">서로 import하는 패키지</h3><ul>${cycles}</ul>` : ''}
+<h3 style="margin-top:22px">건너뛴 것</h3><ul>${skipped}</ul>
+<div class="draftbar"><button type="button" class="primary" id="savedraft">design/에 저장</button><code>${esc(d.command)}</code><button type="button" id="copycmd">명령 복사</button></div>
+<p id="savemsg" class="muted"></p>
+<pre class="yaml">${esc(d.yaml)}</pre>`;
+}
+
+/* ---------- 프로젝트 ---------- */
+let autoOpened = false;
+async function post(url, body) {
+  try {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => ({}));
+    return r.ok ? { ok: true, ...j } : { ok: false, error: j.error || `요청이 거부되었다 (${r.status})` };
+  } catch (e) { return { ok: false, error: '서버에 연결할 수 없다' }; }
+}
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+async function openProjects() {
+  drawerOpen = '#projects';
+  let p = { recent: [], workspace: [], canOpen: false };
+  try { p = await (await fetch('/api/projects', { cache: 'no-store' })).json(); } catch (e) {}
+  const item = (path, ok) => `<button type="button" data-openpath="${esc(path)}" ${ok ? '' : 'disabled'}><span class="id">${esc(path)}</span></button>`;
+  const form = p.canOpen
+    ? `<form id="openform"><input id="openpath" type="text" placeholder="E:\\dev\\projects\\tolchain" autocomplete="off" spellcheck="false" aria-label="프로젝트 경로"><button type="submit">열기</button></form><p id="openerr"></p>`
+    : `<p class="muted">루프백이 아닌 주소로 띄워서 프로젝트를 열 수 없다</p>`;
+  $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="프로젝트 열기"><div class="head"><h2>프로젝트 열기</h2><button type="button" class="close" data-close="1">닫기</button></div>
+${form}
+<div><h3>최근</h3><div class="issuelist">${p.recent.map(x => item(x.path, x.exists && p.canOpen)).join('') || '<span class="muted">없음</span>'}</div></div>
+${p.workspace.length ? `<div><h3>작업 폴더</h3><div class="issuelist">${p.workspace.map(x => item(x, p.canOpen)).join('')}</div></div>` : ''}
+</aside>`;
+  ($('#openpath') || $('#drawer .close')).focus();
+}
+async function openProject(path) {
+  const res = await post('/api/open', { path });
+  if (!res.ok) { const e = $('#openerr'); if (e) e.textContent = res.error; else toast(res.error); return; }
+  closeDrawer();
+  view = 'map'; current = ''; flowSel = ''; flowCompare = ''; failAt = ''; mapFocus = '';
+  history.replaceState(null, '', '#map');
+  await load();
+}
+async function saveDraft() {
+  const btn = $('#savedraft'); if (btn) btn.disabled = true;
+  const res = await post('/api/init', {});
+  if (!res.ok) { $('#savemsg').textContent = res.error; if (btn) btn.disabled = false; return; }
+  toast(`${res.path}을 만들었다`);
+  await load();
+}
+
 /* ---------- 이동 ---------- */
+const VIEWS = { check: ['map', 'module', 'flow', 'reqs'], analyze: ['map', 'module', 'draft'], none: [] };
 function render() {
+  if (!(VIEWS[S.mode] || VIEWS.check).includes(view)) view = 'map';
   renderHeader();
-  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs })[view]();
+  if (S.mode === 'none') { setSide(''); $('#main').innerHTML = `<p class="muted">열 프로젝트를 고른다. 설계 파일(design/*.yaml)이나 go.mod가 있는 폴더를 연다.</p>`; return; }
+  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs, draft: renderDraft })[view]();
 }
 function go(v, arg) {
   view = v;
@@ -669,6 +756,10 @@ function go(v, arg) {
 const toggleFail = id => { failAt = failAt === id ? '' : id; render(); };
 document.addEventListener('click', e => {
   const t = e.target;
+  if (t.closest('#projbtn')) return openProjects();
+  const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
+  if (t.closest('#savedraft')) return saveDraft();
+  if (t.closest('#copycmd')) { navigator.clipboard.writeText(S.draft.command).then(() => toast('명령을 복사했다'), () => toast('복사할 수 없다')); return; }
   const tab = t.closest('[data-view]'); if (tab) return go(tab.dataset.view);
   if (t.closest('#issuesbtn')) return openIssues();
   if (t.closest('[data-close]')) return closeDrawer();
@@ -678,6 +769,11 @@ document.addEventListener('click', e => {
   const fp = t.closest('[data-flowpick]'); if (fp) { flowSel = fp.dataset.flowpick; failAt = ''; return go('flow'); }
   if (t.closest('[data-clearfail]')) { failAt = ''; return render(); }
   const fa = t.closest('[data-fail]'); if (fa) return toggleFail(fa.dataset.fail);
+});
+document.addEventListener('submit', e => {
+  if (e.target.id !== 'openform') return;
+  e.preventDefault();
+  openProject($('#openpath').value.trim());
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && drawerOpen) closeDrawer();
@@ -693,11 +789,12 @@ async function load() {
   M = toMaps(st.model);
   B = st.hasBase ? toMaps(st.base) : M;
   render();
-  if (drawerOpen === '#issues') openIssues(); else if (drawerOpen) openDrawer(drawerOpen);
+  if (drawerOpen === '#issues') openIssues(); else if (drawerOpen && drawerOpen[0] !== '#') openDrawer(drawerOpen);
+  if (S.mode === 'none' && !autoOpened) { autoOpened = true; openProjects(); }
 }
 {
   const [v, arg] = location.hash.slice(1).split('/');
-  if (['map', 'module', 'flow', 'reqs'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
+  if (['map', 'module', 'flow', 'reqs', 'draft'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
 }
 const es = new EventSource('/api/events');
 es.onmessage = e => { if (+e.data !== meta.version) load(); };
