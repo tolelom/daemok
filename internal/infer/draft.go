@@ -469,7 +469,7 @@ func external(requires []string, pkgs []*pkg, d *Draft) []External {
 	}
 	out := make([]External, 0, len(requires))
 	for _, r := range requires {
-		var ids []string
+		ids := []string{}
 		for id := range users[r] {
 			ids = append(ids, id)
 		}

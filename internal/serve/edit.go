@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/tolelom/daemok/internal/edit"
 	"github.com/tolelom/daemok/internal/model"
@@ -38,6 +40,9 @@ func (s *Server) editDesign(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusForbidden, "루프백 주소로 띄운 대조 모드에서만 고칠 수 있다")
 		return
 	}
+	// 버전 확인부터 쓰기까지 한 번에 하나만 한다. 같은 버전의 두 번째 요청은 409가 된다.
+	s.editMu.Lock()
+	defer s.editMu.Unlock()
 	var req struct {
 		Op      string `json:"op"`
 		ID      string `json:"id"`
@@ -123,9 +128,23 @@ func writeAtomic(path string, b []byte) error {
 		return err
 	}
 	os.Chmod(tmp.Name(), mode)
-	if err := os.Rename(tmp.Name(), path); err != nil {
+	if err := renameRetry(tmp.Name(), path); err != nil {
 		os.Remove(tmp.Name())
 		return err
 	}
 	return nil
+}
+
+// renameRetry는 Windows에서 다른 쪽(감시, 에디터, 백신)이 대상을 잠깐 열고 있어
+// 이름 바꾸기가 실패하면 짧게 기다렸다 다시 한다.
+func renameRetry(from, to string) error {
+	err := os.Rename(from, to)
+	if runtime.GOOS != "windows" {
+		return err
+	}
+	for wait := time.Millisecond; err != nil && wait < time.Second; wait *= 2 {
+		time.Sleep(wait)
+		err = os.Rename(from, to)
+	}
+	return err
 }

@@ -9,3 +9,5 @@ require (
 )
 
 require github.com/google/uuid v1.6.0
+
+require github.com/unused/lib v1.0.0

@@ -62,6 +62,7 @@ type Server struct {
 	subs    map[chan int]bool
 	opts    Options
 	mode    string // 마지막으로 낸 상태의 모드
+	editMu  sync.Mutex
 }
 
 func New(design, root string) *Server {

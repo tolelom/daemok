@@ -122,6 +122,7 @@ func TestExternalRequires(t *testing.T) {
 		{Module: "github.com/gofiber/fiber/v2", Users: []string{"api"}},
 		{Module: "github.com/google/uuid", Users: []string{"api", "db"}},
 		{Module: "github.com/lib/pq", Users: []string{"db"}},
+		{Module: "github.com/unused/lib", Users: []string{}}, // 화면이 users.length를 읽으므로 null이 아니라 빈 배열
 	}
 	if !reflect.DeepEqual(a.Report.External, want) {
 		t.Fatalf("%+v", a.Report.External)
