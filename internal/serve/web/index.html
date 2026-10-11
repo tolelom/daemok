@@ -32,6 +32,8 @@ header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border
 .brand b { font: 700 16px var(--mono); }
 .brand span { color: var(--ink-3); font-size: 13px; overflow-wrap: anywhere; }
 .brand span.bad { color: var(--err); }
+.brand .chgbtn { font: inherit; font-family: var(--sans); font-size: 13px; color: var(--chg); }
+.chglist { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
 nav.tabs { display: flex; gap: 22px; align-self: stretch; }
 nav.tabs button { border: 0; background: none; padding: 0; cursor: pointer; color: var(--ink-2); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 nav.tabs button:hover { color: var(--ink); }
@@ -344,9 +346,9 @@ function renderHeader() {
   $('#projbtn').title = S.root || '';
   $('#modebadge').hidden = S.mode !== 'analyze';
   const changed = S.mode === 'check' && meta.hasBase ? changeCount() : 0;
-  const base = S.mode !== 'check' ? '' : !meta.hasBase ? '기준 없음' : changed ? `HEAD 대비 변경 ${changed}개` : 'HEAD와 같음';
-  const status = S.mode === 'none' ? [S.problem] : [t.toLocaleTimeString(), S.fatal ? '설계 파일을 읽지 못했다' : '', base];
-  $('#status').textContent = status.filter(Boolean).join('  ');
+  const base = S.mode !== 'check' ? '' : !meta.hasBase ? '기준 없음' : changed ? `<button type="button" class="link chgbtn" id="changesbtn">HEAD 대비 변경 ${changed}개</button>` : 'HEAD와 같음';
+  const status = S.mode === 'none' ? [esc(S.problem)] : [esc(t.toLocaleTimeString()), S.fatal ? '설계 파일을 읽지 못했다' : '', base];
+  $('#status').innerHTML = status.filter(Boolean).join('  ');
   $('#status').className = S.fatal ? 'bad' : '';
   const views = VIEWS[S.mode] || VIEWS.check;
   document.querySelectorAll('nav.tabs button').forEach(b => {
@@ -754,6 +756,21 @@ function openIssues() {
   $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="진단"><div class="head"><h2>진단</h2><button type="button" class="close" data-close="1">닫기</button></div>${sec('design', '설계 검사')}${sec('code', '코드 대조')}</aside>`;
   $('#drawer .close').focus();
 }
+// openChanges는 기준(HEAD) 대비 추가·수정·삭제된 노드를 상태별로 보인다.
+function openChanges() {
+  drawerOpen = '#changes';
+  const by = { add: [], chg: [], rem: [] };
+  for (const c of COLS) for (const id of new Set([...Object.keys(M[c]), ...Object.keys(B[c])])) { const st = stOf(c, id); if (st) by[st].push([c, id]); }
+  const label = { reqs: '요구사항', actors: '액터', ifaces: '인터페이스', exes: '실행 단위', mods: '모듈', groups: '그룹', members: '그룹 멤버', enums: 'enum', consts: '상수', errors: '에러', types: '타입', contracts: '계약', hks: '핸들러 종류', funcs: '함수', eks: '이벤트 종류', events: '이벤트', flows: '흐름' };
+  const item = (st, [c, id]) => {
+    const k = KEYKIND[c];
+    const link = st === 'rem' ? `<span class="id">${esc(id)}</span>` : ['mod', 'grp', 'mem'].includes(k) ? unitLink(id) : nodeLink(k, id);
+    return `<li><span class="muted">${label[c] || c}</span> ${link}</li>`;
+  };
+  const sec = st => by[st].length ? `<div><h3><span class="st ${st}">${ST[st]}</span> ${by[st].length}</h3><ul class="chglist">${by[st].map(x => item(st, x)).join('')}</ul></div>` : '';
+  $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="HEAD 대비 변경"><div class="head"><h2>HEAD 대비 변경</h2><button type="button" class="close" data-close="1">닫기</button></div><p class="muted">작업 중인 설계 파일과 마지막 커밋의 차이다. 커밋하면 사라진다.</p>${sec('add')}${sec('chg')}${sec('rem')}</aside>`;
+  $('#drawer .close').focus();
+}
 function closeDrawer() { drawerOpen = null; $('#drawer').innerHTML = ''; }
 
 /* ---------- 초안 ---------- */
@@ -843,6 +860,7 @@ const toggleFail = id => { failAt = failAt === id ? '' : id; render(); };
 document.addEventListener('click', e => {
   const t = e.target;
   if (t.closest('#projbtn')) return openProjects();
+  if (t.closest('#changesbtn')) return openChanges();
   const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('경로를 복사했다'), () => toast('복사할 수 없다')); return; }
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
@@ -881,7 +899,7 @@ async function load() {
   M = toMaps(st.model);
   B = st.hasBase ? toMaps(st.base) : M;
   render();
-  if (drawerOpen === '#issues') openIssues(); else if (drawerOpen && drawerOpen[0] !== '#') openDrawer(drawerOpen);
+  if (drawerOpen === '#issues') openIssues(); else if (drawerOpen === '#changes') openChanges(); else if (drawerOpen && drawerOpen[0] !== '#') openDrawer(drawerOpen);
   if (S.mode === 'none' && !autoOpened) { autoOpened = true; openProjects(); }
 }
 {
