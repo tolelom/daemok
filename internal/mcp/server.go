@@ -17,7 +17,13 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
+// defaultProtocol은 지원하는 MCP 프로토콜 중 최신이다. 클라이언트가 모르는 버전을 요청하면 이것으로 답한다.
 const defaultProtocol = "2025-06-18"
+
+var protocols = map[string]bool{"2025-06-18": true, "2025-03-26": true, "2024-11-05": true}
+
+// maxLine은 메시지 한 줄의 최대 바이트다. 넘는 줄은 그 줄만 거부한다.
+var maxLine = 16 << 20
 
 // Server는 기본 설계 디렉토리와 코드 루트를 가진다. 도구 인자로 바꿀 수 있다.
 type Server struct {
@@ -48,12 +54,25 @@ type response struct {
 
 // Serve는 r가 끝날 때까지 한 줄에 하나씩 요청을 읽고 w에 응답을 쓴다. 알림(id 없음)에는 응답하지 않는다.
 func (s *Server) Serve(r io.Reader, w io.Writer) error {
-	sc := bufio.NewScanner(r)
-	sc.Buffer(make([]byte, 0, 64*1024), 16<<20)
+	br := bufio.NewReader(r)
 	enc := json.NewEncoder(w)
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		if line == "" {
+	for {
+		raw, tooLong, err := readLine(br)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if tooLong {
+			enc.Encode(response{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{-32700, "메시지가 너무 길다"}})
+		}
+		line := strings.TrimSpace(string(raw))
+		if line == "" || tooLong {
+			if err == io.EOF {
+				return nil
+			}
+			continue
+		}
+		if line[0] == '[' {
+			enc.Encode(response{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{-32600, "배치 요청은 받지 않는다"}})
 			continue
 		}
 		var req request
@@ -72,8 +91,27 @@ func (s *Server) Serve(r io.Reader, w io.Writer) error {
 		if err := enc.Encode(resp); err != nil {
 			return err
 		}
+		if err == io.EOF {
+			return nil
+		}
 	}
-	return sc.Err()
+}
+
+// readLine은 줄바꿈까지 한 줄을 읽는다. maxLine을 넘으면 나머지를 버리고 tooLong을 준다.
+func readLine(br *bufio.Reader) (line []byte, tooLong bool, err error) {
+	for {
+		chunk, err := br.ReadSlice('\n')
+		if !tooLong {
+			if len(line)+len(chunk) > maxLine {
+				tooLong, line = true, nil
+			} else {
+				line = append(line, chunk...)
+			}
+		}
+		if err != bufio.ErrBufferFull {
+			return line, tooLong, err
+		}
+	}
 }
 
 func (s *Server) handle(req request) (any, *rpcError) {
@@ -83,7 +121,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			ProtocolVersion string `json:"protocolVersion"`
 		}
 		json.Unmarshal(req.Params, &p)
-		if p.ProtocolVersion == "" {
+		if !protocols[p.ProtocolVersion] {
 			p.ProtocolVersion = defaultProtocol
 		}
 		return map[string]any{

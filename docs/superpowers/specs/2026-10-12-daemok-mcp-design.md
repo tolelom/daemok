@@ -12,18 +12,20 @@
 
 | 메서드 | 응답 |
 |---|---|
-| `initialize` | `protocolVersion`(요청의 값, 없으면 `2025-06-18`), `capabilities.tools`, `serverInfo`(`daemok`, 버전) |
+| `initialize` | `protocolVersion`(요청한 값이 지원하는 버전 `2025-06-18`, `2025-03-26`, `2024-11-05` 중 하나면 그 값, 아니면 `2025-06-18`), `capabilities.tools`, `serverInfo`(`daemok`, 버전) |
 | `notifications/initialized` 등 알림 | 응답 없음 |
 | `ping` | 빈 결과 |
 | `tools/list` | 아래 도구 |
 | `tools/call` | 도구 결과(`content`의 text 하나). 도구 실행 실패는 `isError: true` |
 | 그 밖 | JSON-RPC 오류 -32601 |
 
-알 수 없는 도구와 잘못된 인자는 JSON-RPC 오류 -32602입니다.
+알 수 없는 도구와 잘못된 인자는 JSON-RPC 오류 -32602입니다. 배치(JSON 배열)는 받지 않고 -32600을 줍니다. 16MB를 넘는 줄은 그 줄만 -32700으로 거부하고 다음 줄을 계속 읽습니다.
 
 ## 도구
 
 모두 읽기 전용입니다. 파일 쓰기는 CLI와 화면만 합니다.
+
+도구 인자의 `design`, `root`는 제한하지 않습니다. 서버는 클라이언트를 띄운 사용자의 권한으로 로컬에서 돌고, 클라이언트가 여러 프로젝트를 오가며 경로를 넘기기 때문입니다. 그래서 클라이언트가 넘긴 디렉토리의 `*.yaml` 원문을 그대로 돌려줄 수 있습니다.
 
 | 도구 | 인자 | 결과 |
 |---|---|---|
@@ -35,6 +37,6 @@
 
 | 대상 | 확인 |
 |---|---|
-| 프로토콜 | initialize, initialized 알림에 응답 없음, ping, tools/list, 없는 메서드 -32601, 없는 도구 -32602, 깨진 JSON -32700 |
+| 프로토콜 | initialize와 버전 협상, initialized 알림에 응답 없음, ping, tools/list, 없는 메서드 -32601, 없는 도구 -32602, 깨진 JSON -32700, 배치 -32600, 너무 긴 줄 뒤에도 계속 응답 |
 | 도구 | 임시 프로젝트에서 세 도구의 결과 |
 | 명령 | `daemok mcp`가 표준 입력이 끝나면 0으로 끝남 |
