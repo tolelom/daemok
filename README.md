@@ -4,7 +4,7 @@
 
 이름은 대목(大木)에서 왔다. 한옥에서 설계부터 시공까지 맡는 목수를 가리킨다.
 
-설계 문서는 [docs/design](docs/design/)에, 설계 파일 형식은 [모델](docs/design/01-model.md)에 있다.
+설계 문서는 [docs/design](docs/design/)에, 설계 파일 형식은 [모델](docs/design/01-model.md)에 있다. 정하지 않은 것과 미룬 작업은 [미결](docs/design/04-open-items.md)에 있다.
 
 ## 설치
 
