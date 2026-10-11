@@ -10,7 +10,7 @@ import (
 const usage = `사용법:
   daemok check [--design DIR] [--root DIR] [--strict]
   daemok gen   [--design DIR] [--root DIR] [--dry-run]
-  daemok init  [--root DIR] [--design DIR]
+  daemok init  [--root DIR] [--design DIR] [--dry-run]
   daemok serve [--design DIR] [--root DIR] [--addr HOST:PORT] [--workspace DIR]
 `
 

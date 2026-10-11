@@ -12,12 +12,13 @@ import (
 )
 
 // runInit은 설계 파일이 없는 Go 모듈의 코드에서 초안을 만들어 설계 디렉토리에 쓴다.
-// 이미 설계 파일이 있으면 쓰지 않고 1, Go 모듈이 아니거나 쓰지 못하면 2다.
+// 이미 설계 파일이 있으면 쓰지 않고 1, Go 모듈이 아니거나 쓰지 못하면 2다. --dry-run은 쓰지 않고 출력만 한다.
 func runInit(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	design := fs.String("design", "", "설계 디렉토리 (기본 <root>/design)")
 	root := fs.String("root", ".", "코드 루트")
+	dryRun := fs.Bool("dry-run", false, "쓰지 않고 초안과 분석 메모만 출력한다")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -29,6 +30,12 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "분석할 수 없다: %v\n", err)
 		return 2
+	}
+	if *dryRun {
+		stdout.Write(a.YAML)
+		fmt.Fprintln(stdout)
+		printReport(stdout, a.Report)
+		return 0
 	}
 	p, err := infer.Write(dir, a)
 	switch {

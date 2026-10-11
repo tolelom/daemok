@@ -41,3 +41,20 @@ func TestInitNotModule(t *testing.T) {
 		t.Fatal(errb.String())
 	}
 }
+
+func TestInitDryRun(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/demo\n"), 0o644)
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "c.go"), []byte("package core\n"), 0o644)
+	var out, errb bytes.Buffer
+	if code := run([]string{"init", "--root", root, "--dry-run"}, &out, &errb); code != 0 {
+		t.Fatalf("%d %s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "core: { tier: tier0 }") || !strings.Contains(out.String(), "패키지 1, 모듈 1") {
+		t.Fatal(out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, "design")); err == nil {
+		t.Fatal("--dry-run은 쓰지 않는다")
+	}
+}
