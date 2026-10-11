@@ -216,3 +216,17 @@ tolchain `feat/daemok` 브랜치(기준 `main` `29c1d3a`)에 형식 v0.4 설계 
 | 합계 | 355 | 124 | 34% |
 
 설계가 거의 덮는 곳은 이벤트와 tx 모듈이고, 덮지 않는 곳은 저장소(`storage`), 네트워크 프로토콜(`network`의 메시지·피어), RPC, 지갑, 설정이다.
+
+## 코드에서 만든 초안과의 비교
+
+`main` `29c1d3a`의 복사본에서 `daemok init`이 만든 초안과 이 문서의 설계 파일(`internal/model/testdata/tolchain/design/tolchain.yaml`)을 모듈 단위로 비교한다. 초안의 `daemok check`는 오류 0, 경고 1(어느 실행 단위에도 없는 모듈 `testutil`)이다.
+
+| 항목 | 세는 규칙 | 수 | 모듈 |
+|---|---|---|---|
+| tier가 다른 모듈 | 초안의 층 번호와 손으로 쓴 설계의 tier 순번(foundation 0부터 service 4까지)이 다른 모듈. 그룹 멤버 제외 | 6 | `config`, `network`, `wallet`(service, 초안 2층), `vm`(execution, 초안 2층), `indexer`(persistence, 초안 3층), `consensus`(service, 초안 3층) |
+| 그룹으로 묶을 패키지 | 손으로 쓴 설계에서 그룹 멤버인 패키지 | 8 | `vm/modules/*` 8개 |
+| ID가 다른 모듈 | 같은 경로인데 ID가 다른 모듈 | 0 | |
+| 초안에만 있는 모듈 | 손으로 쓴 설계에 없는 패키지 | 1 | `internal/testutil` |
+
+- 모듈의 `depends_on`은 13개 모두 손으로 쓴 설계와 같다.
+- tier가 다른 6개는 모두 초안 쪽이 같거나 낮은 층 수에 놓여 의존 방향은 어긋나지 않는다. 손으로 쓴 tier는 의존 깊이가 아니라 역할(persistence, execution, service)로 나뉜다.
