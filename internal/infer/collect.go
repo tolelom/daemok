@@ -25,6 +25,7 @@ type pkg struct {
 	dir     string
 	main    bool
 	imports []string // 같은 모듈 안의 패키지 디렉토리, 정렬
+	ext     []string // 표준 라이브러리가 아닌 다른 모듈의 import 경로, 정렬
 	doc     string   // 패키지 doc 주석의 첫 문장
 }
 
@@ -35,17 +36,42 @@ type Skip struct {
 }
 
 func modulePath(root string) (string, error) {
+	module, _, err := readGoMod(root)
+	return module, err
+}
+
+// readGoMod는 go.mod의 module 경로와 직접 require(// indirect가 아닌 것)를 준다.
+func readGoMod(root string) (module string, requires []string, err error) {
 	src, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
-		return "", ErrNotModule
+		return "", nil, ErrNotModule
 	}
+	inBlock := false
 	for _, line := range strings.Split(string(src), "\n") {
-		f := strings.Fields(line)
-		if len(f) >= 2 && f[0] == "module" {
-			return strings.Trim(f[1], `"`), nil
+		code, comment, _ := strings.Cut(line, "//")
+		f := strings.Fields(code)
+		switch {
+		case len(f) >= 2 && f[0] == "module":
+			module = strings.Trim(f[1], `"`)
+		case len(f) >= 2 && f[0] == "require" && f[1] == "(":
+			inBlock = true
+		case inBlock && len(f) == 1 && f[0] == ")":
+			inBlock = false
+		case len(f) >= 3 && f[0] == "require", inBlock && len(f) >= 2:
+			if strings.TrimSpace(comment) == "indirect" {
+				continue
+			}
+			if f[0] == "require" {
+				f = f[1:]
+			}
+			requires = append(requires, strings.Trim(f[0], `"`))
 		}
 	}
-	return "", fmt.Errorf("go.mod에 module 줄이 없다")
+	if module == "" {
+		return "", nil, fmt.Errorf("go.mod에 module 줄이 없다")
+	}
+	sort.Strings(requires)
+	return module, requires, nil
 }
 
 func collect(root, module string) ([]*pkg, []Skip, error) {
@@ -105,6 +131,11 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 				case strings.HasPrefix(ip, module+"/"):
 					dep = strings.TrimPrefix(ip, module+"/")
 				default:
+					// 첫 경로 요소에 점이 없으면 표준 라이브러리다.
+					if first, _, _ := strings.Cut(ip, "/"); strings.Contains(first, ".") && !seen["ext:"+ip] {
+						seen["ext:"+ip] = true
+						pk.ext = append(pk.ext, ip)
+					}
 					continue
 				}
 				if dep != pk.dir && !seen[dep] {
@@ -114,6 +145,7 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 			}
 		}
 		sort.Strings(pk.imports)
+		sort.Strings(pk.ext)
 		pkgs = append(pkgs, pk)
 		return nil
 	})

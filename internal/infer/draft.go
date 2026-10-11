@@ -53,6 +53,14 @@ type Report struct {
 	Cycles [][]string `json:"cycles"`
 	// GroupCandidates는 그룹으로 묶을 만한 형제 패키지다. 그룹은 핸들러 종류(L3)가 있어야 해서 초안에 넣지 않고 제안만 한다.
 	GroupCandidates []GroupCandidate `json:"groupCandidates"`
+	// External은 go.mod의 직접 require와 그 모듈을 import하는 모듈·실행 단위다.
+	External []External `json:"external"`
+}
+
+// External은 외부 모듈 하나와 그걸 쓰는 모듈·실행 단위 ID다.
+type External struct {
+	Module string   `json:"module"`
+	Users  []string `json:"users"`
 }
 
 // GroupCandidate는 같은 부모 디렉토리 아래 형제 모듈 3개 이상이 형제 밖의 모듈을 공통으로 쓰는 묶음이다.
@@ -72,7 +80,7 @@ type Analysis struct {
 
 // Analyze는 root의 go.mod와 Go 패키지에서 초안을 만든다. 파일을 쓰지 않는다.
 func Analyze(root string) (*Analysis, error) {
-	module, err := modulePath(root)
+	module, requires, err := readGoMod(root)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +89,7 @@ func Analyze(root string) (*Analysis, error) {
 		return nil, fmt.Errorf("코드를 읽을 수 없다: %w", err)
 	}
 	d, rep := build(module, pkgs, skips)
+	rep.External = external(requires, pkgs, d)
 	return &Analysis{Draft: d, YAML: Render(d), Report: rep}, nil
 }
 
@@ -409,5 +418,55 @@ func groupCandidates(libDirs []string, libIDs map[string]string, mods []Mod) []G
 		out = append(out, GroupCandidate{Path: parent, Members: members, Common: common, Exceptions: exceptions})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out
+}
+
+// external은 require마다 그 모듈(또는 하위 패키지)을 import하는 초안 노드를 모은다.
+// require가 겹치면(a/b와 a/b/c) 가장 긴 것에 붙인다.
+func external(requires []string, pkgs []*pkg, d *Draft) []External {
+	if len(requires) == 0 {
+		return nil
+	}
+	idOf := map[string]string{}
+	for _, m := range d.Mods {
+		dir := m.Path
+		if dir == "" {
+			dir = m.ID
+		}
+		idOf[dir] = m.ID
+	}
+	for _, e := range d.Exes {
+		idOf[e.Dir] = e.ID
+	}
+	users := map[string]map[string]bool{}
+	for _, p := range pkgs {
+		id, ok := idOf[p.dir]
+		if !ok {
+			continue
+		}
+		for _, ip := range p.ext {
+			best := ""
+			for _, r := range requires {
+				if (ip == r || strings.HasPrefix(ip, r+"/")) && len(r) > len(best) {
+					best = r
+				}
+			}
+			if best != "" {
+				if users[best] == nil {
+					users[best] = map[string]bool{}
+				}
+				users[best][id] = true
+			}
+		}
+	}
+	out := make([]External, 0, len(requires))
+	for _, r := range requires {
+		var ids []string
+		for id := range users[r] {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		out = append(out, External{Module: r, Users: ids})
+	}
 	return out
 }

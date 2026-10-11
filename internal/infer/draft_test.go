@@ -112,3 +112,18 @@ func TestGroupCandidates(t *testing.T) {
 		t.Fatalf("%+v", rep.GroupCandidates)
 	}
 }
+
+func TestExternalRequires(t *testing.T) {
+	a, err := Analyze(filepath.Join("testdata", "ext"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []External{
+		{Module: "github.com/gofiber/fiber/v2", Users: []string{"api"}},
+		{Module: "github.com/google/uuid", Users: []string{"api", "db"}},
+		{Module: "github.com/lib/pq", Users: []string{"db"}},
+	}
+	if !reflect.DeepEqual(a.Report.External, want) {
+		t.Fatalf("%+v", a.Report.External)
+	}
+}

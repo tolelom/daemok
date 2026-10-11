@@ -66,6 +66,13 @@ func printReport(w io.Writer, r infer.Report) {
 		}
 		fmt.Fprintln(w)
 	}
+	for _, e := range r.External {
+		users := strings.Join(e.Users, ", ")
+		if users == "" {
+			users = "쓰는 모듈 없음"
+		}
+		fmt.Fprintf(w, "외부 의존: %s (%s)\n", e.Module, users)
+	}
 	if len(r.FanIn) > 0 {
 		var xs []string
 		for _, f := range r.FanIn {
