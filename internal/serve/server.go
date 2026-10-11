@@ -59,6 +59,7 @@ type Server struct {
 	version int
 	sig     string
 	subs    map[chan int]bool
+	opts    Options
 }
 
 func New(design, root string) *Server {
@@ -98,7 +99,7 @@ func fill(st *state, r workspace.Result, root string) {
 
 // shellQuote는 공백이 있는 경로를 큰따옴표로 감싼다.
 func shellQuote(p string) string {
-	if strings.ContainsAny(p, " 	") {
+	if strings.ContainsAny(p, " \t") {
 		return `"` + p + `"`
 	}
 	return p
@@ -143,21 +144,21 @@ func (s *Server) Version() int {
 
 // signature는 설계 디렉토리의 *.yaml과 코드 루트의 .go 파일의 이름·크기·수정 시각이다.
 // 파일 추가·삭제·수정을 잡는다. 코드 쪽은 생성 파일 범위와 같은 디렉토리만 본다.
-func (s *Server) signature() string {
+func signature(design, root string) string {
 	var b strings.Builder
-	paths, _ := filepath.Glob(filepath.Join(s.design, "*.yaml"))
+	paths, _ := filepath.Glob(filepath.Join(design, "*.yaml"))
 	sort.Strings(paths)
 	for _, p := range paths {
 		if st, err := os.Stat(p); err == nil {
 			fmt.Fprintf(&b, "d|%s|%d|%d\n", filepath.Base(p), st.Size(), st.ModTime().UnixNano())
 		}
 	}
-	filepath.WalkDir(s.root, func(p string, d fs.DirEntry, err error) error {
+	filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
-			if p != s.root && workspace.SkipDir(d.Name()) {
+			if p != root && workspace.SkipDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -173,10 +174,15 @@ func (s *Server) signature() string {
 	return b.String()
 }
 
-// Poll은 설계 디렉토리가 바뀌었으면 Refresh하고 true를 준다.
+// Poll은 설계나 코드가 바뀌었으면 Refresh하고 true를 준다. 도중에 프로젝트가 바뀌면 아무것도 하지 않는다.
 func (s *Server) Poll() bool {
-	sig := s.signature()
+	design, root := s.paths()
+	sig := signature(design, root)
 	s.mu.Lock()
+	if s.design != design || s.root != root {
+		s.mu.Unlock()
+		return false
+	}
 	changed := sig != s.sig
 	s.sig = sig
 	s.mu.Unlock()
@@ -213,7 +219,10 @@ func (s *Server) Handler() http.Handler {
 		w.Write(body)
 	})
 	mux.HandleFunc("/api/events", s.events)
-	return mux
+	mux.HandleFunc("GET /api/projects", s.projects)
+	mux.HandleFunc("POST /api/open", s.open)
+	mux.HandleFunc("POST /api/init", s.initDraft)
+	return s.guard(mux)
 }
 
 // events는 상태가 바뀔 때마다 버전 번호를 SSE로 보낸다.
