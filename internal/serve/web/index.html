@@ -275,6 +275,13 @@ const topUnits = () => [...Object.values(M.mods), ...Object.values(M.groups)];
 const tiersTopDown = () => [...M.tiers].reverse().concat(['']);
 
 // 기준(git HEAD) 대비 상태: add, chg, rem, ''
+// changeCount는 기준(HEAD) 대비 추가·수정·삭제된 노드 수다.
+function changeCount() {
+  if (!meta.hasBase) return 0;
+  let n = 0;
+  for (const c of COLS) for (const id of new Set([...Object.keys(M[c]), ...Object.keys(B[c])])) if (stOf(c, id)) n++;
+  return n;
+}
 function stOf(col, id) {
   if (!meta.hasBase) return '';
   const a = B[col][id], b = M[col][id];
@@ -319,7 +326,9 @@ function renderHeader() {
   $('#projbtn').textContent = (S.root || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '프로젝트 열기';
   $('#projbtn').title = S.root || '';
   $('#modebadge').hidden = S.mode !== 'analyze';
-  const status = S.mode === 'none' ? [S.problem] : [t.toLocaleTimeString(), S.fatal ? '설계 파일을 읽지 못했다' : '', S.mode === 'check' && !meta.hasBase ? '기준 없음' : ''];
+  const changed = S.mode === 'check' && meta.hasBase ? changeCount() : 0;
+  const base = S.mode !== 'check' ? '' : !meta.hasBase ? '기준 없음' : changed ? `HEAD 대비 변경 ${changed}개` : 'HEAD와 같음';
+  const status = S.mode === 'none' ? [S.problem] : [t.toLocaleTimeString(), S.fatal ? '설계 파일을 읽지 못했다' : '', base];
   $('#status').textContent = status.filter(Boolean).join('  ');
   $('#status').className = S.fatal ? 'bad' : '';
   const views = VIEWS[S.mode] || VIEWS.check;
@@ -350,7 +359,7 @@ function mapEdges() {
   return [...out.values()];
 }
 function mapPanel(id) {
-  const tail = `<hr>${legend(Object.keys(KINDS))}<label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 관계선 모두 보기</label>`;
+  const tail = `<hr>${legend(Object.keys(KINDS))}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 관계선 모두 보기</label>`;
   const u = unitNode(id);
   if (!u) return `<p class="muted">모듈에 마우스를 올리면 연결이 여기 적힌다. 누르면 모듈 보기로 간다.</p>${tail}`;
   const es = mapEdges();
@@ -396,7 +405,7 @@ function renderMap() {
     if (u.type === 'grp') s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${NW}" height="${NH}" rx="6"/>`;
     s += `<rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="6"/>`;
     s += `<text class="nm" x="${p.x + 12}" y="${p.y + 25}">${esc(u.id)}</text><text class="sb" x="${p.x + 12}" y="${p.y + 44}">${esc(fit(sub, 22))}</text>`;
-    if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + NW - 12}" cy="${p.y + 12}"/>`;
+    if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + NW - 12}" cy="${p.y + 12}"><title>${iss === 'err' ? '오류가 있다' : '경고가 있다'}</title></circle>`;
     s += `</g>`;
   }
   s += '</svg>';
