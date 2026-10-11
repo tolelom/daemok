@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -23,6 +24,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	design := fs.String("design", "design", "설계 디렉토리")
 	root := fs.String("root", ".", "코드 루트")
 	addr := fs.String("addr", "127.0.0.1:7412", "들을 주소")
+	workspaceDir := fs.String("workspace", "", "프로젝트를 찾을 작업 폴더")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -32,6 +34,15 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "주소를 열 수 없다: %v\n", err)
 		return 2
+	}
+	local := isLoopback(ln.Addr())
+	cfg := ""
+	if d, err := os.UserConfigDir(); err == nil {
+		cfg = filepath.Join(d, "daemok")
+	}
+	s.SetOptions(serve.Options{Workspace: *workspaceDir, ConfigDir: cfg, Local: local})
+	if !local {
+		fmt.Fprintln(stderr, "루프백이 아닌 주소라 프로젝트 열기와 초안 저장을 끈다")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -49,4 +60,9 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	return 0
+}
+
+func isLoopback(a net.Addr) bool {
+	t, ok := a.(*net.TCPAddr)
+	return ok && t.IP.IsLoopback()
 }

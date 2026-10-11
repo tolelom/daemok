@@ -36,7 +36,9 @@ func setup(t *testing.T, src string) (*Server, string) {
 func getState(t *testing.T, s *Server) map[string]any {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/api/state", nil))
+	req := httptest.NewRequest("GET", "/api/state", nil)
+	req.Host = "127.0.0.1:7412"
+	s.Handler().ServeHTTP(rec, req)
 	if rec.Code != 200 {
 		t.Fatalf("status %d", rec.Code)
 	}
