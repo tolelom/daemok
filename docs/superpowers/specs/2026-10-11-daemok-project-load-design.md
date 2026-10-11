@@ -26,7 +26,8 @@
 
 | 위치 | 역할 |
 |---|---|
-| `internal/gosrc` (새) | 디렉토리의 Go 파일 선택과 파싱. `_test.go`와 `//go:build ignore` 파일 제외, OS·아키텍처 조건은 모두 참. `internal/codescan`의 `goFiles`, `ignored`, `satisfiable`을 옮긴 것 |
+| `internal/gosrc` (새) | 디렉토리의 Go 파일 선택과 파싱. `_test.go`와 `//go:build ignore` 파일 제외, OS·아키텍처 조건은 모두 참. `internal/codescan`의 `goFiles`, `ignored`, `satisfiable`과 `workspace.SkipDir`을 옮긴 것 |
+| `internal/workspace` | 디스크가 아닌 설계 파일 내용으로 `Run`과 같은 대조를 하는 `RunSources` |
 | `internal/infer` (새) | 코드 루트에서 초안 모델, 초안 YAML 텍스트, 분석 메모를 만듭니다. 파일을 쓰지 않습니다 |
 | `internal/infer`의 쓰기 함수 | `design/`이 없거나 `*.yaml`이 없을 때만 `design/<system>.yaml`을 새로 만듭니다 |
 | `cmd/daemok/init.go` (새) | `daemok init [--root DIR] [--design DIR]` |
@@ -37,7 +38,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 
 ## 분석 규칙
 
-초안을 쓴 직후 `daemok check`(설계 검사와 코드 대조)의 오류가 0이 되도록 아래 규칙을 정합니다. 경고와 정보는 남을 수 있습니다.
+초안을 쓴 직후 `daemok check`(설계 검사와 코드 대조)의 오류가 0이 되도록 아래 규칙을 정합니다. 경고와 정보는 남을 수 있습니다. 파싱할 수 없는 Go 파일이 있으면 코드 대조의 그 오류는 남습니다.
 
 ### 수집
 
@@ -55,10 +56,12 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | 그 밖 | `modules` | 디렉토리 이름의 snake_case | `depends_on`: 내부 import |
 
 - snake_case 변환: 소문자나 숫자 뒤의 대문자 앞, 대문자 연속 뒤에 소문자가 오면 그 연속의 마지막 대문자 앞에 `_`를 넣고 전부 소문자(`certGen` → `cert_gen`, `HTTPServer` → `http_server`).
-- ID 충돌: 부모 디렉토리 이름을 앞에 붙입니다(`api_util`). 그래도 겹치면 경로 요소 전체를 `_`로 잇습니다. 모듈과 실행 단위는 ID 이름공간이 달라 서로 충돌하지 않고, 각 종류 안에서 이 규칙을 씁니다.
+- ID 충돌: 부모 디렉토리 이름을 앞에 붙입니다(`api_util`). 그래도 겹치면 경로 요소를 하나씩 더 붙이고, 경로 전체로도 겹치면 디렉토리 순서대로 `_2`, `_3`을 붙입니다. 모듈과 실행 단위는 ID 이름공간이 달라 서로 충돌하지 않고, 각 종류 안에서 이 규칙을 씁니다.
 - ID와 경로가 다르면 `path`를 적습니다.
-- Go 식별자가 아닌 경로 요소(`foo-bar`)가 있는 패키지는 모듈로 넣지 않고 분석 메모에 이유를 남깁니다. 그 패키지를 import하는 모듈의 코드 대조 결과는 테스트로 확인하고, 오류가 나면 이 규칙을 고칩니다.
-- system ID는 모듈 경로의 마지막 요소의 snake_case입니다.
+- 모듈로 넣지 않고 분석 메모에 이유를 남기는 패키지: Go 식별자(`^[A-Za-z][A-Za-z0-9_]*$`)가 아닌 경로 요소가 있는 패키지(`foo-bar`), 루트 디렉토리의 main이 아닌 패키지. 이 패키지를 import하는 코드는 코드 대조에서 "관리하지 않는 패키지" 정보로 나옵니다.
+- `_`로 시작하는 디렉토리는 Go 도구처럼 건너뜁니다.
+- 실행 단위 ID가 소문자 snake_case(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)가 아니면 넣지 않고 분석 메모에 남깁니다.
+- system ID는 모듈 경로에서 `v2` 같은 버전 요소를 뺀 마지막 요소의 snake_case입니다. `-`와 `.`은 `_`로 바꿉니다.
 
 ### tier
 
@@ -93,7 +96,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 ### 현재 프로젝트
 
 - `Server`의 설계 디렉토리와 코드 루트를 잠금 아래에서 바꿀 수 있게 합니다.
-- 열기: 경로를 절대경로로 바꾸고 디렉토리인지 확인한 뒤 `root = 경로`, `design = 경로/design`으로 두고 서명을 초기화해 `Refresh`합니다. SSE 구독자는 새 버전 번호를 받습니다.
+- 열기: 경로를 절대경로로 바꾸고 디렉토리인지, `design/*.yaml`이나 `go.mod`가 있는지 확인한 뒤 `root = 경로`, `design = 경로/design`으로 두고 서명을 초기화해 `Refresh`합니다. 확인에 실패하면 현재 프로젝트를 바꾸지 않습니다. SSE 구독자는 새 버전 번호를 받습니다.
 - `daemok serve`의 `--design`, `--root`는 시작 프로젝트를 정합니다. 기본값은 지금과 같습니다.
 
 ### 모드
@@ -104,7 +107,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 |---|---|---|
 | 설계 디렉토리에 `*.yaml`이 있음 | `check` | 지금과 같음 |
 | 없음 | `analyze` | infer의 초안 모델을 `toView`로 바꾼 모델, 초안 모델의 `check` 진단, 초안 YAML, 분석 메모 |
-| 루트가 Go 모듈이 아님 | `none` | 열기 실패 이유 |
+| 루트가 Go 모듈이 아님 | `none` | 이유. `fatal`은 참 |
 
 상태 JSON에 `mode`를 더합니다.
 
@@ -121,12 +124,15 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 
 ## 보안
 
+루프백 주소에서 들을 때:
+
 | 대상 | 규칙 |
 |---|---|
-| 모든 요청 | `Host`가 `127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>`가 아니면 403 |
-| POST | `Origin`이 같은 호스트가 아니면 403. 본문은 `Content-Type: application/json`만 받습니다 |
-| 루프백이 아닌 `--addr` | `open`과 `init`을 끄고 시작할 때 경고를 출력합니다 |
+| 모든 요청 | `Host`의 호스트 부분이 `127.0.0.1` 같은 루프백 IP나 `localhost`가 아니면 403 |
+| POST | `Origin`의 호스트가 `Host`와 다르거나 없으면 403. `Content-Type`이 `application/json`이 아니면 415 |
 | 쓰기 | `design/` 생성과 파일 하나의 `O_EXCL` 생성뿐입니다. 덮어쓰기 없음 |
+
+루프백이 아닌 `--addr`에서는 `open`과 `init`이 403이고, 시작할 때 경고를 출력합니다. Host·Origin 검사는 하지 않습니다.
 
 같은 PC의 다른 프로세스는 이 검사로 막지 못합니다.
 
@@ -165,7 +171,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | `design/`에 `*.yaml`이 있어 쓰지 않음 | 1 |
 | Go 모듈이 아님, 쓰기 실패 | 2 |
 
-쓴 파일 경로와 분석 메모를 출력합니다.
+`--design`의 기본값은 `<root>/design`입니다. 쓴 파일 경로와 분석 메모를 출력합니다.
 
 ## 테스트
 
@@ -174,7 +180,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | `internal/gosrc` | 옮긴 뒤 기존 codescan 테스트가 바뀌지 않고 통과 |
 | infer 규칙 | `testdata`의 작은 Go 모듈로 층 계산, ID 충돌, snake_case, Go 식별자가 아닌 경로, 중첩 `go.mod`, 루트 main, `ignore` 파일, `_test.go` 제외, doc 주석 summary |
 | infer 출력 | 두 번 실행한 결과가 같은 바이트. 초안을 다시 읽은 모델이 초안 모델과 같음 |
-| 불변식 | fixture마다 임시 복사본에 초안을 쓰고 `workspace.Run`의 오류 0. 설계를 뺀 `workspace/testdata/fiber` 포함 |
+| 불변식 | infer fixture와 설계를 뺀 `codescan/testdata/scan`마다 초안을 `workspace.RunSources`로 대조해 파싱 실패 파일의 오류 말고는 오류 0 |
 | `daemok init` | 위 표의 종료 코드 |
 | serve | 열기 후 `mode`와 경로, Host·Origin 403, 루프백이 아닌 주소에서 `open`·`init` 꺼짐, `init`의 409, 최근 목록 저장, 작업 폴더의 깊이 제한과 건너뛰기 |
 | 화면 | headless 브라우저 캡처로 완료 조건 4, 5 확인 |
