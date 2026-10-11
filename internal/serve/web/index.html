@@ -91,6 +91,10 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .sw.dash { border-top-style: dashed; } .sw.dot { border-top-style: dotted; }
 
 /* 지도 */
+.mapsearch { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; }
+.mapsearch input { width: min(320px, 100%); font: 14px var(--mono); color: var(--ink); background: var(--bg-2); border: 1px solid var(--rule-2); padding: 5px 9px; border-radius: 4px; }
+.map svg.dim .unit.hit > * { opacity: 1; }
+.unit.hit .box { stroke: var(--accent); stroke-width: 1.5; }
 .mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
 .map { overflow-x: auto; }
 .map svg { display: block; max-width: 100%; height: auto; }
@@ -420,10 +424,10 @@ function renderMap() {
     s += `</g>`;
   }
   s += '</svg>';
-  $('#main').innerHTML = `<div class="mapwrap"><div class="map">${s}</div><aside class="panel" id="mappanel"></aside></div>`;
+  $('#main').innerHTML = `<div class="mapsearch"><input id="mapq" type="search" placeholder="모듈 찾기 (/)" autocomplete="off" spellcheck="false" aria-label="모듈 찾기"><span id="mapqn" class="muted"></span></div><div class="mapwrap"><div class="map">${s}</div><aside class="panel" id="mappanel"></aside></div>`;
   const svg = $('#mapsvg');
   const hi = id => {
-    svg.classList.toggle('dim', !!id);
+    svg.classList.toggle('dim', !!id || !!($('#mapq') && $('#mapq').value.trim()));
     const near = new Set();
     svg.querySelectorAll('.edge, .edge-label').forEach(el => {
       const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id)));
@@ -449,6 +453,23 @@ function renderMap() {
     g.addEventListener('blur', () => hi(null));
     g.addEventListener('click', () => go('module', g.dataset.id));
     g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go('module', g.dataset.id); } });
+  });
+  const q = $('#mapq');
+  const find = () => {
+    const t = q.value.trim().toLowerCase();
+    if (!t) { svg.classList.remove('dim'); svg.querySelectorAll('.unit').forEach(g => g.classList.remove('hit')); $('#mapqn').textContent = ''; return []; }
+    const match = n => [n.id, n.path, n.summary].some(x => String(x || '').toLowerCase().includes(t));
+    // 그룹 멤버는 지도에 따로 그리지 않으므로 맞으면 그 그룹을 강조한다.
+    const hits = [...new Set([...units.filter(match).map(u => u.id), ...Object.values(M.members).filter(match).map(m => m.group)])];
+    svg.classList.add('dim');
+    svg.querySelectorAll('.unit').forEach(g => g.classList.toggle('hit', hits.includes(g.dataset.id)));
+    $('#mapqn').textContent = `${hits.length}개`;
+    return hits;
+  };
+  q.addEventListener('input', find);
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { const h = find(); if (h.length) go('module', h[0]); }
+    if (e.key === 'Escape') { q.value = ''; find(); q.blur(); }
   });
   panel(null);
   hi(null);
@@ -814,6 +835,10 @@ document.addEventListener('submit', e => {
   openProject($('#openpath').value.trim());
 });
 document.addEventListener('keydown', e => {
+  if (e.key === '/' && !drawerOpen && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) {
+    if (view !== 'map') go('map');
+    const q = $('#mapq'); if (q) { e.preventDefault(); q.focus(); }
+  }
   if (e.key === 'Escape' && drawerOpen) closeDrawer();
 });
 
