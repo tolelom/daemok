@@ -20,7 +20,7 @@ Go 1.27 이상. 외부 의존성은 없다.
 
 | 명령 | 하는 일 | 주요 옵션 |
 |---|---|---|
-| `daemok check` | 설계 검사, import 대조, 생성 파일 최신 여부를 출력한다 | `--design DIR`, `--root DIR`, `--strict`(경고도 실패) |
+| `daemok check` | 설계 검사, import 대조, 생성 파일 최신 여부를 출력한다 | `--design DIR`, `--root DIR`, `--strict`(경고도 실패), `--format json` |
 | `daemok gen` | 설계에서 Go 생성 파일을 쓰고, 설계에 없는 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
 | `daemok init` | 설계 파일이 없는 Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다 | `--root DIR`, `--design DIR`(기본 `<root>/design`), `--dry-run` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |

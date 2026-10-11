@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -176,5 +177,37 @@ func TestGenStopsOnDesignError(t *testing.T) {
 	code, out, _ := runCLI(t, "gen", "--design", dir, "--root", filepath.Dir(dir))
 	if code != 2 || !strings.Contains(out, "상위 tier 의존") {
 		t.Fatalf("exit %d\n%s", code, out)
+	}
+}
+
+func TestCheckJSON(t *testing.T) {
+	dir := writeDesign(t, cleanDesign+"\n  orphan_extra: { tier: x }\n")
+	code, out, _ := runCLI(t, "check", "--design", dir, "--format", "json")
+	var got struct {
+		Diagnostics []struct {
+			Level string `json:"level"`
+			Msg   string `json:"msg"`
+			File  string `json:"file"`
+			Line  int    `json:"line"`
+			Group string `json:"group"`
+		} `json:"diagnostics"`
+		Counts map[string]int `json:"counts"`
+	}
+	if err := json.Unmarshal([]byte(out), &got); err != nil {
+		t.Fatalf("JSON이 아니다: %v\n%s", err, out)
+	}
+	if code != 1 || got.Counts["error"] == 0 || len(got.Diagnostics) == 0 {
+		t.Fatalf("%d %+v", code, got)
+	}
+	d := got.Diagnostics[0]
+	if d.Level != "error" || d.File == "" || d.Line == 0 || d.Group == "" || strings.Contains(d.Group, ":") {
+		t.Fatalf("%+v", d)
+	}
+}
+
+func TestCheckUnknownFormat(t *testing.T) {
+	dir := writeDesign(t, cleanDesign)
+	if code, _, errOut := runCLI(t, "check", "--design", dir, "--format", "xml"); code != 2 || !strings.Contains(errOut, "format") {
+		t.Fatalf("%d %s", code, errOut)
 	}
 }

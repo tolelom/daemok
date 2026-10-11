@@ -8,7 +8,7 @@ import (
 )
 
 const usage = `사용법:
-  daemok check [--design DIR] [--root DIR] [--strict]
+  daemok check [--design DIR] [--root DIR] [--strict] [--format text|json]
   daemok gen   [--design DIR] [--root DIR] [--dry-run]
   daemok coverage [--design DIR] [--root DIR]
   daemok init  [--root DIR] [--design DIR] [--dry-run]
