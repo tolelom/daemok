@@ -49,4 +49,4 @@
 |---|---|
 | 텍스트 고치기 | 플로우·블록 형식마다 네 작업, 주석과 다른 줄이 그대로인지, 찾지 못할 때 오류 |
 | 서버 | 성공 후 상태 반영, 버전 불일치 409, 읽기 오류가 생기는 편집 422, 대조 모드가 아니면 403 |
-| 화면 | headless로 tier 바꾸기, 의존 추가·삭제, 모듈 추가 |
+| 화면 | headless로 tier 바꾸기, 의존 추가·삭제, 모듈 추가. 브라우저와 node가 필요해 `DAEMOK_E2E=1 go test ./internal/serve -run TestUIEditE2E`로 따로 돌립니다(`scripts/e2e/edit.mjs`) |
