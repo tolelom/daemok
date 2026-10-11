@@ -24,10 +24,12 @@ type Options struct {
 
 const recentMax = 10
 
+// SetOptions는 설정을 바꾸고 상태를 다시 만든다. 상태의 canEdit이 설정을 따른다.
 func (s *Server) SetOptions(o Options) {
 	s.mu.Lock()
 	s.opts = o
 	s.mu.Unlock()
+	s.Refresh()
 }
 
 func (s *Server) options() Options {

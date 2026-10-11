@@ -40,6 +40,7 @@ type state struct {
 	Mode      string      `json:"mode"` // check, analyze, none
 	Draft     *vDraft     `json:"draft,omitempty"`
 	Problem   string      `json:"problem,omitempty"`
+	CanEdit   bool        `json:"canEdit"` // 루프백이고 대조 모드면 화면에서 L2를 고칠 수 있다
 }
 
 // vDraft는 분석 모드의 초안이다.
@@ -60,6 +61,7 @@ type Server struct {
 	sig     string
 	subs    map[chan int]bool
 	opts    Options
+	mode    string // 마지막으로 낸 상태의 모드
 }
 
 func New(design, root string) *Server {
@@ -91,7 +93,14 @@ func (s *Server) Refresh() {
 	} else {
 		st.Mode, st.Fatal, st.Problem = "none", true, err.Error()
 	}
+	st.CanEdit = st.Mode == "check" && s.options().Local
 	s.publish(st)
+}
+
+func (s *Server) currentMode() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mode
 }
 
 func fill(st *state, r workspace.Result, root string) {
@@ -124,6 +133,7 @@ func (s *Server) publish(st state) {
 		return
 	}
 	s.version++
+	s.mode = st.Mode
 	st.Version = s.version
 	body, err := json.Marshal(st)
 	if err != nil {
@@ -231,6 +241,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects", s.projects)
 	mux.HandleFunc("POST /api/open", s.open)
 	mux.HandleFunc("POST /api/init", s.initDraft)
+	mux.HandleFunc("POST /api/edit", s.editDesign)
 	return s.guard(mux)
 }
 

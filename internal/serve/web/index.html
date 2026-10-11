@@ -199,6 +199,14 @@ td.id, td .id { font-family: var(--mono); }
 .req p { margin: 4px 0 0; }
 .req .by { font-size: 14px; color: var(--ink-3); }
 .req.unmet .by { color: var(--warn); }
+.deps { display: inline-flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.dep { display: inline-flex; align-items: center; gap: 2px; }
+.dep .x { border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 0 3px; font-size: 15px; line-height: 1; }
+.dep .x:hover { color: var(--err); }
+.facts select, .addmod input, .addmod select { font: 13.5px var(--mono); color: var(--ink); background: var(--bg-2); border: 1px solid var(--rule-2); padding: 3px 6px; border-radius: 4px; }
+.addmod { display: grid; gap: 6px; }
+.addmod h3 { margin: 0; }
+.addmod button { justify-self: start; border: 1px solid var(--accent); color: var(--accent); background: none; padding: 3px 12px; border-radius: 4px; cursor: pointer; }
 .reqbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .reqbar button { border: 1px solid var(--rule-2); background: none; padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 13.5px; color: var(--ink-2); }
 .reqbar button[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); }
@@ -389,7 +397,7 @@ function kindFilter() {
   return `<div class="legend kfilter">${kinds.map(k => `<label class="k-${k}"><input type="checkbox" data-kind="${k}" ${hiddenKinds.has(k) ? '' : 'checked'}><span class="sw ${KINDS[k].style}"></span>${KINDS[k].name} <span class="muted">${count[k]}</span></label>`).join('')}</div>`;
 }
 function mapPanel(id) {
-  const tail = `<hr>${kindFilter()}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 고른 종류의 관계선 모두 보기</label>`;
+  const tail = `<hr>${kindFilter()}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 고른 종류의 관계선 모두 보기</label>${S.canEdit ? `<hr><form id="addmod" class="addmod"><h3>모듈 추가</h3><input id="addmodid" placeholder="모듈 ID (snake_case)" autocomplete="off" spellcheck="false" aria-label="모듈 ID"><select id="addmodtier" aria-label="tier">${[...M.tiers].reverse().map(t => `<option>${esc(t)}</option>`).join('')}</select><button type="submit">추가</button></form>` : ''}`;
   const u = unitNode(id);
   if (!u) return `<p class="muted">모듈에 마우스를 올리면 연결이 여기 적힌다. 누르면 모듈 보기로 간다.</p>${tail}`;
   const es = mapEdges();
@@ -547,6 +555,13 @@ function renderModule() {
   const dirs = ids.map(id => (unitNode(id) || {}).path).filter(Boolean);
   const gen = S.files.filter(f => dirs.includes(f.path.slice(0, f.path.lastIndexOf('/'))));
   if (gen.length) facts.push(['생성 파일', `<span class="list">${gen.map(f => `<span class="id">${esc(f.path)}</span>`).join('')}</span>`]);
+  if (S.canEdit && kind === 'mod') {
+    const opts = M.tiers.map(t => `<option ${t === u.tier ? 'selected' : ''}>${esc(t)}</option>`).join('');
+    facts.unshift(['tier', `<select data-edit="tier" data-id="${esc(current)}" aria-label="tier 바꾸기">${opts}</select>`]);
+    const deps = u.depends_on || [];
+    const cands = topUnits().map(x => x.id).filter(x => x !== current && !deps.includes(x)).sort();
+    facts.push(['depends_on', `<span class="deps">${deps.map(d => `<span class="dep">${unitLink(d)}<button type="button" class="x" data-rmdep="${esc(d)}" aria-label="${esc(d)} 의존 지우기">×</button></span>`).join('')}<select data-adddep="${esc(current)}" aria-label="의존 추가"><option value="">의존 추가</option>${cands.map(x => `<option>${esc(x)}</option>`).join('')}</select></span>`]);
+  }
   const iss = issuesFor(ownedKeys(current));
   if (iss.length) facts.push(['진단', diagList(iss)]);
   const where = [kind === 'grp' ? '그룹' : kind === 'mem' ? '그룹 멤버' : '모듈', tierOf(current) ? `tier ${tierOf(current)}` : '', u.path && u.path !== current ? u.path : '', u.role].filter(Boolean).map(esc).join(', ');
@@ -843,6 +858,14 @@ async function saveDraft() {
   await load();
 }
 
+/* ---------- 편집 ---------- */
+async function editOp(op, id, value) {
+  const res = await post('/api/edit', { op, id, value, version: meta.version });
+  if (!res.ok) { toast(res.error); render(); return false; }
+  await load();
+  return true;
+}
+
 /* ---------- 이동 ---------- */
 const VIEWS = { check: ['map', 'module', 'flow', 'reqs'], analyze: ['map', 'module', 'draft'], none: [] };
 function render() {
@@ -866,6 +889,7 @@ document.addEventListener('click', e => {
   const t = e.target;
   if (t.closest('#projbtn')) return openProjects();
   if (t.closest('#changesbtn')) return openChanges();
+  const rd = t.closest('[data-rmdep]'); if (rd) return editOp('remove_dep', current, rd.dataset.rmdep);
   const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('경로를 복사했다'), () => toast('복사할 수 없다')); return; }
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
@@ -881,10 +905,18 @@ document.addEventListener('click', e => {
   if (t.closest('[data-clearfail]')) { failAt = ''; return render(); }
   const fa = t.closest('[data-fail]'); if (fa) return toggleFail(fa.dataset.fail);
 });
-document.addEventListener('submit', e => {
-  if (e.target.id !== 'openform') return;
-  e.preventDefault();
-  openProject($('#openpath').value.trim());
+document.addEventListener('submit', async e => {
+  if (e.target.id === 'openform') { e.preventDefault(); openProject($('#openpath').value.trim()); }
+  if (e.target.id === 'addmod') {
+    e.preventDefault();
+    const id = $('#addmodid').value.trim();
+    if (id && await editOp('add_module', id, $('#addmodtier').value)) go('module', id);
+  }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.matches('select[data-edit="tier"]')) editOp('tier', t.dataset.id, t.value);
+  if (t.matches('select[data-adddep]') && t.value) editOp('add_dep', t.dataset.adddep, t.value);
 });
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
