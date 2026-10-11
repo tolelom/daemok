@@ -9,6 +9,7 @@ import (
 
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/workspace"
+	"github.com/tolelom/daemok/internal/yaml"
 )
 
 func runCheck(args []string, stdout, stderr io.Writer) int {
@@ -40,11 +41,48 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// printDiags는 진단을 한 줄씩 쓴다. 같은 수준·같은 설명("설명: 대상"의 설명)이 3개 이상이면
+// 머리 한 줄 아래에 위치와 대상만 들여 쓴다.
 func printDiags(w io.Writer, diags model.Diagnostics) {
+	type key struct {
+		lv    model.Level
+		group string
+	}
+	keyOf := func(d model.Diagnostic) key {
+		g, _, _ := strings.Cut(d.Msg, ": ")
+		return key{d.Level, g}
+	}
+	count := map[key]int{}
 	for _, d := range diags {
-		fmt.Fprintln(w, d.String())
+		count[keyOf(d)]++
+	}
+	done := map[key]bool{}
+	for _, d := range diags {
+		k := keyOf(d)
+		if count[k] < 3 {
+			fmt.Fprintln(w, d.String())
+			continue
+		}
+		if done[k] {
+			continue
+		}
+		done[k] = true
+		fmt.Fprintf(w, "%s: %s %d개\n", k.lv, k.group, count[k])
+		for _, x := range diags {
+			if keyOf(x) == k {
+				_, target, _ := strings.Cut(x.Msg, ": ")
+				fmt.Fprintf(w, "  %s: %s\n", where(x.Pos), target)
+			}
+		}
 	}
 	fmt.Fprintf(w, "오류 %d, 경고 %d, 정보 %d\n", diags.Count(model.Error), diags.Count(model.Warning), diags.Count(model.Info))
+}
+
+func where(p yaml.Pos) string {
+	if p.Line == 0 {
+		return p.File
+	}
+	return p.String()
 }
 
 // printJSON은 진단을 CI와 도구가 읽는 JSON으로 쓴다. group은 메시지의 "설명: 대상"에서 설명 부분이다.
