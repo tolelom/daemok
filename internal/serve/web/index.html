@@ -611,7 +611,7 @@ function flowGrid(shown) {
   const infos = shown.map((f, s) => sideInfo(f, s, rows));
   const two = shown.length > 1;
   const gap = two ? '<div></div>' : '';
-  const tmpl = infos.map(x => `2.4em minmax(9em, max-content) 10px ${'14px '.repeat(x.lanes.length)}minmax(7em, max-content) minmax(8em, 1fr)`).join(' 28px ');
+  const tmpl = infos.map(x => `2.4em minmax(9em, max-content) 10px ${'14px '.repeat(x.lanes.length)}minmax(7em, max-content) minmax(8em, max-content)`).join(' 28px ');
   const span = x => `style="grid-column: span ${x.cols}"`;
   let h = '';
   if (two) h += infos.map(x => `<div class="sidehead" ${span(x)}><h2>${esc(x.f.id)}</h2><p>${esc(x.f.in)} 모듈, 단계 ${x.f.steps.length}${x.f.summary ? '. ' + esc(x.f.summary) : ''}</p></div>`).join(gap);
