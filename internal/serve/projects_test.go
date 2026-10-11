@@ -123,3 +123,28 @@ func TestProjectsList(t *testing.T) {
 		t.Fatalf("%+v", out)
 	}
 }
+
+// 감시 루프가 옛 프로젝트로 늦게 끝낸 상태는 새 프로젝트의 상태를 덮지 않는다.
+func TestStalePublishIsDropped(t *testing.T) {
+	s, _ := setup(t, design)
+	local(t, s)
+	root := goModule(t)
+	if err := s.Open(root); err != nil {
+		t.Fatal(err)
+	}
+	v := s.Version()
+	s.publish(state{Design: "old/design", Root: "old"})
+	if s.Version() != v || getState(t, s)["root"] != root {
+		t.Fatal("옛 프로젝트의 상태가 새 상태를 덮었다")
+	}
+}
+
+func TestRelativeRootBecomesAbsolute(t *testing.T) {
+	root := goModule(t)
+	t.Chdir(root)
+	s := New("design", ".")
+	s.Poll()
+	if st := getState(t, s); st["root"] != root || st["mode"] != "analyze" {
+		t.Fatalf("%v %v", st["root"], st["mode"])
+	}
+}

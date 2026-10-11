@@ -63,6 +63,10 @@ type Server struct {
 }
 
 func New(design, root string) *Server {
+	// 화면이 프로젝트 이름을 보이도록 절대경로로 둔다. 실패하면 받은 그대로 쓴다.
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	// 첫 Poll이 반드시 상태를 만들도록 서명을 어떤 실제 서명과도 다른 값으로 둔다.
 	return &Server{design: design, root: root, subs: map[chan int]bool{}, sig: "\x00"}
 }
@@ -112,8 +116,13 @@ func (s *Server) paths() (design, root string) {
 }
 
 // publish는 상태에 버전을 붙여 저장하고 구독자에게 알린다.
+// 그사이 다른 프로젝트를 열었으면 버린다. 늦게 끝난 옛 프로젝트의 상태가 새 상태를 덮지 않게 한다.
 func (s *Server) publish(st state) {
 	s.mu.Lock()
+	if st.Design != s.design || st.Root != s.root {
+		s.mu.Unlock()
+		return
+	}
 	s.version++
 	st.Version = s.version
 	body, err := json.Marshal(st)
