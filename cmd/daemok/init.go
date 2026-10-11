@@ -73,6 +73,13 @@ func printReport(w io.Writer, r infer.Report) {
 		}
 		fmt.Fprintf(w, "외부 의존: %s (%s)\n", e.Module, users)
 	}
+	for _, h := range r.Hints {
+		kind := h.Kind
+		if h.Type != "" {
+			kind += " " + h.Type
+		}
+		fmt.Fprintf(w, "L3 후보(%s): %s %s (%s)\n", kind, h.Module, strings.Join(h.Names, ", "), h.Where)
+	}
 	if len(r.FanIn) > 0 {
 		var xs []string
 		for _, f := range r.FanIn {

@@ -55,6 +55,8 @@ type Report struct {
 	GroupCandidates []GroupCandidate `json:"groupCandidates"`
 	// External은 go.mod의 직접 require와 그 모듈을 import하는 모듈·실행 단위다.
 	External []External `json:"external"`
+	// Hints는 L3 노드(gen: false)로 올릴 만한 손으로 쓴 선언이다.
+	Hints []Hint `json:"hints"`
 }
 
 // External은 외부 모듈 하나와 그걸 쓰는 모듈·실행 단위 ID다.
@@ -227,6 +229,12 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 	}
 	sort.Slice(rep.Cycles, func(i, j int) bool { return rep.Cycles[i][0] < rep.Cycles[j][0] })
 	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Mods)
+	for _, dir := range libDirs {
+		for _, h := range byDir[dir].hints {
+			h.Module = libIDs[dir]
+			rep.Hints = append(rep.Hints, h)
+		}
+	}
 	sort.Slice(skips, func(i, j int) bool { return skips[i].Path < skips[j].Path })
 	rep.Skipped = skips
 	for id, n := range fan {
