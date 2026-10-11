@@ -2,6 +2,7 @@ package infer
 
 import (
 	"fmt"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -50,6 +51,16 @@ type Report struct {
 	FanIn       []FanIn `json:"fanIn"`
 	// Cycles는 서로 import하는 패키지 묶음의 모듈 ID다. 모든 플랫폼의 파일을 합쳐 보면 생길 수 있다.
 	Cycles [][]string `json:"cycles"`
+	// GroupCandidates는 그룹으로 묶을 만한 형제 패키지다. 그룹은 핸들러 종류(L3)가 있어야 해서 초안에 넣지 않고 제안만 한다.
+	GroupCandidates []GroupCandidate `json:"groupCandidates"`
+}
+
+// GroupCandidate는 같은 부모 디렉토리 아래 형제 모듈 3개 이상이 형제 밖의 모듈을 공통으로 쓰는 묶음이다.
+type GroupCandidate struct {
+	Path       string   `json:"path"`       // 부모 디렉토리
+	Members    []string `json:"members"`    // 모듈 ID
+	Common     []string `json:"common"`     // 모든 형제가 쓰는 형제 밖 모듈
+	Exceptions []string `json:"exceptions"` // 형제끼리의 의존 "a → b". 그룹 예외 후보
 }
 
 // Analysis는 Analyze의 결과다.
@@ -206,6 +217,7 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		rep.Cycles = append(rep.Cycles, ids)
 	}
 	sort.Slice(rep.Cycles, func(i, j int) bool { return rep.Cycles[i][0] < rep.Cycles[j][0] })
+	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Mods)
 	sort.Slice(skips, func(i, j int) bool { return skips[i].Path < skips[j].Path })
 	rep.Skipped = skips
 	for id, n := range fan {
@@ -347,4 +359,55 @@ func components(nodes []string, edges func(string) []string) (map[string]int, []
 		}
 	}
 	return comp, comps
+}
+
+// groupCandidates는 부모 디렉토리가 같은 형제 모듈 3개 이상이 형제 밖 모듈을 하나 이상 공통으로 쓰면 후보로 낸다.
+// 루트 바로 아래 디렉토리는 프로젝트의 큰 구조라 보지 않는다.
+func groupCandidates(libDirs []string, libIDs map[string]string, mods []Mod) []GroupCandidate {
+	deps := map[string][]string{}
+	for _, m := range mods {
+		deps[m.ID] = m.DependsOn
+	}
+	byParent := map[string][]string{}
+	for _, dir := range libDirs {
+		if parent := path.Dir(dir); parent != "." {
+			byParent[parent] = append(byParent[parent], libIDs[dir])
+		}
+	}
+	var out []GroupCandidate
+	for parent, members := range byParent {
+		if len(members) < 3 {
+			continue
+		}
+		sort.Strings(members)
+		sibling := map[string]bool{}
+		for _, id := range members {
+			sibling[id] = true
+		}
+		count := map[string]int{}
+		var exceptions []string
+		for _, id := range members {
+			for _, dep := range deps[id] {
+				if sibling[dep] {
+					exceptions = append(exceptions, id+" → "+dep)
+				} else {
+					count[dep]++
+				}
+			}
+		}
+		var common []string
+		for dep, n := range count {
+			if n == len(members) {
+				common = append(common, dep)
+			}
+		}
+		if len(common) == 0 {
+			continue
+		}
+		sort.Strings(common)
+		sort.Strings(exceptions)
+		out = append(out, GroupCandidate{Path: parent, Members: members, Common: common, Exceptions: exceptions})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	return out
 }

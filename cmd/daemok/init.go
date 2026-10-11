@@ -52,6 +52,13 @@ func printReport(w io.Writer, r infer.Report) {
 	for _, c := range r.Cycles {
 		fmt.Fprintf(w, "순환 import: %s\n", strings.Join(c, ", "))
 	}
+	for _, g := range r.GroupCandidates {
+		fmt.Fprintf(w, "그룹 후보: %s (%s), 공통 의존 %s", g.Path, strings.Join(g.Members, ", "), strings.Join(g.Common, ", "))
+		if len(g.Exceptions) > 0 {
+			fmt.Fprintf(w, ", 예외 후보 %s", strings.Join(g.Exceptions, ", "))
+		}
+		fmt.Fprintln(w)
+	}
 	if len(r.FanIn) > 0 {
 		var xs []string
 		for _, f := range r.FanIn {

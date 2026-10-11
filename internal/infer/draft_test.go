@@ -96,3 +96,19 @@ func TestBuildCycleSharesTier(t *testing.T) {
 		t.Fatalf("%v", rep.Cycles)
 	}
 }
+
+func TestGroupCandidates(t *testing.T) {
+	pkgs := []*pkg{
+		{dir: "core"}, {dir: "vm", imports: []string{"core"}},
+		{dir: "vm/modules/a", imports: []string{"core", "vm"}},
+		{dir: "vm/modules/b", imports: []string{"core", "vm"}},
+		{dir: "vm/modules/c", imports: []string{"core", "vm", "vm/modules/a"}},
+		{dir: "internal/x"}, {dir: "internal/y", imports: []string{"core"}}, {dir: "internal/z", imports: []string{"vm"}},
+		{dir: "pair/p", imports: []string{"core"}}, {dir: "pair/q", imports: []string{"core"}},
+	}
+	_, rep := build("example.com/g", pkgs, nil)
+	want := []GroupCandidate{{Path: "vm/modules", Members: []string{"a", "b", "c"}, Common: []string{"core", "vm"}, Exceptions: []string{"c → a"}}}
+	if !reflect.DeepEqual(rep.GroupCandidates, want) {
+		t.Fatalf("%+v", rep.GroupCandidates)
+	}
+}
