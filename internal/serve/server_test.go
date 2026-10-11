@@ -399,3 +399,13 @@ func TestIssueGroupIsMessageKind(t *testing.T) {
 		}
 	}
 }
+
+func TestIssueHasAbsolutePath(t *testing.T) {
+	s, _ := setup(t, design)
+	for _, it := range getState(t, s)["issues"].([]any) {
+		i := it.(map[string]any)
+		if i["file"] != "" && !filepath.IsAbs(i["abs"].(string)) {
+			t.Fatalf("%v", i)
+		}
+	}
+}

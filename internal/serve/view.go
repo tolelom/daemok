@@ -267,6 +267,8 @@ type vIssue struct {
 	Origin string `json:"origin"` // design, code
 	// Group은 메시지의 "설명: 대상"에서 설명 부분이다. 화면이 같은 원인의 진단을 묶는다.
 	Group string `json:"group"`
+	// Abs는 에디터로 열 수 있는 File의 절대경로다.
+	Abs string `json:"abs"`
 }
 
 type vFile struct {
@@ -608,7 +610,11 @@ func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIss
 			origin = "code"
 		}
 		group, _, _ := strings.Cut(d.Msg, ": ")
-		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin, Group: group})
+		abs := d.Pos.File
+		if a, err := filepath.Abs(abs); err == nil && abs != "" {
+			abs = a
+		}
+		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin, Group: group, Abs: abs})
 	}
 	return out
 }

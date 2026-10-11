@@ -222,6 +222,11 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
 .igroup > summary::before { content: "+"; color: var(--ink-3); width: 1ch; }
 .igroup[open] > summary::before { content: "-"; }
 .igroup > button { padding-left: 22px; }
+.issuelist .irow { display: flex; align-items: flex-start; gap: 8px; border-bottom: 1px solid var(--rule); }
+.issuelist .irow > button { flex: 1; border-bottom: 0; min-width: 0; }
+.iact { display: flex; gap: 8px; padding: 8px 0; white-space: nowrap; font-size: 12.5px; }
+.iact a, .iact button { color: var(--ink-3); border: 0; background: none; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.iact a:hover, .iact button:hover { color: var(--accent); }
 .issuelist .where { color: var(--ink-3); font-size: 12.5px; font-family: var(--mono); overflow-wrap: anywhere; }
 
 @media (max-width: 1000px) {
@@ -733,7 +738,10 @@ function openIssues() {
   const row = i => {
     const target = i.key && (['mod', 'grp', 'mem'].includes(i.key.split(':')[0]) ? `data-go="${esc(i.key.split(':').slice(1).join(':'))}"` : `data-open="${esc(i.key)}"`);
     const where = i.file ? `${i.file}${i.line ? ':' + i.line : ''}` : '';
-    return `<button type="button" ${target || 'disabled'}><span class="sev ${i.lv}">${SEV[i.lv]}</span><span>${esc(i.msg)}${where ? `<br><span class="where">${esc(where)}</span>` : ''}</span></button>`;
+    const loc = i.abs ? i.abs + (i.line ? ':' + i.line : '') : '';
+    // VS Code는 URL 스킴으로 연다. 다른 에디터는 복사한 "경로:줄"을 파일 찾기에 붙여넣는다.
+    const acts = loc ? `<span class="iact"><a href="vscode://file/${encodeURI(loc.replace(/\\/g, '/'))}">VS Code</a><button type="button" data-copy="${esc(loc)}">경로 복사</button></span>` : '';
+    return `<div class="irow"><button type="button" ${target || 'disabled'}><span class="sev ${i.lv}">${SEV[i.lv]}</span><span>${esc(i.msg)}${where ? `<br><span class="where">${esc(where)}</span>` : ''}</span></button>${acts}</div>`;
   };
   // 같은 수준·같은 원인(메시지의 설명 부분)이 3개 이상이면 접히는 한 줄로 묶는다.
   const rows = l => {
@@ -835,6 +843,7 @@ const toggleFail = id => { failAt = failAt === id ? '' : id; render(); };
 document.addEventListener('click', e => {
   const t = e.target;
   if (t.closest('#projbtn')) return openProjects();
+  const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('경로를 복사했다'), () => toast('복사할 수 없다')); return; }
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
   if (t.closest('#savedraft')) return saveDraft();
