@@ -207,6 +207,11 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
 .issuelist button { display: flex; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--rule); background: none; padding: 8px 0; cursor: pointer; font-size: 14px; }
 .issuelist button:hover:not([disabled]) { background: var(--bg-3); }
 .issuelist button[disabled] { cursor: default; }
+.igroup > summary { display: flex; gap: 10px; font-family: var(--sans); padding: 8px 0; border-bottom: 1px solid var(--rule); cursor: pointer; font-size: 14px; list-style: none; }
+.igroup > summary::-webkit-details-marker { display: none; }
+.igroup > summary::before { content: "+"; color: var(--ink-3); width: 1ch; }
+.igroup[open] > summary::before { content: "-"; }
+.igroup > button { padding-left: 22px; }
 .issuelist .where { color: var(--ink-3); font-size: 12.5px; font-family: var(--mono); overflow-wrap: anywhere; }
 
 @media (max-width: 1000px) {
@@ -666,7 +671,14 @@ function openIssues() {
     const where = i.file ? `${i.file}${i.line ? ':' + i.line : ''}` : '';
     return `<button type="button" ${target || 'disabled'}><span class="sev ${i.lv}">${SEV[i.lv]}</span><span>${esc(i.msg)}${where ? `<br><span class="where">${esc(where)}</span>` : ''}</span></button>`;
   };
-  const sec = (o, title) => { const l = S.issues.filter(i => i.origin === o); return `<div><h3>${title} ${l.length}</h3><div class="issuelist">${l.map(row).join('') || '<span class="muted">없음</span>'}</div></div>`; };
+  // 같은 수준·같은 원인(메시지의 설명 부분)이 3개 이상이면 접히는 한 줄로 묶는다.
+  const rows = l => {
+    const groups = new Map();
+    l.forEach(i => { const k = i.lv + '\u0000' + (i.group || i.msg); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+    return [...groups.values()].map(g => g.length < 3 ? g.map(row).join('')
+      : `<details class="igroup"><summary><span class="sev ${g[0].lv}">${SEV[g[0].lv]}</span><span>${esc(g[0].group)} <span class="muted">${g.length}개</span></span></summary>${g.map(row).join('')}</details>`).join('');
+  };
+  const sec = (o, title) => { const l = S.issues.filter(i => i.origin === o); return `<div><h3>${title} ${l.length}</h3><div class="issuelist">${rows(l) || '<span class="muted">없음</span>'}</div></div>`; };
   $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="진단"><div class="head"><h2>진단</h2><button type="button" class="close" data-close="1">닫기</button></div>${sec('design', '설계 검사')}${sec('code', '코드 대조')}</aside>`;
   $('#drawer .close').focus();
 }

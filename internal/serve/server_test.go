@@ -386,3 +386,16 @@ func TestNoneMode(t *testing.T) {
 		t.Fatalf("%v", st)
 	}
 }
+
+func TestIssueGroupIsMessageKind(t *testing.T) {
+	s, _ := setup(t, design)
+	for _, it := range getState(t, s)["issues"].([]any) {
+		i := it.(map[string]any)
+		if strings.HasPrefix(i["msg"].(string), "생성 파일이 없다") && i["group"] != "생성 파일이 없다" {
+			t.Fatalf("%v", i)
+		}
+		if i["group"] == "" || i["group"] == nil {
+			t.Fatalf("묶음 키가 없다: %v", i)
+		}
+	}
+}

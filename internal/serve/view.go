@@ -265,6 +265,8 @@ type vIssue struct {
 	File   string `json:"file"`
 	Line   int    `json:"line"`
 	Origin string `json:"origin"` // design, code
+	// Group은 메시지의 "설명: 대상"에서 설명 부분이다. 화면이 같은 원인의 진단을 묶는다.
+	Group string `json:"group"`
 }
 
 type vFile struct {
@@ -605,7 +607,8 @@ func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIss
 		if fromCode[d] {
 			origin = "code"
 		}
-		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin})
+		group, _, _ := strings.Cut(d.Msg, ": ")
+		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin, Group: group})
 	}
 	return out
 }
