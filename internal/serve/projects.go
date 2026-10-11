@@ -197,6 +197,10 @@ func (s *Server) initDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Poll()
+	// 화면 알림이 짧도록 코드 루트 기준 슬래시 경로로 준다.
+	if rel, err := filepath.Rel(root, p); err == nil {
+		p = filepath.ToSlash(rel)
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"path": p})
 }
 

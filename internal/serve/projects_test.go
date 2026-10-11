@@ -70,7 +70,7 @@ func TestInitWritesDraftAndSwitchesToCheck(t *testing.T) {
 	s.Poll()
 	local(t, s)
 	code, out := post(t, s, "/api/init", "{}")
-	if code != 200 || !strings.HasSuffix(out["path"].(string), "demo.yaml") {
+	if code != 200 || out["path"] != "design/demo.yaml" {
 		t.Fatalf("%d %v", code, out)
 	}
 	if st := getState(t, s); st["mode"] != "check" {
