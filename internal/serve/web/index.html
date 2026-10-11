@@ -511,7 +511,11 @@ function relGroups(list, side) {
 }
 function renderModule() {
   const all = topUnits();
-  if (!current || !unitNode(current)) current = all.length ? all[0].id : '';
+  // 처음 들어오면 지도에서 마지막으로 본 모듈, 없으면 가장 많이 쓰이는 모듈을 고른다.
+  if (!current || !unitNode(current)) {
+    const fanIn = id => new Set(S.relations.filter(r => unitOf(r.to) === id && unitOf(r.from) !== id).map(r => unitOf(r.from))).size;
+    current = unitNode(mapFocus) ? mapFocus : all.length ? [...all].sort((a, b) => fanIn(b.id) - fanIn(a.id) || a.id.localeCompare(b.id))[0].id : '';
+  }
   setSide(moduleSide());
   if (!current) { $('#main').innerHTML = '<p class="muted">설계에 모듈이 없다.</p>'; return; }
   const u = unitNode(current), kind = u.type;
@@ -524,6 +528,10 @@ function renderModule() {
     const list = Object.values(M[col]).filter(n => ids.includes(n.in));
     if (list.length) facts.push([label, inlineList(list.map(n => nodeLink(k, n.id)))]);
   }
+  // 이 모듈(그룹이면 멤버까지) 디렉토리 바로 아래의 생성 파일
+  const dirs = ids.map(id => (unitNode(id) || {}).path).filter(Boolean);
+  const gen = S.files.filter(f => dirs.includes(f.path.slice(0, f.path.lastIndexOf('/'))));
+  if (gen.length) facts.push(['생성 파일', `<span class="list">${gen.map(f => `<span class="id">${esc(f.path)}</span>`).join('')}</span>`]);
   const iss = issuesFor(ownedKeys(current));
   if (iss.length) facts.push(['진단', diagList(iss)]);
   const where = [kind === 'grp' ? '그룹' : kind === 'mem' ? '그룹 멤버' : '모듈', tierOf(current) ? `tier ${tierOf(current)}` : '', u.path && u.path !== current ? u.path : '', u.role].filter(Boolean).map(esc).join(', ');
