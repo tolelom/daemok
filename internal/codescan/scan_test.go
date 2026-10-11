@@ -219,8 +219,9 @@ modules:
 enums:
   tx_type: { in: core, gen: false, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
 `,
-		"core/tx.go":   "package core\n\ntype TxType string\n\nconst (\n\tTxTransfer  TxType = \"transfer\"\n\tTxMintAsset TxType = \"mint_asset\"\n)\n",
-		"api/api.go":   "package api\n\nimport _ \"example.com/l/core\"\n\nfunc Kind(s string) bool {\n\treturn s == \"mint_asset\" || s == \"other\"\n}\n",
+		"core/tx.go": "package core\n\ntype TxType string\n\nconst (\n\tTxTransfer  TxType = \"transfer\"\n\tTxMintAsset TxType = \"mint_asset\"\n)\n",
+		// 비교와 case만 알린다. 로그 인자 같은 다른 자리의 같은 문자열은 enum과 상관없을 때가 많다.
+		"api/api.go":   "package api\n\nimport _ \"example.com/l/core\"\n\nfunc Kind(s string) bool {\n\tlog(\"mint_asset\")\n\tswitch s {\n\tcase \"transfer\":\n\t\treturn true\n\t}\n\treturn s == \"mint_asset\" || s == \"other\"\n}\n\nfunc log(string) {}\n",
 		"free/free.go": "package free\n\nfunc F() string { return \"transfer\" }\n",
 	}
 	for p, c := range files {
@@ -236,7 +237,10 @@ enums:
 			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
 		}
 	}
-	want := []string{`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @api.go:6`}
+	want := []string{
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @api.go:8`,
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @api.go:11`,
+	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("%q", got)
 	}

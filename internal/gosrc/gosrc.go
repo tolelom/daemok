@@ -46,6 +46,16 @@ func Files(fset *token.FileSet, dir string, mode parser.Mode) ([]*ast.File, []Pa
 	return files, errs
 }
 
+// ImportsOnly는 파일의 package 절과 import만 읽는다. 본문에 문법 오류가 있어도 읽힌다.
+// 빌드 제약으로 빠지는 파일이면 nil이다.
+func ImportsOnly(fset *token.FileSet, path string) (*ast.File, error) {
+	f, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly|parser.ParseComments)
+	if err != nil || ignored(f) {
+		return nil, err
+	}
+	return f, nil
+}
+
 // SkipDir는 코드를 읽지 않는 디렉토리다.
 func SkipDir(name string) bool {
 	return strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules"

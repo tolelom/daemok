@@ -336,8 +336,9 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 	}
 }
 
-// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문에서 쓰면 정보로 알린다.
-// enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
+// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문의 비교(==, !=)나
+// switch case에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
+// 로그 키나 외부 프로토콜 문자열처럼 다른 자리의 같은 문자열은 enum과 상관없을 때가 많아 보지 않는다.
 func (s *scanner) enumLiterals(id string, f *ast.File) {
 	consts := map[string]string{} // 값 → 상수 이름
 	for _, en := range s.m.Enums {
@@ -358,16 +359,27 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 		if !ok || fn.Body == nil {
 			continue
 		}
+		var compared []ast.Expr
 		ast.Inspect(fn.Body, func(n ast.Node) bool {
-			lit, ok := n.(*ast.BasicLit)
+			switch x := n.(type) {
+			case *ast.BinaryExpr:
+				if x.Op == token.EQL || x.Op == token.NEQ {
+					compared = append(compared, x.X, x.Y)
+				}
+			case *ast.CaseClause:
+				compared = append(compared, x.List...)
+			}
+			return true
+		})
+		for _, e := range compared {
+			lit, ok := ast.Unparen(e).(*ast.BasicLit)
 			if !ok || lit.Kind != token.STRING {
-				return true
+				continue
 			}
 			v, err := strconv.Unquote(lit.Value)
 			if c, hit := consts[v]; err == nil && hit {
 				s.diags.Infof(s.pos(lit.Pos()), "enum 상수 대신 문자열 리터럴을 쓴다: 모듈 %s, %q (%s)", id, v, c)
 			}
-			return true
-		})
+		}
 	}
 }

@@ -108,15 +108,24 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 			}
 		}
 		files, errs := gosrc.Files(fset, p, parser.SkipObjectResolution)
+		// 본문만 깨진 파일(작업 중인 파일)은 import만 읽어 의존에 넣는다. 힌트는 읽은 파일에서만 낸다.
+		all := files
 		for _, e := range errs {
+			if f, err := gosrc.ImportsOnly(fset, e.Path); err == nil {
+				if f != nil {
+					all = append(all, f)
+				}
+				skips = append(skips, Skip{rel(e.Path), "본문을 읽을 수 없어 import만 반영했다: " + e.Err.Error()})
+				continue
+			}
 			skips = append(skips, Skip{rel(e.Path), "Go 파일을 읽을 수 없다: " + e.Err.Error()})
 		}
-		if len(files) == 0 {
+		if len(all) == 0 {
 			return nil
 		}
 		pk := &pkg{dir: rel(p)}
 		seen := map[string]bool{}
-		for _, f := range files {
+		for _, f := range all {
 			if f.Name.Name == "main" {
 				pk.main = true
 			}
