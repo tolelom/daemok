@@ -1,0 +1,62 @@
+package main
+
+import (
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+
+	"github.com/tolelom/daemok/internal/infer"
+)
+
+// runInit은 설계 파일이 없는 Go 모듈의 코드에서 초안을 만들어 설계 디렉토리에 쓴다.
+// 이미 설계 파일이 있으면 쓰지 않고 1, Go 모듈이 아니거나 쓰지 못하면 2다.
+func runInit(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("init", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	design := fs.String("design", "", "설계 디렉토리 (기본 <root>/design)")
+	root := fs.String("root", ".", "코드 루트")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	dir := *design
+	if dir == "" {
+		dir = filepath.Join(*root, "design")
+	}
+	a, err := infer.Analyze(*root)
+	if err != nil {
+		fmt.Fprintf(stderr, "분석할 수 없다: %v\n", err)
+		return 2
+	}
+	p, err := infer.Write(dir, a)
+	switch {
+	case errors.Is(err, infer.ErrDesignExists):
+		fmt.Fprintf(stderr, "%v: %s\n", err, dir)
+		return 1
+	case err != nil:
+		fmt.Fprintf(stderr, "쓸 수 없다: %v\n", err)
+		return 2
+	}
+	printReport(stdout, a.Report)
+	fmt.Fprintf(stdout, "쓴 파일: %s\n", p)
+	return 0
+}
+
+func printReport(w io.Writer, r infer.Report) {
+	fmt.Fprintf(w, "패키지 %d, 모듈 %d, 실행 단위 %d\n", r.Packages, r.Modules, r.Executables)
+	for _, s := range r.Skipped {
+		fmt.Fprintf(w, "건너뜀: %s (%s)\n", s.Path, s.Reason)
+	}
+	for _, c := range r.Cycles {
+		fmt.Fprintf(w, "순환 import: %s\n", strings.Join(c, ", "))
+	}
+	if len(r.FanIn) > 0 {
+		var xs []string
+		for _, f := range r.FanIn {
+			xs = append(xs, fmt.Sprintf("%s %d", f.ID, f.Count))
+		}
+		fmt.Fprintf(w, "많이 쓰이는 패키지: %s\n", strings.Join(xs, ", "))
+	}
+}
