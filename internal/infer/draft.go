@@ -68,7 +68,7 @@ func Analyze(root string) (*Analysis, error) {
 		return nil, fmt.Errorf("코드를 읽을 수 없다: %w", err)
 	}
 	d, rep := build(module, pkgs, skips)
-	return &Analysis{Draft: d, Report: rep}, nil
+	return &Analysis{Draft: d, YAML: Render(d), Report: rep}, nil
 }
 
 func systemID(module string) string {
