@@ -165,13 +165,6 @@ func (g *gen) assign(e *model.Event, fl *model.Field, target, dir string, f *goF
 	return fmt.Sprintf("\tif v, ok := m[%q].(%s); ok {\n\t\t%s = v\n\t} else {\n\t\t%s\n\t}\n", fl.Name, gt, target, fail)
 }
 
-// fieldType은 struct 필드와 같은 규칙의 Go 타입이다.
-func (g *gen) fieldType(fl *model.Field, dir string, f *goFile) string {
-	line := g.structFields([]*model.Field{fl}, dir, f, false)[0]
-	parts := strings.Fields(line)
-	return parts[1]
-}
-
 // helperKind는 필드가 변환 도우미를 쓰면 그 종류를 준다. optional 여부는 호출하는 쪽이 다룬다.
 func (g *gen) helperKind(fl *model.Field) string {
 	if fl.RefType.Name != "" {

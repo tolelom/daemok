@@ -158,23 +158,7 @@ func (g *gen) types() error {
 func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax bool) []string {
 	var lines []string
 	for _, fl := range fields {
-		var gt string
-		if fl.RefType.Name != "" {
-			base := g.goType(fl.RefType.Name, dir, f)
-			if fl.Many {
-				gt = "[]" + base
-			} else {
-				gt = "*" + base
-			}
-		} else {
-			gt = g.goType(fl.Type.Name, dir, f)
-			if fl.Many {
-				gt = "[]" + gt
-			}
-			if fl.Optional && !strings.HasPrefix(gt, "*") && !strings.HasPrefix(gt, "[]") {
-				gt = "*" + gt
-			}
-		}
+		gt := g.fieldType(fl, dir, f)
 		tag := fl.Name
 		if fl.Optional {
 			tag += ",omitempty"
@@ -188,6 +172,25 @@ func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax
 	return lines
 }
 
+// fieldType은 설계 필드의 Go 타입이다. ref는 포인터(many면 슬라이스), optional이면 포인터다.
+func (g *gen) fieldType(fl *model.Field, dir string, f *goFile) string {
+	if fl.RefType.Name != "" {
+		base := g.goType(fl.RefType.Name, dir, f)
+		if fl.Many {
+			return "[]" + base
+		}
+		return "*" + base
+	}
+	gt := g.goType(fl.Type.Name, dir, f)
+	if fl.Many {
+		gt = "[]" + gt
+	}
+	if fl.Optional && !strings.HasPrefix(gt, "*") && !strings.HasPrefix(gt, "[]") {
+		gt = "*" + gt
+	}
+	return gt
+}
+
 func paramName(name string) string {
 	n := lowerFirst(model.GoName(name))
 	if token.IsKeyword(n) {
@@ -196,17 +199,24 @@ func paramName(name string) string {
 	return n
 }
 
+// methodTypes는 계약 메서드의 파라미터와 반환 타입이다. 반환 끝에 error가 붙는다.
+func (g *gen) methodTypes(me *model.Method, dir string, f *goFile) (params, results []string) {
+	for _, p := range me.Params {
+		params = append(params, g.argType(p.Type.Name, dir, f))
+	}
+	for _, r := range me.Returns {
+		results = append(results, g.argType(r.Name, dir, f))
+	}
+	return params, append(results, "error")
+}
+
 // methodSig는 계약 메서드의 시그니처 줄이다. 반환 끝에 error가 붙는다.
 func (g *gen) methodSig(me *model.Method, dir string, f *goFile) string {
+	pts, rs := g.methodTypes(me, dir, f)
 	var ps []string
-	for _, p := range me.Params {
-		ps = append(ps, paramName(p.Name)+" "+g.argType(p.Type.Name, dir, f))
+	for i, p := range me.Params {
+		ps = append(ps, paramName(p.Name)+" "+pts[i])
 	}
-	var rs []string
-	for _, r := range me.Returns {
-		rs = append(rs, g.argType(r.Name, dir, f))
-	}
-	rs = append(rs, "error")
 	ret := " " + rs[0]
 	if len(rs) > 1 {
 		ret = " (" + strings.Join(rs, ", ") + ")"

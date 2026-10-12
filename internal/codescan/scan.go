@@ -29,6 +29,8 @@ type scanner struct {
 	refs map[string]map[string]bool
 	// 모듈·멤버 ID → 패키지 최상위 선언 이름
 	decls map[string]map[string]bool
+	// 모듈·멤버 ID → 타입 이름 → 선언과 그 파일
+	typeSpecs map[string]map[string]typeSpec
 }
 
 // unit은 코드 디렉토리를 가진 모듈이나 그룹 멤버다.
@@ -41,7 +43,7 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	s := &scanner{
 		m: m, root: root, fset: token.NewFileSet(),
 		units: map[string]string{}, imports: map[string]map[string]bool{}, refs: map[string]map[string]bool{},
-		decls: map[string]map[string]bool{},
+		decls: map[string]map[string]bool{}, typeSpecs: map[string]map[string]typeSpec{},
 	}
 	us := s.unitList()
 	for _, u := range us {
@@ -54,6 +56,7 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	s.unusedDeps(us)
 	s.eventRefs(us)
 	s.handWritten()
+	s.shapes()
 	s.diags.Sort()
 	return s.diags
 }
@@ -94,11 +97,13 @@ func (s *scanner) scanUnit(u unit) {
 	s.imports[u.id] = map[string]bool{}
 	s.refs[u.id] = map[string]bool{}
 	s.decls[u.id] = map[string]bool{}
+	s.typeSpecs[u.id] = map[string]typeSpec{}
 	unmanaged := map[string]bool{}
 	for _, f := range s.goFiles(u.dir) {
 		for _, name := range gosrc.TopNames(f) {
 			s.decls[u.id][name] = true
 		}
+		collectTypeSpecs(f, s.typeSpecs[u.id])
 		for _, im := range f.Imports {
 			ip, _ := strconv.Unquote(im.Path.Value)
 			if ip != s.m.GoModule && !strings.HasPrefix(ip, s.m.GoModule+"/") {

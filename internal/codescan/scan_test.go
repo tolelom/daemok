@@ -296,7 +296,7 @@ handler_kinds:
     key: tx_type
 `,
 		"config/config.go":  "package config\n\nconst DefaultMaxBlockTxs = 500\n",
-		"core/core.go":      "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"not found\")\n\ntype TxType string\n\nconst TxTransfer TxType = \"transfer\"\n\ntype Payload struct{ To string }\n\ntype Store interface{ Get(id string) string }\n\nfunc ErrGone() {}\n",
+		"core/core.go":      "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"not found\")\n\ntype TxType string\n\nconst TxTransfer TxType = \"transfer\"\n\ntype Payload struct{ To string }\n\ntype Store interface{ Get(id string) (string, error) }\n\nfunc ErrGone() {}\n",
 		"core/core_test.go": "package core\n\nconst TxMintAsset TxType = \"mint_asset\"\n",
 		"vm/vm.go":          "package vm\n\nimport _ \"example.com/h/core\"\n",
 	}
@@ -323,6 +323,74 @@ handler_kinds:
 		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 에러 vm_gone (ErrGone) @d.yaml",
 		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 핸들러 종류 tx_handler (TxHandler) @d.yaml",
 	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestHandWrittenShapes(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"design/d.yaml": `version: 0.5
+go_module: example.com/sh
+tiers: [a, b]
+modules:
+  model: { tier: a, path: internal/model }
+  post:  { tier: b, path: internal/post, depends_on: [model] }
+types:
+  post_row: { in: model, gen: false, go: { name: Post }, fields: { title: string, avatar_url: string, series_id: { type: uint, optional: true }, views: int, gone: string } }
+  user: { in: model, gen: false, fields: { name: string, missing: string } }
+  status: { in: model, gen: false, fields: { x: string } }
+contracts:
+  service:
+    in: post
+    gen: false
+    methods:
+      get_post_by_id: { params: { id: uint, user: "*uint" }, returns: [post_row] }
+      list:   { params: { page: int }, returns: ["[]post_row", int64] }
+      delete: { params: { id: uint } }
+      gone:   { params: {} }
+      fn:     { params: { cb: string } }
+  embedded:
+    in: post
+    gen: false
+    methods:
+      get: { params: {} }
+`,
+		"internal/model/model.go": "package model\n\nimport \"gorm.io/gorm\"\n\ntype Post struct {\n\tTitle     string\n\tAvatarURL string\n\tSeriesID  *uint\n\tViews     int64\n\tExtra     bool\n\tinternal  int\n}\n\ntype User struct {\n\tgorm.Model\n\tName string\n}\n\ntype Status string\n",
+		"internal/post/post.go": "package post\n\nimport (\n\tm \"example.com/sh/internal/model\"\n)\n\ntype Service interface {\n\tGetPostByID(id uint, user *uint) (*m.Post, error)\n\tList(page int) ([]m.Post, int, error)\n\tDelete(uint) error\n\tFn(cb func()) error\n\tMore() error\n}\n\ntype Embedded interface {\n\tfmtStringer\n\tGet() error\n}\n\ntype fmtStringer interface{ String() string }\n",
+	}
+	for p, c := range files {
+		writeFile(t, filepath.Join(root, p), c)
+	}
+	m, ds := model.Load(filepath.Join(root, "design"))
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	if cds := check.Run(m); cds.HasErrors() {
+		t.Fatalf("check: %v", cds)
+	}
+	var got []string
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "관리하지 않는") {
+			continue
+		}
+		got = append(got, d.Level.String()+": "+d.Msg)
+	}
+	sort.Strings(got)
+	want := []string{
+		"경고: 설계에 없는 메서드가 코드 계약에 있다: 계약 service (More)",
+		"경고: 설계에 없는 필드가 코드 타입에 있다: 타입 post_row (Extra)",
+		"오류: gen: false 계약의 메서드 시그니처가 코드와 다르다: 계약 service, List: 설계 (int) ([]model.Post, int64, error), 코드 (int) ([]model.Post, int, error)",
+		"오류: gen: false 계약의 메서드가 코드에 없다: 계약 service, Gone",
+		"오류: gen: false 타입의 필드 타입이 코드와 다르다: 타입 post_row, Views: 설계 int, 코드 int64",
+		"오류: gen: false 타입의 필드가 코드에 없다: 타입 post_row, Gone",
+		"오류: gen: false 타입이 코드에서 struct가 아니다: 타입 status (Status)",
+		"정보: 대조할 수 없는 타입식이라 건너뛴다: 계약 service, Fn",
+		"정보: 끼워 넣은 interface가 있어 코드에만 있는 메서드는 보지 않는다: 계약 embedded",
+		"정보: 끼워 넣은 필드가 있어 코드에 없는 설계 필드를 확정하지 않는다: 타입 user (Missing)",
+	}
+	sort.Strings(want)
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
 	}
