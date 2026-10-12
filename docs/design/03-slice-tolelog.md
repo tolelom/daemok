@@ -74,7 +74,7 @@ types:
 | 계층 방향 | `post`(service) → `dto`(transport)는 상위 tier 의존이라 에러 |
 | 에러와 HTTP 상태 | `ErrUnauthorized`가 403이면 경고. 매핑 코드(`HTTPStatus`)를 생성하므로 핸들러마다 따로 적지 않는다 |
 
-`post_status` 값과 같은 문자열 리터럴이 모듈 안에 남아 있는지는 코드 본문을 읽어야 잡힌다. MVP의 코드 대조는 import만 읽으므로 범위 밖이다.
+`post_status` 값과 같은 문자열 리터럴은 함수 본문의 비교(`==`, `!=`)와 switch case에 쓴 것만 정보로 알린다. 쿼리 인자처럼 다른 자리에 쓴 리터럴은 보지 않는다.
 
 ## 생성물
 
@@ -106,6 +106,43 @@ export const POST_TITLE_MAX = 255;
 ```
 
 `export: [ts]`가 붙은 상수와 enum은 TypeScript 상수로도 생성한다. 백엔드와 프론트가 같은 값을 따로 들고 있던 곳이 한 정의로 모인다.
+
+## 도입 결과
+
+fiber_api_server `feat/daemok` 브랜치(기준 `main` `6df1865`)에 설계 파일 `design/fiber.yaml`을 두고 도입했다. 배포 중인 서비스라 동작이 바뀌지 않는 범위로 정했다. 모듈 관계는 지금 코드대로 `depends_on`으로 적었고, 생성물로 바꾼 것은 `post_status` enum 하나다. 손으로 쓴 sentinel 에러 22개와 `model`의 GORM 엔티티 6개는 `gen: false`로 올렸다.
+
+| 대상 | 전 | 후 |
+|---|---|---|
+| 글 상태 | `Post.Status string`과 리터럴 `"published"`·`"draft"` 7곳(`post` 6곳, `sitemap` 1곳) | `internal/model/post_status.gen.go`의 `PostStatus`. 필드 타입이 바뀌어 다른 문자열 변수를 넣으면 컴파일 오류다. 테스트 픽스처 `WithStatus`도 이 타입을 받는다 |
+
+- `daemok check`: 오류 0, 경고 0, 정보 0. `go vet ./...`와 `go test ./...`는 통과한다. CI의 golangci-lint는 돌리지 않았다.
+- 문자열 리터럴 검사는 7곳 중 `==` 비교 1곳(`internal/post/service.go:107`)만 잡았다. 나머지 6곳은 GORM `Where`의 인자다.
+- `gen: false` 노드 28개의 선언은 코드 대조가 모두 찾았다. 에러 이름 하나와 타입 이름 하나를 틀리게 바꾼 사본에서는 그 둘을 오류로 낸다.
+- 에러 ID는 설계 전체에서 하나여야 한다. `ErrUnauthorized`와 `ErrPostNotFound`는 `post`, `comment`, `series`에 같은 이름으로 따로 있어 `post` 쪽만 적었다.
+- 서비스 계약(`Service` interface 5개, 메서드 약 35개)은 올리지 않았다. 코드 대조가 계약의 이름만 보고 메서드와 파라미터는 코드와 비교하지 않는다. 엔티티의 필드 목록도 같은 이유로 대조되지 않는다.
+- 필드 타입을 바꾸자 컴파일러가 `internal/testutil/fixtures.go`의 문자열 변수 하나를 잡았다. 리터럴 검사로는 잡히지 않는 자리다.
+
+### 그룹
+
+`post`, `comment`, `series`, `tag`, `user`는 handler와 service로 된 같은 모양의 도메인이다. 이 다섯을 그룹으로 묶으면 `필요한 키가 없다: "kind"` 오류가 난다. 이 코드에는 핸들러 등록 방식이 없어 적을 핸들러 종류가 없으므로 모듈 다섯 개로 둔다.
+
+### 설계 노드 대응 비율
+
+`daemok coverage` 기준 최상위 선언 197개 중 32개(16%)다.
+
+| 패키지 | 최상위 선언 | 설계 대응 | 비율 |
+|---|---|---|---|
+| `internal/model` | 10 | 10 | 100% |
+| `internal/user` | 11 | 6 | 54% |
+| `internal/utils` | 24 | 6 | 25% |
+| `internal/post` | 22 | 5 | 22% |
+| `internal/comment` | 9 | 2 | 22% |
+| `internal/series` | 9 | 2 | 22% |
+| `internal/httputil` | 5 | 1 | 20% |
+| 그 밖의 14개 | 107 | 0 | 0% |
+| 합계 | 197 | 32 | 16% |
+
+가장 큰 `internal/dto`(43)는 요청·응답 DTO이고 설계에 올리지 않았다.
 
 ## 범위 밖
 
