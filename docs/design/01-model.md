@@ -83,7 +83,7 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 | R | `requirements` | `text`, `status: active \| held \| dropped` |
 | L0 | `system`(`actors`, `interfaces` 포함) | `protocol`, `port`, `path`, `used_by`, `spec` |
 | L1 | `executables` | `exposes`, `composes` |
-| L2 | `tiers`, `modules`, `groups` | `tier`, `depends_on`, `needs`, `implements`, `path`, 모듈의 `role`, 그룹의 `kind`·`rule`·`members`, 멤버의 `handles`·`exceptions`·`needs`. `path`가 없으면 ID가 경로다 |
+| L2 | `tiers`, `modules`, `groups` | `tier`, `depends_on`, `needs`, `implements`, `path`, 모듈의 `role`, 그룹의 `kind`(선택)·`rule`·`members`, 멤버의 `handles`·`exceptions`·`needs`. `path`가 없으면 ID가 경로다. `kind` 없는 그룹은 L2 제약 묶음이라 등록 파일과 blank import를 만들지 않고, 멤버에 `handles`를 적으면 에러다 |
 | L3 | `enums`, `consts`, `errors`, `types`, `contracts`, `handler_kinds`, `event_kinds`, `events` | 아래 표 |
 | L4 | `funcs`, `flows` | 함수는 `in`, `kind`+`handles` 또는 `of`, `errors`, `cases`. 흐름은 아래 절 |
 
@@ -176,8 +176,8 @@ flows:
 | 모듈의 types 전부 | `<모듈>/types.gen.go` | struct |
 | 모듈의 `kind: call` 계약 전부 | `<모듈>/contracts.gen.go` | interface |
 | handler_kind 하나 | `<모듈>/<handler_kind id>.gen.go` | 함수 타입 |
-| 그룹 멤버 하나 | `<그룹 path>/<멤버>/register.gen.go` | `init()` 등록, `var _ Handler = f` |
-| 실행 단위 하나 | `cmd/<실행 단위>/modules.gen.go` | `composes`에 적은 그룹의 멤버 blank import |
+| `kind` 있는 그룹의 멤버 하나 | `<그룹 path>/<멤버>/register.gen.go` | `init()` 등록, `var _ Handler = f` |
+| 실행 단위 하나 | `cmd/<실행 단위>/modules.gen.go` | `composes`에 적은 `kind` 있는 그룹의 멤버 blank import |
 | `needs`가 있는 모듈·멤버 | `<path>/needs.gen.go` | 계약마다 `uses`의 메서드만 담은 interface. 멤버는 그룹의 needs를 포함 |
 | 실행 단위 하나 | `cmd/<실행 단위>/contracts.gen.go` | 조립하는 받는 쪽·주는 쪽 쌍마다 구현 타입의 interface 만족 확인. query 구현은 `<주는 모듈>/query` |
 | event_kind 하나 | `<모듈>/<event_kind id>.gen.go` | 이벤트마다 `<이벤트>Data` struct, `encoding: map`이면 `Map()`과 `<이벤트>DataFrom` |

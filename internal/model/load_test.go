@@ -234,7 +234,11 @@ groups:
 	wantDiag(t, ds, Error, `알 수 없는 키 "tierr"`)
 	wantDiag(t, ds, Error, "rule은 no_sibling_deps")
 	wantDiag(t, ds, Error, `알 수 없는 키 "handlez"`)
-	wantDiag(t, ds, Error, `필요한 키가 없다: "kind"`)
+	for _, d := range ds {
+		if strings.Contains(d.Msg, `"kind"`) {
+			t.Fatalf("그룹 kind는 선택이다: %s", d)
+		}
+	}
 }
 
 func TestSecondSystemAndTiers(t *testing.T) {

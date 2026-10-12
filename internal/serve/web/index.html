@@ -803,7 +803,7 @@ function renderDraft() {
 <p class="sub">설계 파일이 없어 코드의 패키지와 import에서 추정했다. tier 이름과 묶음은 사람이 정한다.</p>
 <dl class="facts"><dt>패키지</dt><dd>${r.packages}</dd><dt>모듈</dt><dd>${r.modules}</dd><dt>실행 단위</dt><dd>${r.executables}</dd><dt>많이 쓰이는 패키지</dt><dd>${fan}</dd></dl>
 ${cycles ? `<h3 style="margin-top:22px">서로 import하는 패키지</h3><ul>${cycles}</ul>` : ''}
-${groups ? `<h3 style="margin-top:22px">그룹 후보</h3><p class="muted" style="margin:0 0 6px">그룹은 핸들러 종류가 있어야 해서 초안에 넣지 않았다. 묶을지는 사람이 정한다.</p><ul>${groups}</ul>` : ''}
+${groups ? `<h3 style="margin-top:22px">그룹 후보</h3><p class="muted" style="margin:0 0 6px">멤버마다 다른 의존을 그룹 하나로 적을 수 없어 초안에 넣지 않았다. 묶을지는 사람이 정한다.</p><ul>${groups}</ul>` : ''}
 ${(r.external || []).length ? `<h3 style="margin-top:22px">외부 의존</h3><ul>${r.external.map(e => `<li><span class="id">${esc(e.module)}</span> ${(e.users || []).length ? e.users.map(unitLink).join(', ') : '<span class="muted">쓰는 모듈 없음</span>'}</li>`).join('')}</ul>` : ''}
 ${(r.hints || []).length ? `<h3 style="margin-top:22px">L3 노드 후보</h3><p class="muted" style="margin:0 0 6px">이미 손으로 쓴 선언이다. 설계에 올릴 때는 gen: false로 둔다.</p><ul>${r.hints.map(h => `<li>${esc(h.kind)}${h.type ? ' <span class="id">' + esc(h.type) + '</span>' : ''} ${unitLink(h.module)} <span class="id">${h.names.map(esc).join(', ')}</span> <span class="muted">${esc(h.where)}</span></li>`).join('')}</ul>` : ''}
 <h3 style="margin-top:22px">건너뛴 것</h3><ul>${skipped}</ul>

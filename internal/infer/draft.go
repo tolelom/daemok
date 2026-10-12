@@ -51,7 +51,7 @@ type Report struct {
 	FanIn       []FanIn `json:"fanIn"`
 	// Cycles는 서로 import하는 패키지 묶음의 모듈 ID다. 모든 플랫폼의 파일을 합쳐 보면 생길 수 있다.
 	Cycles [][]string `json:"cycles"`
-	// GroupCandidates는 그룹으로 묶을 만한 형제 패키지다. 그룹은 핸들러 종류(L3)가 있어야 해서 초안에 넣지 않고 제안만 한다.
+	// GroupCandidates는 그룹으로 묶을 만한 형제 패키지다. 멤버에는 개별 depends_on이 없어 멤버마다 다른 의존을 근거 없이 합치게 되므로 초안에 넣지 않고 제안만 한다.
 	GroupCandidates []GroupCandidate `json:"groupCandidates"`
 	// External은 go.mod의 직접 require와 그 모듈을 import하는 모듈·실행 단위다.
 	External []External `json:"external"`

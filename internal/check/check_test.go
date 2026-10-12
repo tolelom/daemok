@@ -592,3 +592,23 @@ func TestErrorGoName(t *testing.T) {
 	src = replace(t, "ErrLow:      { in: core, message: \"low\" }", "ErrLow:      { in: core, message: \"low\" }\n  core_nf: { in: core, message: \"nf\", go: { name: ErrNotFound } }")
 	want(t, run(t, src), model.Error, "같은 패키지에서 생성 이름이 겹친다: core 패키지의 ErrNotFound (에러 ErrNotFound, 에러 core_nf)")
 }
+
+func TestGroupWithoutKind(t *testing.T) {
+	const domains = "groups:\n  domains:\n    tier: domain\n    depends_on: [core]\n    rule: no_sibling_deps\n    members: { post: {}, comment: {} }\n  tx_modules:"
+	src := replace(t, "groups:\n  tx_modules:", domains)
+	src = strings.Replace(src, "rpc_mod: { tier: service, depends_on: [core, vm]", "rpc_mod: { tier: service, depends_on: [core, vm, post]", 1)
+	src = strings.Replace(src, "composes: [core, vm, tx_modules, rpc_mod]", "composes: [core, vm, tx_modules, rpc_mod, domains]", 1)
+	wantNone(t, run(t, src), model.Error)
+
+	// 등록할 곳이 없는 handles
+	bad := strings.Replace(src, "members: { post: {}, comment: {} }", "members: { post: { handles: [transfer] }, comment: {} }", 1)
+	want(t, run(t, bad), model.Error, "핸들러 종류가 없는 그룹의 멤버에 handles가 있다: post")
+
+	// 핸들러 함수를 kind 없는 그룹 멤버에 둘 수 없다
+	bad = strings.Replace(src, "in: economy\n    kind: tx_handler", "in: post\n    kind: tx_handler", 1)
+	want(t, run(t, bad), model.Error, "핸들러 함수는 핸들러 종류가 있는 그룹의 멤버에 있어야 한다: handle_transfer")
+
+	// 형제 의존 규칙은 kind와 상관없이 본다
+	bad = strings.Replace(src, "members: { post: {}, comment: {} }", "members: { post: {}, comment: { exceptions: [{ depends_on: post, reason: r }] } }", 1)
+	want(t, run(t, bad), model.Info, "그룹 규칙 예외: comment → post")
+}
