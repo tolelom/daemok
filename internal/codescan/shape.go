@@ -8,6 +8,7 @@ import (
 
 	"github.com/tolelom/daemok/internal/gen/golang"
 	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/yaml"
 )
 
 type typeSpec struct {
@@ -34,9 +35,10 @@ func matchName(name string) string {
 	return strings.ToLower(strings.ReplaceAll(name, "_", ""))
 }
 
-// typeExpr는 코드의 타입식을 생성 코드와 같은 모양으로 쓴다. 다른 패키지는 import 경로의 마지막 요소로 한정한다.
+// typeExpr는 코드의 타입식을 생성 코드와 같은 모양으로 쓴다. 설계 모듈 패키지는 import 경로의 마지막 요소로,
+// 그 밖의 패키지는 코드에 쓴 이름 그대로 한정한다.
 // 생성 코드에 나오지 않는 타입식(함수, 채널, 배열 길이, 가변 인자, 제네릭 등)이면 false다.
-func typeExpr(e ast.Expr, f *ast.File) (string, bool) {
+func typeExpr(e ast.Expr, f *ast.File, module string) (string, bool) {
 	switch x := e.(type) {
 	case *ast.Ident:
 		return x.Name, true
@@ -45,35 +47,39 @@ func typeExpr(e ast.Expr, f *ast.File) (string, bool) {
 		if !ok {
 			return "", false
 		}
-		return importBase(f, pkg.Name) + "." + x.Sel.Name, true
+		return importBase(f, pkg.Name, module) + "." + x.Sel.Name, true
 	case *ast.StarExpr:
-		s, ok := typeExpr(x.X, f)
+		s, ok := typeExpr(x.X, f, module)
 		return "*" + s, ok
 	case *ast.ArrayType:
 		if x.Len != nil {
 			return "", false
 		}
-		s, ok := typeExpr(x.Elt, f)
+		s, ok := typeExpr(x.Elt, f, module)
 		return "[]" + s, ok
 	case *ast.MapType:
-		k, ok1 := typeExpr(x.Key, f)
-		v, ok2 := typeExpr(x.Value, f)
+		k, ok1 := typeExpr(x.Key, f, module)
+		v, ok2 := typeExpr(x.Value, f, module)
 		return "map[" + k + "]" + v, ok1 && ok2
 	case *ast.InterfaceType:
 		if x.Methods == nil || len(x.Methods.List) == 0 {
 			return "any", true
 		}
 	case *ast.ParenExpr:
-		return typeExpr(x.X, f)
+		return typeExpr(x.X, f, module)
 	}
 	return "", false
 }
 
-// importBase는 파일에서 패키지를 가리키는 이름을 그 import 경로의 마지막 요소로 바꾼다.
-// 별칭 없는 import의 패키지 이름은 경로의 마지막 요소로 본다.
-func importBase(f *ast.File, name string) string {
+// importBase는 파일에서 패키지를 가리키는 이름이 설계 모듈(go_module 안) 패키지면 그 import 경로의
+// 마지막 요소로 바꾼다. 생성기가 그 이름으로 한정하기 때문이다. 별칭 없는 import의 패키지 이름은
+// 경로의 마지막 요소로 본다. go_module 밖 패키지는 설계에 코드와 같은 이름으로 적으므로 그대로 둔다.
+func importBase(f *ast.File, name, module string) string {
 	for _, im := range f.Imports {
 		p, _ := strconv.Unquote(im.Path.Value)
+		if p != module && !strings.HasPrefix(p, module+"/") {
+			continue
+		}
 		local := path.Base(p)
 		if im.Name != nil {
 			local = im.Name.Name
@@ -86,13 +92,13 @@ func importBase(f *ast.File, name string) string {
 }
 
 // fieldTypes는 파라미터·반환 목록을 타입 하나씩 편다. a, b int는 int 두 개다.
-func fieldTypes(fl *ast.FieldList, f *ast.File) ([]string, bool) {
+func fieldTypes(fl *ast.FieldList, f *ast.File, module string) ([]string, bool) {
 	var out []string
 	if fl == nil {
 		return out, true
 	}
 	for _, fd := range fl.List {
-		t, ok := typeExpr(fd.Type, f)
+		t, ok := typeExpr(fd.Type, f, module)
 		if !ok {
 			return nil, false
 		}
@@ -112,29 +118,48 @@ func sameList(a, b []string) bool {
 }
 
 // shapes는 gen: false인 call 계약과 타입의 코드 선언이 생성했다면 나왔을 모양과 같은지 본다.
-// 선언이 없는 경우는 handWritten이 알린다.
+// 선언이 없는 경우는 handWritten이 알린다. 타입이 아닌 선언(함수, 변수, 상수)이면 오류다.
 func (s *scanner) shapes() {
 	for _, ct := range s.m.Contracts {
 		if ct.Gen || ct.Kind != "call" {
 			continue
 		}
-		if ts, ok := s.typeSpecs[ct.In.Name][ct.GoName()]; ok {
+		ts, ok := s.typeSpecs[ct.In.Name][ct.GoName()]
+		switch {
+		case ok && s.uncomparable(ts, "계약", ct.ID, ct.Pos):
+		case ok:
 			s.contractShape(ct, ts)
+		case s.decls[ct.In.Name][ct.GoName()]:
+			s.diags.Errorf(ct.Pos, "손으로 쓴 계약이 interface가 아니다: 계약 %s (%s)", ct.ID, ct.GoName())
 		}
 	}
 	for _, t := range s.m.Types {
 		if t.Gen {
 			continue
 		}
-		if ts, ok := s.typeSpecs[t.In.Name][t.GoName()]; ok {
+		ts, ok := s.typeSpecs[t.In.Name][t.GoName()]
+		switch {
+		case ok && s.uncomparable(ts, "타입", t.ID, t.Pos):
+		case ok:
 			s.typeShape(t, ts)
+		case s.decls[t.In.Name][t.GoName()]:
+			s.diags.Errorf(t.Pos, "손으로 쓴 타입이 struct가 아니다: 타입 %s (%s)", t.ID, t.GoName())
 		}
 	}
 }
 
+// uncomparable은 타입 별칭과 제네릭 선언이면 정보로 알리고 true를 준다. 생성 코드에 없는 모양이다.
+func (s *scanner) uncomparable(ts typeSpec, what, id string, pos yaml.Pos) bool {
+	if ts.spec.Assign == 0 && ts.spec.TypeParams == nil {
+		return false
+	}
+	s.diags.Infof(pos, "대조할 수 없는 타입식이라 건너뛴다: %s %s (%s)", what, id, ts.spec.Name.Name)
+	return true
+}
+
 func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 	iface, ok := ts.spec.Type.(*ast.InterfaceType)
-	if !ok || ts.spec.TypeParams != nil {
+	if !ok {
 		s.diags.Errorf(ct.Pos, "손으로 쓴 계약이 interface가 아니다: 계약 %s (%s)", ct.ID, ct.GoName())
 		return
 	}
@@ -152,8 +177,8 @@ func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 			embedded = true
 			continue
 		}
-		ps, ok1 := fieldTypes(ft.Params, ts.file)
-		rs, ok2 := fieldTypes(ft.Results, ts.file)
+		ps, ok1 := fieldTypes(ft.Params, ts.file, s.m.GoModule)
+		rs, ok2 := fieldTypes(ft.Results, ts.file, s.m.GoModule)
 		for _, n := range fd.Names {
 			code[matchName(n.Name)] = &method{n.Name, ps, rs, ok1 && ok2}
 			order = append(order, matchName(n.Name))
@@ -192,7 +217,7 @@ func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 
 func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 	st, ok := ts.spec.Type.(*ast.StructType)
-	if !ok || ts.spec.TypeParams != nil {
+	if !ok {
 		s.diags.Errorf(t.Pos, "손으로 쓴 타입이 struct가 아니다: 타입 %s (%s)", t.ID, t.GoName())
 		return
 	}
@@ -208,7 +233,7 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 			embedded = true
 			continue
 		}
-		typ, ok := typeExpr(fd.Type, ts.file)
+		typ, ok := typeExpr(fd.Type, ts.file, s.m.GoModule)
 		for _, n := range fd.Names {
 			if !n.IsExported() {
 				continue

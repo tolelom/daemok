@@ -22,11 +22,16 @@ type goFile struct {
 	pkg     string
 	imports map[string]string // import 경로 → 이름. 이름이 경로의 마지막 요소와 같으면 별칭 없이 쓴다
 	parts   []string
+	// shape이면 별칭을 붙이지 않고 항상 경로의 마지막 요소를 쓴다. 코드 대조용 모양 계산에만 쓴다.
+	shape bool
 }
 
 // use는 경로를 import하고 코드에서 쓸 패키지 이름을 준다.
 // 마지막 요소가 이미 다른 경로에 쓰였으면 경로 요소를 이어 붙인 별칭을 쓴다.
 func (f *goFile) use(importPath string) string {
+	if f.shape {
+		return path.Base(importPath)
+	}
 	if name, ok := f.imports[importPath]; ok {
 		return name
 	}

@@ -16,11 +16,13 @@ type FieldShape struct {
 }
 
 // shapeFile은 소유 패키지 안의 빈 파일이다. 타입식은 그 패키지에서 쓰는 모양이 되고
-// 다른 패키지는 import 경로의 마지막 요소로 한정된다.
+// 다른 패키지는 별칭 없이 import 경로의 마지막 요소로 한정된다.
 func shapeFile(m *model.Model, owner string) (*gen, string, *goFile) {
 	g := &gen{m: m, files: map[string]*goFile{}}
 	dir := g.ownerPath(owner)
-	return g, dir, g.file(dir + "/shape.go")
+	f := g.file(dir + "/shape.go")
+	f.shape = true
+	return g, dir, f
 }
 
 // ContractShape는 계약의 메서드를 생성 규칙대로 바꾼 것이다. 코드 대조가 gen: false 계약에 쓴다.

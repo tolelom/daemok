@@ -395,3 +395,88 @@ contracts:
 		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
 	}
 }
+
+// scanShapes는 설계와 코드 파일로 Scan을 돌려 "손으로 쓴" 대조 진단만 준다.
+func scanShapes(t *testing.T, files map[string]string) []string {
+	t.Helper()
+	root := t.TempDir()
+	for p, c := range files {
+		writeFile(t, filepath.Join(root, p), c)
+	}
+	m, ds := model.Load(filepath.Join(root, "design"))
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	if cds := check.Run(m); cds.HasErrors() {
+		t.Fatalf("check: %v", cds)
+	}
+	var got []string
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "손으로 쓴") || strings.Contains(d.Msg, "대조할 수 없는") {
+			got = append(got, d.Level.String()+": "+d.Msg)
+		}
+	}
+	sort.Strings(got)
+	return got
+}
+
+func TestShapesIgnoreImportAliases(t *testing.T) {
+	// 생성기는 이름이 겹치면 bmodel 같은 별칭을 붙이지만 대조는 경로의 마지막 요소로 한다
+	got := scanShapes(t, map[string]string{
+		"design/d.yaml": `version: 0.5
+go_module: example.com/r
+tiers: [a, b]
+modules:
+  amodel: { tier: a, path: internal/a/model }
+  bmodel: { tier: a, path: internal/b/model }
+  post:   { tier: a, path: internal/post }
+  svc:    { tier: b, path: internal/svc/post, depends_on: [amodel, bmodel, post] }
+types:
+  user:  { in: amodel, gen: false, fields: { name: string } }
+  item:  { in: bmodel, gen: false, fields: { name: string } }
+  entry: { in: post, gen: false, fields: { name: string, raw: "yaml.Node" } }
+contracts:
+  service:
+    in: svc
+    gen: false
+    methods:
+      get:  { params: { u: user, i: item }, returns: [user] }
+      peek: { params: { e: entry } }
+`,
+		"internal/a/model/m.go": "package model\n\ntype User struct{ Name string }\n",
+		"internal/b/model/m.go": "package model\n\ntype Item struct{ Name string }\n",
+		"internal/post/p.go":    "package post\n\nimport yaml \"gopkg.in/yaml.v3\"\n\ntype Entry struct {\n\tName string\n\tRaw  yaml.Node\n}\n",
+		"internal/svc/post/s.go": "package post\n\nimport (\n\ta \"example.com/r/internal/a/model\"\n\tb \"example.com/r/internal/b/model\"\n\tp \"example.com/r/internal/post\"\n)\n\ntype Service interface {\n\tGet(u *a.User, i *b.Item) (*a.User, error)\n\tPeek(e *p.Entry) error\n}\n",
+	})
+	if len(got) != 0 {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+func TestShapesWrongDeclKind(t *testing.T) {
+	got := scanShapes(t, map[string]string{
+		"design/d.yaml": `version: 0.5
+go_module: example.com/w
+tiers: [a]
+modules:
+  core: { tier: a }
+types:
+  entry: { in: core, gen: false, fields: { name: string } }
+  alias: { in: core, gen: false, fields: { name: string } }
+  gen_t: { in: core, gen: false, fields: { name: string } }
+contracts:
+  service: { in: core, gen: false, methods: { get: { params: {} } } }
+`,
+		"core/c.go": "package core\n\nfunc Service() {}\n\nvar Entry = 1\n\ntype row struct{ Name string }\n\ntype Alias = row\n\ntype GenT[T any] struct{ Name T }\n",
+	})
+	want := []string{
+		"오류: 손으로 쓴 계약이 interface가 아니다: 계약 service (Service)",
+		"오류: 손으로 쓴 타입이 struct가 아니다: 타입 entry (Entry)",
+		"정보: 대조할 수 없는 타입식이라 건너뛴다: 타입 alias (Alias)",
+		"정보: 대조할 수 없는 타입식이라 건너뛴다: 타입 gen_t (GenT)",
+	}
+	sort.Strings(want)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}
