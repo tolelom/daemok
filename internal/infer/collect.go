@@ -1,4 +1,4 @@
-// Package infer는 설계 파일이 없는 Go 모듈의 코드에서 L2 설계 초안을 만든다.
+// Package infer는 Go 모듈의 코드에서 L2 설계 초안을 만든다.
 // 기존 프로젝트를 처음 가져올 때만 쓴다.
 package infer
 

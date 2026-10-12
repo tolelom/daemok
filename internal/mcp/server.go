@@ -201,7 +201,7 @@ func toolList() []map[string]any {
 			"inputSchema": with(map[string]any{"module": str("모듈, 그룹, 그룹 멤버 ID")})},
 		{"name": "check", "description": "설계 검사, import 대조, 생성 파일 최신 여부를 돌려 진단을 JSON으로 준다(daemok check --format json과 같다)",
 			"inputSchema": with(nil)},
-		{"name": "draft", "description": "설계 파일이 없는 Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 파일은 쓰지 않는다(daemok init --dry-run과 같다)",
+		{"name": "draft", "description": "Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 설계 파일이 있어도 코드만 본다. 파일은 쓰지 않는다(daemok init --dry-run과 같다)",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"root": paths["root"]}}},
 	}
 }
