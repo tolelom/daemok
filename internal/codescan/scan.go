@@ -385,8 +385,8 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 	}
 }
 
-// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문의 비교(==, !=)나
-// switch case에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
+// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문의 비교(==, !=),
+// switch case, SQL 자리표시자 값(placeholderArgs)에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
 // 로그 키나 외부 프로토콜 문자열처럼 다른 자리의 같은 문자열은 enum과 상관없을 때가 많아 보지 않는다.
 func (s *scanner) enumLiterals(id string, f *ast.File) {
 	consts := map[string]string{} // 값 → 상수 이름
@@ -417,6 +417,8 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 				}
 			case *ast.CaseClause:
 				compared = append(compared, x.List...)
+			case *ast.CallExpr:
+				compared = append(compared, placeholderArgs(x)...)
 			}
 			return true
 		})
@@ -431,4 +433,18 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 			}
 		}
 	}
+}
+
+// placeholderArgs는 ?가 든 문자열 리터럴 인자 뒤의 인자다. db.Where("status = ?", "published")의 값 자리다.
+func placeholderArgs(call *ast.CallExpr) []ast.Expr {
+	for i, a := range call.Args {
+		lit, ok := ast.Unparen(a).(*ast.BasicLit)
+		if !ok || lit.Kind != token.STRING {
+			continue
+		}
+		if q, err := strconv.Unquote(lit.Value); err == nil && strings.Contains(q, "?") {
+			return call.Args[i+1:]
+		}
+	}
+	return nil
 }
