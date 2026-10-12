@@ -116,31 +116,43 @@ fiber_api_server `feat/daemok` 브랜치(기준 `main` `6df1865`)에 설계 파�
 | 글 상태 | `Post.Status string`과 리터럴 `"published"`·`"draft"` 7곳(`post` 6곳, `sitemap` 1곳) | `internal/model/post_status.gen.go`의 `PostStatus`. 필드 타입이 바뀌어 다른 문자열 변수를 넣으면 컴파일 오류다. 테스트 픽스처 `WithStatus`도 이 타입을 받는다 |
 
 - `daemok check`: 오류 0, 경고 0, 정보 0. `go vet ./...`와 `go test ./...`는 통과한다. CI의 golangci-lint는 돌리지 않았다.
-- 문자열 리터럴 검사는 7곳 중 `==` 비교 1곳(`internal/post/service.go:107`)만 잡았다. 나머지 6곳은 GORM `Where`의 인자다.
+- 형식 0.4에서 문자열 리터럴 검사는 7곳 중 `==` 비교 1곳(`internal/post/service.go:107`)만 잡았다. 나머지 6곳 중 5곳은 GORM `Where`의 인자이고 1곳은 대입(`service.go:76`)이다.
 - `gen: false` 노드 28개의 선언은 코드 대조가 모두 찾았다. 에러 이름 하나와 타입 이름 하나를 틀리게 바꾼 사본에서는 그 둘을 오류로 낸다.
-- 에러 ID는 설계 전체에서 하나여야 한다. `ErrUnauthorized`와 `ErrPostNotFound`는 `post`, `comment`, `series`에 같은 이름으로 따로 있어 `post` 쪽만 적었다.
-- 서비스 계약(`Service` interface 5개, 메서드 약 35개)은 올리지 않았다. 코드 대조가 계약의 이름만 보고 메서드와 파라미터는 코드와 비교하지 않는다. 엔티티의 필드 목록도 같은 이유로 대조되지 않는다.
 - 필드 타입을 바꾸자 컴파일러가 `internal/testutil/fixtures.go`의 문자열 변수 하나를 잡았다. 리터럴 검사로는 잡히지 않는 자리다.
+
+### 형식 0.5 적용
+
+`feat/daemok` `382fdec`에서 설계 파일을 형식 0.5로 올렸다.
+
+| 대상 | 0.4 | 0.5 |
+|---|---|---|
+| 같은 이름의 sentinel | `ErrUnauthorized`, `ErrPostNotFound`는 `post` 쪽만 적음 | `comment`, `series` 쪽 4개를 따로 ID를 두고 `go.name`으로 적음. 에러 26개 |
+| 엔티티 | 이름만 대조. GORM 관리 필드는 적지 않음 | 엔티티 6개의 필드 전부를 적고 필드 타입까지 대조. 연관 `User`는 값 필드라 `ref`가 아니라 `type: user`로 적음 |
+| post 서비스 계약 | 올리지 않음 | `post_service`(`Service`) 메서드 9개를 시그니처까지 대조. `errors`는 코드의 `return` 기준 |
+
+- `daemok check`: 오류 0, 경고 1, 정보 0. 경고는 `IsLiked(postID, userID uint) bool`이다. 계약 메서드는 반환 끝에 `error`가 붙어 이 메서드를 적을 수 없다.
+- 엔티티 대조를 처음 돌렸을 때 `series`, `post`, `comment`의 `user`를 `ref`(포인터)로 적은 것이 코드의 값 필드와 달라 오류 3개가 나왔다. 0.4에서는 필드를 대조하지 않아 드러나지 않았다.
+- 같은 설계를 도입 전 코드(`main` `6df1865`)에 대면 리터럴 검사가 `Where` 인자 5곳을 포함해 6곳을 잡는다. 대입 1곳은 보지 않는다. 엔티티 대조는 `Post.Status`가 `string`이라 설계의 `PostStatus`와 다르다는 오류를 낸다.
 
 ### 그룹
 
-`post`, `comment`, `series`, `tag`, `user`는 handler와 service로 된 같은 모양의 도메인이다. 이 다섯을 그룹으로 묶으면 `필요한 키가 없다: "kind"` 오류가 난다. 이 코드에는 핸들러 등록 방식이 없어 적을 핸들러 종류가 없으므로 모듈 다섯 개로 둔다.
+`post`, `comment`, `series`, `tag`, `user`는 handler와 service로 된 같은 모양의 도메인이고 서로 import하지 않는다(`975ae34`). 형식 0.5에서는 `kind` 없는 그룹으로 묶을 수 있지만 묶지 않았다. 다섯 모듈의 `depends_on`이 서로 다르고(`tag`는 `dto`만, `user`는 `dto`, `model`, `upload`, `utils`, `validate`) 멤버에는 개별 `depends_on`이 없어, 묶으면 그룹 `depends_on`이 합집합이 되어 모듈별 의존 검사가 느슨해진다. 형제끼리 import하지 않는다는 것은 모듈로 둔 지금도 설계에 없는 의존 오류로 잡힌다.
 
 ### 설계 노드 대응 비율
 
-`daemok coverage` 기준 최상위 선언 197개 중 32개(16%)다.
+`daemok coverage` 기준 최상위 선언 197개 중 37개(18%)다. 형식 0.4에서는 32개(16%)였고, 늘어난 5개는 `comment`, `series`의 에러 4개와 `post`의 `Service`다. 이 비율은 최상위 선언만 세므로 0.5에서 대조하게 된 엔티티 필드와 계약 메서드는 들어가지 않는다.
 
 | 패키지 | 최상위 선언 | 설계 대응 | 비율 |
 |---|---|---|---|
 | `internal/model` | 10 | 10 | 100% |
 | `internal/user` | 11 | 6 | 54% |
+| `internal/comment` | 9 | 4 | 44% |
+| `internal/series` | 9 | 4 | 44% |
+| `internal/post` | 22 | 6 | 27% |
 | `internal/utils` | 24 | 6 | 25% |
-| `internal/post` | 22 | 5 | 22% |
-| `internal/comment` | 9 | 2 | 22% |
-| `internal/series` | 9 | 2 | 22% |
 | `internal/httputil` | 5 | 1 | 20% |
 | 그 밖의 14개 | 107 | 0 | 0% |
-| 합계 | 197 | 32 | 16% |
+| 합계 | 197 | 37 | 18% |
 
 가장 큰 `internal/dto`(43)는 요청·응답 DTO이고 설계에 올리지 않았다.
 

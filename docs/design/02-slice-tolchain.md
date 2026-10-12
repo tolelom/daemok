@@ -169,6 +169,7 @@ tolchain `feat/daemok` 브랜치(기준 `main` `29c1d3a`)에 형식 v0.4 설계 
 | 블록 적용 | `network/sync.go`의 `handleBlocks`와 `handleBlock`에 같은 순서가 두 번 | 흐름 `apply_block`(단계 13개) 하나를 둘이 부른다. 단계 본문은 `network/apply_block.go` |
 
 - `daemok check`: 오류 0, 경고 2(보류 요구사항 `REQ-random`에 연결된 요소, 케이스가 없는 에러 `ErrBalanceOverflow`), 정보 1(그룹 예외 `reward → asset`). import 대조와 이벤트 상수 참조에서 어긋난 곳이 없다.
+- 형식 0.5로 올린 뒤(`a8a41c6`, 첫 줄만 바꿈)에도 `daemok check` 결과는 오류 0, 경고 2, 정보 33으로 같다. `gen: false` 타입 `TransferPayload`의 필드 대조도 통과한다.
 - `go test ./...`는 `core`의 `TestHash_OnBehalfOf_BackwardCompatible` 하나만 실패한다. 이 실패는 도입 전 `29c1d3a`에서도 같다.
 - indexer는 이벤트 본문을 지금처럼 `ev.Data["키"]`로 읽는다. indexer 테스트가 키 일부가 빠진 이벤트를 건너뛰거나 처리하는 동작을 확인하고 있어, 키가 하나라도 없으면 오류를 내는 `<이벤트>DataFrom`으로 바꾸지 않았다.
 
