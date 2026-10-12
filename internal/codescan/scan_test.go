@@ -312,16 +312,16 @@ handler_kinds:
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "gen: false") {
+		if strings.Contains(d.Msg, "손으로 쓴") {
 			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File))
 		}
 	}
 	sort.Strings(got)
 	want := []string{
-		"오류: gen: false인데 코드에 선언이 없다: 모듈 config, 상수 max_tx_age (MaxTxAge) @d.yaml",
-		"오류: gen: false인데 코드에 선언이 없다: 모듈 core, enum tx_type (TxMintAsset) @d.yaml",
-		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 에러 vm_gone (ErrGone) @d.yaml",
-		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 핸들러 종류 tx_handler (TxHandler) @d.yaml",
+		"오류: 손으로 쓴다고 한 선언이 코드에 없다: 모듈 config, 상수 max_tx_age (MaxTxAge) @d.yaml",
+		"오류: 손으로 쓴다고 한 선언이 코드에 없다: 모듈 core, enum tx_type (TxMintAsset) @d.yaml",
+		"오류: 손으로 쓴다고 한 선언이 코드에 없다: 모듈 vm, 에러 vm_gone (ErrGone) @d.yaml",
+		"오류: 손으로 쓴다고 한 선언이 코드에 없다: 모듈 vm, 핸들러 종류 tx_handler (TxHandler) @d.yaml",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
@@ -381,11 +381,11 @@ contracts:
 	want := []string{
 		"경고: 설계에 없는 메서드가 코드 계약에 있다: 계약 service (More)",
 		"경고: 설계에 없는 필드가 코드 타입에 있다: 타입 post_row (Extra)",
-		"오류: gen: false 계약의 메서드 시그니처가 코드와 다르다: 계약 service, List: 설계 (int) ([]model.Post, int64, error), 코드 (int) ([]model.Post, int, error)",
-		"오류: gen: false 계약의 메서드가 코드에 없다: 계약 service, Gone",
-		"오류: gen: false 타입의 필드 타입이 코드와 다르다: 타입 post_row, Views: 설계 int, 코드 int64",
-		"오류: gen: false 타입의 필드가 코드에 없다: 타입 post_row, Gone",
-		"오류: gen: false 타입이 코드에서 struct가 아니다: 타입 status (Status)",
+		"오류: 손으로 쓴 계약 메서드의 시그니처가 설계와 다르다: 계약 service, List: 설계 (int) ([]model.Post, int64, error), 코드 (int) ([]model.Post, int, error)",
+		"오류: 손으로 쓴 계약에 설계 메서드가 없다: 계약 service, Gone",
+		"오류: 손으로 쓴 타입 필드의 타입이 설계와 다르다: 타입 post_row, Views: 설계 int, 코드 int64",
+		"오류: 손으로 쓴 타입에 설계 필드가 없다: 타입 post_row, Gone",
+		"오류: 손으로 쓴 타입이 struct가 아니다: 타입 status (Status)",
 		"정보: 대조할 수 없는 타입식이라 건너뛴다: 계약 service, Fn",
 		"정보: 끼워 넣은 interface가 있어 코드에만 있는 메서드는 보지 않는다: 계약 embedded",
 		"정보: 끼워 넣은 필드가 있어 코드에 없는 설계 필드를 확정하지 않는다: 타입 user (Missing)",

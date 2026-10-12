@@ -135,7 +135,7 @@ func (s *scanner) shapes() {
 func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 	iface, ok := ts.spec.Type.(*ast.InterfaceType)
 	if !ok || ts.spec.TypeParams != nil {
-		s.diags.Errorf(ct.Pos, "gen: false 계약이 코드에서 interface가 아니다: 계약 %s (%s)", ct.ID, ct.GoName())
+		s.diags.Errorf(ct.Pos, "손으로 쓴 계약이 interface가 아니다: 계약 %s (%s)", ct.ID, ct.GoName())
 		return
 	}
 	type method struct {
@@ -167,11 +167,11 @@ func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 		pos := ct.Methods[i].Pos
 		switch {
 		case !ok:
-			s.diags.Errorf(pos, "gen: false 계약의 메서드가 코드에 없다: 계약 %s, %s", ct.ID, want.Name)
+			s.diags.Errorf(pos, "손으로 쓴 계약에 설계 메서드가 없다: 계약 %s, %s", ct.ID, want.Name)
 		case !got.ok:
 			s.diags.Infof(pos, "대조할 수 없는 타입식이라 건너뛴다: 계약 %s, %s", ct.ID, got.name)
 		case !sameList(want.Params, got.params) || !sameList(want.Results, got.results):
-			s.diags.Errorf(pos, "gen: false 계약의 메서드 시그니처가 코드와 다르다: 계약 %s, %s: 설계 %s, 코드 %s",
+			s.diags.Errorf(pos, "손으로 쓴 계약 메서드의 시그니처가 설계와 다르다: 계약 %s, %s: 설계 %s, 코드 %s",
 				ct.ID, got.name, signature(want.Params, want.Results), signature(got.params, got.results))
 		}
 	}
@@ -193,7 +193,7 @@ func (s *scanner) contractShape(ct *model.Contract, ts typeSpec) {
 func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 	st, ok := ts.spec.Type.(*ast.StructType)
 	if !ok || ts.spec.TypeParams != nil {
-		s.diags.Errorf(t.Pos, "gen: false 타입이 코드에서 struct가 아니다: 타입 %s (%s)", t.ID, t.GoName())
+		s.diags.Errorf(t.Pos, "손으로 쓴 타입이 struct가 아니다: 타입 %s (%s)", t.ID, t.GoName())
 		return
 	}
 	type field struct {
@@ -228,11 +228,11 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 		case !ok && embedded:
 			unknown = append(unknown, want.Name)
 		case !ok:
-			s.diags.Errorf(pos, "gen: false 타입의 필드가 코드에 없다: 타입 %s, %s", t.ID, want.Name)
+			s.diags.Errorf(pos, "손으로 쓴 타입에 설계 필드가 없다: 타입 %s, %s", t.ID, want.Name)
 		case !got.ok:
 			s.diags.Infof(pos, "대조할 수 없는 타입식이라 건너뛴다: 타입 %s, %s", t.ID, got.name)
 		case want.Type != got.typ:
-			s.diags.Errorf(pos, "gen: false 타입의 필드 타입이 코드와 다르다: 타입 %s, %s: 설계 %s, 코드 %s", t.ID, got.name, want.Type, got.typ)
+			s.diags.Errorf(pos, "손으로 쓴 타입 필드의 타입이 설계와 다르다: 타입 %s, %s: 설계 %s, 코드 %s", t.ID, got.name, want.Type, got.typ)
 		}
 	}
 	if len(unknown) > 0 {

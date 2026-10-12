@@ -309,7 +309,7 @@ func (s *scanner) handWritten() {
 		}
 		for _, n := range names {
 			if !s.decls[o.In.Name][n] {
-				s.diags.Errorf(o.Pos, "gen: false인데 코드에 선언이 없다: 모듈 %s, %s %s (%s)", o.In.Name, what, o.ID, n)
+				s.diags.Errorf(o.Pos, "손으로 쓴다고 한 선언이 코드에 없다: 모듈 %s, %s %s (%s)", o.In.Name, what, o.ID, n)
 			}
 		}
 	}
