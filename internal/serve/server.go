@@ -112,8 +112,12 @@ func (s *Server) refresh() {
 		st.Mode, st.Fatal, st.Problem = "none", true, err.Error()
 	}
 	st.CanEdit = st.Mode == "check" && s.options().Local
+	refreshBuilt()
 	s.publish(st)
 }
+
+// refreshBuilt는 상태를 다 만들고 내기 직전에 불린다. 테스트가 상태 만들기를 겹치게 하려고 바꾼다.
+var refreshBuilt = func() {}
 
 // designSum은 설계 디렉토리 *.yaml의 이름과 내용 요약이다.
 func designSum(design string) string {
