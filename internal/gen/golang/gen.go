@@ -4,6 +4,7 @@ package golang
 import (
 	"fmt"
 	"go/token"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -226,7 +227,12 @@ func (g *gen) methodSig(me *model.Method, dir string, f *goFile) string {
 		var names []string
 		for _, r := range me.Errors {
 			if e := g.m.Error(r.Name); e != nil {
-				names = append(names, e.GoName())
+				// 주석이라 import하지 않고 패키지 이름만 붙인다
+				name := e.GoName()
+				if owner := g.ownerPath(e.In.Name); owner != dir {
+					name = path.Base(owner) + "." + name
+				}
+				names = append(names, name)
 			} else {
 				names = append(names, r.Name)
 			}

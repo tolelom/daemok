@@ -136,7 +136,7 @@ contracts:
   store:
     in: api
     methods:
-      get: { params: { id: uint }, returns: [], errors: [core_nf] }
+      get: { params: { id: uint }, returns: [], errors: [core_nf, api_nf] }
 funcs:
   get:
     in: api
@@ -153,7 +153,7 @@ funcs:
 		`ErrNotFound = errors.New("nf")`,
 		"case errors.Is(err, ErrNotFound):",
 		"core.ErrNotFound",
-		"// ErrNotFound",
+		"// core.ErrNotFound, ErrNotFound",
 	} {
 		if !strings.Contains(all, s) {
 			t.Errorf("생성 코드에 %q가 없다", s)

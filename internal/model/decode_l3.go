@@ -52,7 +52,7 @@ func (mg *merger) errors(n *yaml.Node) {
 		if !mg.unique("에러", id, pos) {
 			return
 		}
-		e := &ErrorDef{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
+		e := &ErrorDef{Owned: d.owned(id, pos, v), Go: d.goOpts(v, "name")}
 		if d.need(pos, v, "message") {
 			e.Message = d.str(v, "message")
 		}

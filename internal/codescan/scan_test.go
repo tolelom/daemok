@@ -359,7 +359,7 @@ contracts:
       get: { params: {} }
 `,
 		"internal/model/model.go": "package model\n\nimport \"gorm.io/gorm\"\n\ntype Post struct {\n\tTitle     string\n\tAvatarURL string\n\tSeriesID  *uint\n\tViews     int64\n\tExtra     bool\n\tinternal  int\n}\n\ntype User struct {\n\tgorm.Model\n\tName string\n}\n\ntype Status string\n",
-		"internal/post/post.go": "package post\n\nimport (\n\tm \"example.com/sh/internal/model\"\n)\n\ntype Service interface {\n\tGetPostByID(id uint, user *uint) (*m.Post, error)\n\tList(page int) ([]m.Post, int, error)\n\tDelete(uint) error\n\tFn(cb func()) error\n\tMore() error\n}\n\ntype Embedded interface {\n\tfmtStringer\n\tGet() error\n}\n\ntype fmtStringer interface{ String() string }\n",
+		"internal/post/post.go":   "package post\n\nimport (\n\tm \"example.com/sh/internal/model\"\n)\n\ntype Service interface {\n\tGetPostByID(id uint, user *uint) (*m.Post, error)\n\tList(page int) ([]m.Post, int, error)\n\tDelete(uint) error\n\tFn(cb func()) error\n\tMore() error\n}\n\ntype Embedded interface {\n\tfmtStringer\n\tGet() error\n}\n\ntype fmtStringer interface{ String() string }\n",
 	}
 	for p, c := range files {
 		writeFile(t, filepath.Join(root, p), c)
@@ -444,9 +444,9 @@ contracts:
       get:  { params: { u: user, i: item }, returns: [user] }
       peek: { params: { e: entry } }
 `,
-		"internal/a/model/m.go": "package model\n\ntype User struct{ Name string }\n",
-		"internal/b/model/m.go": "package model\n\ntype Item struct{ Name string }\n",
-		"internal/post/p.go":    "package post\n\nimport yaml \"gopkg.in/yaml.v3\"\n\ntype Entry struct {\n\tName string\n\tRaw  yaml.Node\n}\n",
+		"internal/a/model/m.go":  "package model\n\ntype User struct{ Name string }\n",
+		"internal/b/model/m.go":  "package model\n\ntype Item struct{ Name string }\n",
+		"internal/post/p.go":     "package post\n\nimport yaml \"gopkg.in/yaml.v3\"\n\ntype Entry struct {\n\tName string\n\tRaw  yaml.Node\n}\n",
 		"internal/svc/post/s.go": "package post\n\nimport (\n\ta \"example.com/r/internal/a/model\"\n\tb \"example.com/r/internal/b/model\"\n\tp \"example.com/r/internal/post\"\n)\n\ntype Service interface {\n\tGet(u *a.User, i *b.Item) (*a.User, error)\n\tPeek(e *p.Entry) error\n}\n",
 	})
 	if len(got) != 0 {

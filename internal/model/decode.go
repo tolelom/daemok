@@ -144,12 +144,16 @@ func (d *decoder) owned(id string, pos yaml.Pos, n *yaml.Node) Owned {
 	return o
 }
 
-func (d *decoder) goOpts(n *yaml.Node) GoOpts {
+// goOpts는 go 블록을 읽는다. keys가 있으면 그 키만 받는다.
+func (d *decoder) goOpts(n *yaml.Node, keys ...string) GoOpts {
 	g := n.Get("go")
 	if g == nil || !d.mapping(g, "go") {
 		return GoOpts{}
 	}
-	d.allow(g, "type", "name", "prefix", "register")
+	if len(keys) == 0 {
+		keys = []string{"type", "name", "prefix", "register"}
+	}
+	d.allow(g, keys...)
 	return GoOpts{Type: d.str(g, "type"), Name: d.str(g, "name"), Prefix: d.str(g, "prefix"), Register: d.str(g, "register")}
 }
 

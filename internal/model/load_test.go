@@ -733,3 +733,8 @@ func TestErrorGoName(t *testing.T) {
 		t.Fatalf("b_err: %q", got)
 	}
 }
+
+func TestErrorGoKeys(t *testing.T) {
+	_, ds := loadOne(t, "errors:\n  e: { in: m, message: a, go: { name: ErrA, prefix: P } }\n")
+	wantDiag(t, ds, Error, `알 수 없는 키 "prefix"`)
+}
