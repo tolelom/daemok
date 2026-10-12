@@ -149,8 +149,7 @@ func (mg *merger) groups(n *yaml.Node) {
 		if d.need(pos, v, "tier") {
 			g.Tier = d.ref(v, "tier")
 		}
-		// kind는 선택이다. 키를 적고 값을 비운 것은 빠뜨린 것으로 본다.
-		if v.Get("kind") != nil && d.need(pos, v, "kind") {
+		if d.need(pos, v, "kind") {
 			g.Kind = d.ref(v, "kind")
 		}
 		if g.Path == "" {

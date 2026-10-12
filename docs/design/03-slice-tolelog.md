@@ -137,7 +137,7 @@ fiber_api_server `feat/daemok` 브랜치(기준 `main` `6df1865`)에 설계 파�
 
 ### 그룹
 
-`post`, `comment`, `series`, `tag`, `user`는 handler와 service로 된 같은 모양의 도메인이고 서로 import하지 않는다(`975ae34`). 형식 0.5에서는 `kind` 없는 그룹으로 묶을 수 있지만 묶지 않았다. 다섯 모듈의 `depends_on`이 서로 다르고(`tag`는 `dto`만, `user`는 `dto`, `model`, `upload`, `utils`, `validate`) 멤버에는 개별 `depends_on`이 없어, 묶으면 그룹 `depends_on`이 합집합이 되어 모듈별 의존 검사가 느슨해진다. 형제끼리 import하지 않는다는 것은 모듈로 둔 지금도 설계에 없는 의존 오류로 잡힌다.
+`post`, `comment`, `series`, `tag`, `user`는 handler와 service로 된 같은 모양의 도메인이고 서로 import하지 않는다(`975ae34`). 그룹은 핸들러 종류(`kind`)가 필수라 묶을 수 없고, `kind`를 선택으로 하는 변경도 아래 이유로 되돌렸다. 다섯 모듈의 `depends_on`이 서로 다르고(`tag`는 `dto`만, `user`는 `dto`, `model`, `upload`, `utils`, `validate`) 멤버에는 개별 `depends_on`이 없어, 묶으면 그룹 `depends_on`이 합집합이 되어 모듈별 의존 검사가 느슨해진다. 형제끼리 import하지 않는다는 것은 모듈로 둔 지금도 설계에 없는 의존 오류로 잡힌다.
 
 ### 설계 노드 대응 비율
 

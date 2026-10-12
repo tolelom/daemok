@@ -1,13 +1,13 @@
 # 형식 v0.5
 
-> tolchain과 tolelog 백엔드 두 도입 사례에서 공통으로 막힌 형식 제약을 풉니다. 에러의 Go 이름 분리, 핸들러 종류 없는 그룹, `gen: false` 계약과 타입의 시그니처 대조, 리터럴 검사의 SQL 자리표시자 인자입니다.
+> tolchain과 tolelog 백엔드 두 도입 사례에서 공통으로 막힌 형식 제약을 풉니다. 에러의 Go 이름 분리, `gen: false` 계약과 타입의 시그니처 대조, 리터럴 검사의 SQL 자리표시자 인자입니다. 그룹 `kind`를 선택으로 하는 변경은 넣었다가 뺐습니다.
 
 ## 근거
 
 | 막힌 곳 | 사례 |
 |---|---|
 | 에러 ID가 곧 Go 이름이고 설계 전체에서 하나 | tolelog `post`, `comment`, `series`가 같은 이름의 `ErrUnauthorized`, `ErrPostNotFound`를 따로 선언합니다. `post` 쪽만 적었습니다 |
-| 그룹은 `kind` 필수 | tolelog의 같은 모양 도메인 다섯(`post`, `comment`, `series`, `tag`, `user`)에 핸들러 등록 방식이 없어 그룹으로 묶지 못했습니다. 0.5에서 `kind`를 선택으로 했지만 다섯 모듈의 `depends_on`이 서로 달라 묶지 않았습니다(아래 그룹 절) |
+| 그룹은 `kind` 필수 | tolelog의 같은 모양 도메인 다섯(`post`, `comment`, `series`, `tag`, `user`)에 핸들러 등록 방식이 없어 그룹으로 묶지 못했습니다. 0.5에서 다루지 않습니다(아래 그룹 절) |
 | 코드 대조가 계약과 타입의 이름만 봄 | tolelog `Service` interface 5개(메서드 약 35개)와 엔티티 필드를 올리지 않았습니다 |
 | 리터럴 검사가 비교와 case만 봄 | tolelog 글 상태 리터럴 7곳 중 6곳이 GORM `Where`의 인자라 안 잡혔습니다 |
 
@@ -28,26 +28,9 @@ errors:
 - ID는 지금처럼 설계 전체에서 하나입니다. 참조(`errors: [...]`, 케이스의 `error`)는 ID로 합니다.
 - 같은 패키지 생성 이름 충돌, 생성 코드, 케이스 테스트의 `errors.Is` 대상, 코드 대조는 모두 Go 이름을 씁니다.
 
-## 핸들러 종류 없는 그룹
+## 그룹 `kind`는 필수로 둠
 
-```yaml
-groups:
-  domains:
-    tier: domain
-    path: internal
-    depends_on: [model, dto, httputil]
-    rule: no_sibling_deps
-    members: { post: {}, comment: {}, series: {}, tag: {}, user: {} }
-```
-
-- 그룹의 `kind`는 선택입니다. `kind`가 없는 그룹은 L2 제약 묶음이고 등록 파일과 blank import를 만들지 않습니다. 멤버의 `needs`, `in`으로 둔 L3·L4 노드는 지금처럼 생성합니다.
-- 공통 `depends_on`, `needs`, `rule`, 멤버 예외, 다른 노드의 그룹·멤버 참조는 `kind`가 있는 그룹과 같습니다.
-- `register.gen.go`와 실행 단위의 멤버 blank import를 만들지 않습니다. blank import는 `init()` 등록을 일으키려는 것이라 등록이 없으면 이유가 없습니다.
-- `kind` 없는 그룹의 멤버에 `handles`가 있으면 오류입니다. 등록할 곳이 없습니다.
-- 핸들러 함수(`kind` + `handles`)를 `kind` 없는 그룹의 멤버에 둘 수 없습니다. 지금 규칙(함수와 그룹의 핸들러 종류가 다르면 오류)이 그대로 막습니다.
-- `daemok init` 초안은 그룹을 계속 "그룹 후보" 메모로만 제안합니다. 멤버는 개별 `depends_on`이 없어 멤버마다 다른 의존이 그룹 `depends_on`의 합집합이나 근거 없는 예외가 되기 때문입니다. 메모의 설명에서 "핸들러 종류가 필요해서"는 이 이유로 바꿉니다.
-
-tolelog에서 다섯 도메인은 서로 import하지 않습니다(`975ae34` 확인). 그래도 묶지 않았습니다. 다섯 모듈의 `depends_on`이 서로 다르고(`tag`는 `dto`만, `user`는 다섯 개) 멤버에는 개별 `depends_on`이 없어, 묶으면 그룹 `depends_on`이 합집합이 되어 모듈별 의존 검사가 느슨해집니다. 이 형식 변경은 지금 쓰는 곳이 없고, 유지할지는 [미결](../../design/04-open-items.md)에 둡니다.
+`kind`를 선택으로 하고 `kind` 없는 그룹을 생성 없는 L2 제약 묶음으로 두는 변경을 넣었다가 되돌렸습니다. tolelog의 다섯 도메인은 서로 import하지 않지만(`975ae34` 확인) `depends_on`이 서로 다르고(`tag`는 `dto`만, `user`는 다섯 개), 멤버에는 개별 `depends_on`이 없습니다. 묶으면 그룹 `depends_on`이 합집합이 되어 모듈별 의존 검사가 느슨해지므로 묶지 않았고, 그러면 이 변경을 쓰는 곳이 없습니다. 형제끼리 import하지 않는다는 것은 모듈로 둔 지금도 설계에 없는 의존 오류로 잡힙니다. 같은 이유로 `daemok init` 초안의 그룹 후보도 메모로 둡니다.
 
 ## 계약과 타입의 시그니처 대조
 
@@ -89,4 +72,4 @@ tolelog에서 다섯 도메인은 서로 import하지 않습니다(`975ae34` 확
 
 1. tolchain `feat/daemok`와 tolelog `feat/daemok`의 설계 파일을 0.5로 올리고 `daemok check`가 오류 0입니다. 새 대조가 실제 어긋남을 잡으면 설계를 고치고 결과 문서에 적습니다.
 2. tolelog에 `comment`, `series`의 에러를 `go.name`으로 올리고, `post` 계약(`Service`)과 엔티티를 시그니처·필드 대조로 올린 뒤 대응 비율을 다시 잽니다. 다섯 도메인의 그룹 적용은 위 그룹 절의 이유로 하지 않습니다. 결과는 `docs/design/03-slice-tolelog.md`에 적습니다.
-3. `docs/design/01-model.md`를 0.5 기준으로 고치고 `04-open-items.md`의 그룹 `kind` 항목을 "`kind` 없는 그룹을 둘지"로 바꿉니다.
+3. `docs/design/01-model.md`를 0.5 기준으로 고치고 `04-open-items.md`에서 그룹 `kind` 항목을 지웁니다.

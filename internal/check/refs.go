@@ -55,9 +55,6 @@ func (c *checker) refs() {
 		c.needRefs(g.ID, g.Needs)
 		for _, mem := range g.Members {
 			c.needRefs(mem.ID, mem.Needs)
-			if g.Kind.Name == "" && len(mem.Handles) > 0 {
-				c.errorf(mem.Handles[0].Pos, "핸들러 종류가 없는 그룹의 멤버에 handles가 있다: %s", mem.ID)
-			}
 			for _, r := range mem.Handles {
 				c.handleValue(g.Kind, r)
 			}

@@ -11,8 +11,6 @@ func (c *checker) l4() {
 			switch {
 			case owner.Member == nil:
 				c.errorf(f.In.Pos, "핸들러 함수는 그룹 멤버에 있어야 한다: %s", f.ID)
-			case owner.Member.Group.Kind.Name == "":
-				c.errorf(f.In.Pos, "핸들러 함수는 핸들러 종류가 있는 그룹의 멤버에 있어야 한다: %s", f.ID)
 			case owner.Member.Group.Kind.Name != f.Kind.Name:
 				c.errorf(f.Kind.Pos, "함수와 그룹의 핸들러 종류가 다르다: 함수 %s(%s), 멤버 %s(%s)", f.ID, f.Kind.Name, owner.ID, owner.Member.Group.Kind.Name)
 			case f.Handles.Name != "" && !has(owner.Member.Handles, f.Handles.Name):

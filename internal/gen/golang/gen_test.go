@@ -163,32 +163,3 @@ funcs:
 		t.Errorf("생성 코드에 에러 ID가 남았다:\n%s", all)
 	}
 }
-
-func TestGroupWithoutKindGeneratesNothing(t *testing.T) {
-	files := genSrc(t, `
-system: { id: s, interfaces: { api: { protocol: http } } }
-executables:
-  server: { exposes: [api], composes: [router, domains] }
-tiers: [a, b, c]
-modules:
-  model:  { tier: a }
-  router: { tier: c, depends_on: [domains], implements: [api] }
-groups:
-  domains:
-    tier: b
-    path: internal
-    depends_on: [model]
-    rule: no_sibling_deps
-    members: { post: {}, comment: {} }
-enums:
-  post_status: { in: post, values: [draft, published] }
-`)
-	for p := range files {
-		if strings.HasSuffix(p, "register.gen.go") || strings.HasSuffix(p, "modules.gen.go") {
-			t.Errorf("kind 없는 그룹이 %s를 만들었다", p)
-		}
-	}
-	if _, ok := files["internal/post/post_status.gen.go"]; !ok {
-		t.Errorf("멤버의 L3 노드는 생성한다: %v", files)
-	}
-}
