@@ -12,7 +12,7 @@ import (
 // 같은 버전으로 동시에 온 편집은 하나만 받아들이고 나머지는 409로 돌려보낸다.
 // 200을 받은 편집은 모두 파일에 남아야 한다.
 func TestEditConcurrentSameVersion(t *testing.T) {
-	src := `version: 0.4
+	src := `version: 0.5
 go_module: example.com/x
 tiers: [a, b]
 modules:

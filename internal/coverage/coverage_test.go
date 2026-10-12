@@ -9,7 +9,7 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-const design = `version: 0.4
+const design = `version: 0.5
 go_module: example.com/cov
 tiers: [a, b]
 modules:

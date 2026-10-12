@@ -75,9 +75,9 @@ func TestAddDepIDShapes(t *testing.T) {
 
 // 줄을 넣을 때는 파일 어딘가가 아니라 넣는 자리 앞줄의 줄바꿈을 따른다.
 func TestInsertFollowsLocalLineEnding(t *testing.T) {
-	src := "version: 0.4\r\nmodules:\n  core: { tier: a }\n"
+	src := "version: 0.5\r\nmodules:\n  core: { tier: a }\n"
 	got := mustEdit(t)(AddModule([]byte(src), "f", "web", "a"))
-	if got != "version: 0.4\r\nmodules:\n  core: { tier: a }\n  web: { tier: a }\n" {
+	if got != "version: 0.5\r\nmodules:\n  core: { tier: a }\n  web: { tier: a }\n" {
 		t.Fatalf("%q", got)
 	}
 }

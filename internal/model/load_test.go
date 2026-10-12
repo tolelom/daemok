@@ -22,7 +22,7 @@ func load(t *testing.T, files map[string]string) (*Model, Diagnostics) {
 
 func loadOne(t *testing.T, src string) (*Model, Diagnostics) {
 	t.Helper()
-	return load(t, map[string]string{"d.yaml": "version: 0.4\n" + src})
+	return load(t, map[string]string{"d.yaml": "version: 0.5\n" + src})
 }
 
 func find(ds Diagnostics, level Level, substr string) *Diagnostic {
@@ -72,14 +72,14 @@ func TestNoDesignFiles(t *testing.T) {
 func TestTopLevelScalars(t *testing.T) {
 	m, ds := loadOne(t, "go_module: github.com/x/y\nts_out: web/gen.ts\n")
 	wantClean(t, ds)
-	if m.Version != "0.4" || m.GoModule != "github.com/x/y" || m.TSOut != "web/gen.ts" {
+	if m.Version != "0.5" || m.GoModule != "github.com/x/y" || m.TSOut != "web/gen.ts" {
 		t.Fatalf("%+v", m)
 	}
 }
 
 func TestVersionMismatch(t *testing.T) {
-	_, ds := load(t, map[string]string{"d.yaml": "version: 0.2\n"})
-	wantDiag(t, ds, Error, "지원하는 형식 버전은 0.4다")
+	_, ds := load(t, map[string]string{"d.yaml": "version: 0.4\n"})
+	wantDiag(t, ds, Error, "지원하는 형식 버전은 0.5다")
 }
 
 func TestUnknownTopKey(t *testing.T) {
@@ -91,7 +91,7 @@ func TestUnknownTopKey(t *testing.T) {
 }
 
 func TestParseErrorBecomesDiagnostic(t *testing.T) {
-	_, ds := load(t, map[string]string{"a.yaml": "version: 0.4\n", "b.yaml": "x:\n\ty: 1\n"})
+	_, ds := load(t, map[string]string{"a.yaml": "version: 0.5\n", "b.yaml": "x:\n\ty: 1\n"})
 	d := wantDiag(t, ds, Error, "탭")
 	if !strings.HasSuffix(d.Pos.File, "b.yaml") || d.Pos.Line != 2 {
 		t.Fatalf("pos %v", d.Pos)
@@ -100,8 +100,8 @@ func TestParseErrorBecomesDiagnostic(t *testing.T) {
 
 func TestMergeAcrossFiles(t *testing.T) {
 	m, ds := load(t, map[string]string{
-		"a.yaml": "version: 0.4\nrequirements:\n  REQ-a: { text: A }\n",
-		"b.yaml": "version: 0.4\nrequirements:\n  REQ-b: { text: B, status: held }\n",
+		"a.yaml": "version: 0.5\nrequirements:\n  REQ-a: { text: A }\n",
+		"b.yaml": "version: 0.5\nrequirements:\n  REQ-b: { text: B, status: held }\n",
 	})
 	wantClean(t, ds)
 	if len(m.Requirements) != 2 || m.Requirements[0].ID != "REQ-a" || m.Requirements[1].Status != "held" {
@@ -114,8 +114,8 @@ func TestMergeAcrossFiles(t *testing.T) {
 
 func TestDuplicateIDAcrossFiles(t *testing.T) {
 	_, ds := load(t, map[string]string{
-		"a.yaml": "version: 0.4\nrequirements:\n  REQ-a: { text: A }\n",
-		"b.yaml": "version: 0.4\nrequirements:\n  REQ-a: { text: B }\n",
+		"a.yaml": "version: 0.5\nrequirements:\n  REQ-a: { text: A }\n",
+		"b.yaml": "version: 0.5\nrequirements:\n  REQ-a: { text: B }\n",
 	})
 	d := wantDiag(t, ds, Error, `중복 ID 요구사항 "REQ-a"`)
 	if !strings.Contains(d.Msg, "a.yaml:3:3") || !strings.HasSuffix(d.Pos.File, "b.yaml") {
@@ -125,8 +125,8 @@ func TestDuplicateIDAcrossFiles(t *testing.T) {
 
 func TestScalarConflictAcrossFiles(t *testing.T) {
 	_, ds := load(t, map[string]string{
-		"a.yaml": "version: 0.4\ngo_module: x\n",
-		"b.yaml": "version: 0.4\ngo_module: y\n",
+		"a.yaml": "version: 0.5\ngo_module: x\n",
+		"b.yaml": "version: 0.5\ngo_module: y\n",
 	})
 	wantDiag(t, ds, Error, `다른 파일과 값이 다르다: "go_module"`)
 }
@@ -239,8 +239,8 @@ groups:
 
 func TestSecondSystemAndTiers(t *testing.T) {
 	_, ds := load(t, map[string]string{
-		"a.yaml": "version: 0.4\nsystem: { id: a }\ntiers: [x]\n",
-		"b.yaml": "version: 0.4\nsystem: { id: b }\ntiers: [y]\n",
+		"a.yaml": "version: 0.5\nsystem: { id: a }\ntiers: [x]\n",
+		"b.yaml": "version: 0.5\nsystem: { id: b }\ntiers: [y]\n",
 	})
 	wantDiag(t, ds, Error, "system은 한 파일에만")
 	wantDiag(t, ds, Error, "tiers는 한 파일에만")

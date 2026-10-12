@@ -13,7 +13,7 @@ import (
 func genSrc(t *testing.T, src string) map[string]string {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ngo_module: example.com/x\n"+src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.5\ngo_module: example.com/x\n"+src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	m, ds := model.Load(dir)

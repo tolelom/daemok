@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const design = `version: 0.4
+const design = `version: 0.5
 go_module: example.com/x
 tiers: [a, b]
 modules:
@@ -104,7 +104,7 @@ func TestPollAndBrokenFile(t *testing.T) {
 		t.Fatal("바뀐 것이 없는데 갱신했다")
 	}
 	time.Sleep(10 * time.Millisecond)
-	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\nmodules: [\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.5\nmodules: [\n"), 0o644)
 	if !s.Poll() || s.Version() != v+1 {
 		t.Fatal("수정을 감지하지 못했다")
 	}
@@ -112,7 +112,7 @@ func TestPollAndBrokenFile(t *testing.T) {
 	if st["fatal"] != true || len(st["issues"].([]any)) == 0 {
 		t.Fatalf("문법 오류는 진단으로 보여야 한다: %v", st)
 	}
-	os.WriteFile(filepath.Join(dir, "e.yaml"), []byte("version: 0.4\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "e.yaml"), []byte("version: 0.5\n"), 0o644)
 	if !s.Poll() {
 		t.Fatal("파일 추가를 감지하지 못했다")
 	}
@@ -195,7 +195,7 @@ func TestGroupWithoutMembersHasEmptyList(t *testing.T) {
 }
 
 func TestQueryPackageDiagHasModuleKey(t *testing.T) {
-	src := `version: 0.4
+	src := `version: 0.5
 go_module: example.com/x
 tiers: [a, b]
 modules:
@@ -240,7 +240,7 @@ func TestCodeScanDiagOnDesignFileIsCodeOrigin(t *testing.T) {
 	t.Fatal("진단이 없다")
 }
 
-const relDesign = `version: 0.4
+const relDesign = `version: 0.5
 go_module: example.com/x
 tiers: [a, b, c]
 modules:

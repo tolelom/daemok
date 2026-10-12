@@ -9,7 +9,7 @@ import (
 )
 
 func TestWrite(t *testing.T) {
-	a := &Analysis{Draft: &Draft{System: "x"}, YAML: []byte("version: 0.4\n")}
+	a := &Analysis{Draft: &Draft{System: "x"}, YAML: []byte("version: 0.5\n")}
 	dir := filepath.Join(t.TempDir(), "design")
 	p, err := Write(dir, a)
 	if err != nil || p != filepath.Join(dir, "x.yaml") {

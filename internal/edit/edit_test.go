@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const flow = `version: 0.4
+const flow = `version: 0.5
 tiers: [a, b, c]
 
 # ── L2 ──
@@ -19,7 +19,7 @@ enums:
   kind: { in: core, values: [x] }
 `
 
-const block = `version: 0.4
+const block = `version: 0.5
 tiers: [a, b]
 modules:
   core:
@@ -106,7 +106,7 @@ func TestCRLFAndMissing(t *testing.T) {
 }
 
 func TestNoTrailingNewline(t *testing.T) {
-	src := "version: 0.4\ntiers: [a]\nmodules:\n  core: { tier: a }"
+	src := "version: 0.5\ntiers: [a]\nmodules:\n  core: { tier: a }"
 	got, err := AddModule([]byte(src), "f", "api", "a")
 	must(t, err)
 	same(t, got, src+"\n  api: { tier: a }\n")

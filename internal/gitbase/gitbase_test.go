@@ -28,7 +28,7 @@ func TestFiles(t *testing.T) {
 		t.Fatalf("저장소 밖: ok=%v err=%v", ok, err)
 	}
 	run(t, repo, "init", "-q")
-	os.WriteFile(filepath.Join(design, "a.yaml"), []byte("version: 0.4\n"), 0o644)
+	os.WriteFile(filepath.Join(design, "a.yaml"), []byte("version: 0.5\n"), 0o644)
 	os.WriteFile(filepath.Join(design, "note.txt"), []byte("x"), 0o644)
 	// 커밋 전
 	if _, ok, _ := Files(design); ok {
@@ -38,9 +38,9 @@ func TestFiles(t *testing.T) {
 	run(t, repo, "commit", "-q", "-m", "init")
 	// 작업 트리에서 지워도 HEAD에는 있다
 	os.Remove(filepath.Join(design, "a.yaml"))
-	os.WriteFile(filepath.Join(design, "b.yaml"), []byte("version: 0.4\n"), 0o644)
+	os.WriteFile(filepath.Join(design, "b.yaml"), []byte("version: 0.5\n"), 0o644)
 	files, ok, err := Files(design)
-	if !ok || err != nil || len(files) != 1 || string(files["HEAD:design/a.yaml"]) != "version: 0.4\n" {
+	if !ok || err != nil || len(files) != 1 || string(files["HEAD:design/a.yaml"]) != "version: 0.5\n" {
 		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
 	}
 	// HEAD에 설계 디렉토리가 없으면 빈 목록
@@ -58,12 +58,12 @@ func TestNonASCIIPath(t *testing.T) {
 	repo := t.TempDir()
 	design := filepath.Join(repo, "d 설계")
 	os.MkdirAll(design, 0o755)
-	os.WriteFile(filepath.Join(design, "모듈.yaml"), []byte("version: 0.4\n"), 0o644)
+	os.WriteFile(filepath.Join(design, "모듈.yaml"), []byte("version: 0.5\n"), 0o644)
 	run(t, repo, "init", "-q")
 	run(t, repo, "add", ".")
 	run(t, repo, "commit", "-q", "-m", "init")
 	files, ok, err := Files(design)
-	if !ok || err != nil || string(files["HEAD:d 설계/모듈.yaml"]) != "version: 0.4\n" {
+	if !ok || err != nil || string(files["HEAD:d 설계/모듈.yaml"]) != "version: 0.5\n" {
 		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
 	}
 }

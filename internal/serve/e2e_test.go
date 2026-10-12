@@ -18,7 +18,7 @@ func TestUIEditE2E(t *testing.T) {
 	if err != nil {
 		t.Skip("node가 없다")
 	}
-	s, dir := setup(t, `version: 0.4
+	s, dir := setup(t, `version: 0.5
 go_module: example.com/x
 tiers: [a, b]
 modules:

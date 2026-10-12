@@ -1,4 +1,4 @@
-version: 0.4
+version: 0.5
 go_module: example.com/basic
 
 executables:

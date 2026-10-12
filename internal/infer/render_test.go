@@ -10,7 +10,7 @@ import (
 
 const layersYAML = `# daemok init이 만든 초안이다. 코드의 패키지와 import에서 추정했다.
 # tier 이름, 그룹, summary는 사람이 정한다.
-version: 0.4
+version: 0.5
 go_module: example.com/layers
 
 system:

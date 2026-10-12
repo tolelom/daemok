@@ -11,7 +11,7 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-const design = `version: 0.4
+const design = `version: 0.5
 go_module: example.com/x
 tiers: [a]
 modules:
@@ -50,14 +50,14 @@ func wantDiag(t *testing.T, r Result, substr string) {
 }
 
 func TestLoadErrorIsFatal(t *testing.T) {
-	root, dir := setup(t, "version: 0.4\nmodulez: {}\n")
+	root, dir := setup(t, "version: 0.5\nmodulez: {}\n")
 	if r := Run(dir, root); !r.Fatal || r.Plan != nil {
 		t.Fatalf("%+v", r)
 	}
 }
 
 func TestCheckErrorHasNoPlan(t *testing.T) {
-	root, dir := setup(t, "version: 0.4\ntiers: [a, b]\nmodules:\n  low: { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
+	root, dir := setup(t, "version: 0.5\ntiers: [a, b]\nmodules:\n  low: { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
 	r := Run(dir, root)
 	if r.Fatal || r.Plan != nil || !r.Diags.HasErrors() {
 		t.Fatalf("%+v", r)
@@ -125,7 +125,7 @@ func TestStaleGeneratedFileAnywhere(t *testing.T) {
 }
 
 func TestCodeScanIncluded(t *testing.T) {
-	root, dir := setup(t, "version: 0.4\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\n  api: { tier: a }\n")
+	root, dir := setup(t, "version: 0.5\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\n  api: { tier: a }\n")
 	write(t, filepath.Join(root, "core", "core.go"), "package core\n\nimport _ \"example.com/x/api\"\n")
 	wantDiag(t, Run(dir, root), "설계에 없는 의존을 import한다: core → api")
 }

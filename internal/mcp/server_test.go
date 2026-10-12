@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const design = `version: 0.4
+const design = `version: 0.5
 go_module: example.com/m
 tiers: [a, b]
 modules:

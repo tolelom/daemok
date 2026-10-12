@@ -70,7 +70,7 @@ func TestMissingDirsAreSilent(t *testing.T) {
 func TestDeclaredButUnreferenced(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"design/d.yaml": `version: 0.4
+		"design/d.yaml": `version: 0.5
 go_module: example.com/u
 tiers: [a, b]
 modules:
@@ -123,7 +123,7 @@ func writeFile(t *testing.T, p, content string) {
 func TestDotImportBuildIgnoreAndGeneratedFiles(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"design/d.yaml": `version: 0.4
+		"design/d.yaml": `version: 0.5
 go_module: example.com/u
 tiers: [a, b]
 modules:
@@ -173,7 +173,7 @@ events:
 func TestAdHocErrors(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"design/d.yaml": `version: 0.4
+		"design/d.yaml": `version: 0.5
 go_module: example.com/e
 tiers: [a, b]
 modules:
@@ -209,7 +209,7 @@ errors:
 func TestEnumLiterals(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"design/d.yaml": `version: 0.4
+		"design/d.yaml": `version: 0.5
 go_module: example.com/l
 tiers: [a, b]
 modules:
@@ -249,7 +249,7 @@ enums:
 func TestHandWrittenDeclsExist(t *testing.T) {
 	root := t.TempDir()
 	files := map[string]string{
-		"design/d.yaml": `version: 0.4
+		"design/d.yaml": `version: 0.5
 go_module: example.com/h
 tiers: [a, b, c]
 modules:

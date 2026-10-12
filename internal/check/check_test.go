@@ -13,7 +13,7 @@ import (
 func run(t *testing.T, src string) model.Diagnostics {
 	t.Helper()
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ngo_module: example.com/t\n"+src), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.5\ngo_module: example.com/t\n"+src), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	m, ds := model.Load(dir)
@@ -571,7 +571,7 @@ func TestGoNames(t *testing.T) {
 
 func TestGoModuleAndDuration(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.4\ntiers: [a]\nmodules:\n  core: { tier: a }\nconsts:\n  wait: { in: core, type: duration, value: 1.5h }\n"), 0o644)
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.5\ntiers: [a]\nmodules:\n  core: { tier: a }\nconsts:\n  wait: { in: core, type: duration, value: 1.5h }\n"), 0o644)
 	m, ds := model.Load(dir)
 	if ds.HasErrors() {
 		t.Fatal(ds)

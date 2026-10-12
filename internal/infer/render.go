@@ -11,7 +11,7 @@ func Render(d *Draft) []byte {
 	var b bytes.Buffer
 	b.WriteString("# daemok init이 만든 초안이다. 코드의 패키지와 import에서 추정했다.\n")
 	b.WriteString("# tier 이름, 그룹, summary는 사람이 정한다.\n")
-	b.WriteString("version: 0.4\n")
+	b.WriteString("version: 0.5\n")
 	fmt.Fprintf(&b, "go_module: %s\n", d.GoModule)
 	fmt.Fprintf(&b, "\nsystem:\n  id: %s\n", d.System)
 	if len(d.Exes) > 0 {
