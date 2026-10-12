@@ -362,6 +362,14 @@ func (hk *HandlerKind) GoName() string {
 	return GoName(hk.ID)
 }
 
+// GoName은 에러 sentinel의 Go 이름이다. go.name이 없으면 ID가 Go 이름이다.
+func (e *ErrorDef) GoName() string {
+	if e.Go.Name != "" {
+		return e.Go.Name
+	}
+	return e.ID
+}
+
 // GoName은 상수의 Go 이름이다.
 func (c *Const) GoName() string {
 	if c.Go.Name != "" {

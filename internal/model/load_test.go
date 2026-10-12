@@ -716,3 +716,16 @@ flows:
 	wantDiag(t, ds, Error, `필요한 키가 없다: "id"`)
 	wantDiag(t, ds, Error, `알 수 없는 키 "retry"`)
 }
+
+func TestErrorGoName(t *testing.T) {
+	m, ds := loadOne(t, "errors:\n  ErrA: { in: m, message: a }\n  b_err: { in: n, message: b, go: { name: ErrA } }\n")
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	if got := m.Error("ErrA").GoName(); got != "ErrA" {
+		t.Fatalf("ErrA: %q", got)
+	}
+	if got := m.Error("b_err").GoName(); got != "ErrA" {
+		t.Fatalf("b_err: %q", got)
+	}
+}

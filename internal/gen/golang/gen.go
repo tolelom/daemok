@@ -125,9 +125,9 @@ func (g *gen) errors() error {
 		pkg := f.use("errors")
 		var lines, cases []string
 		for _, e := range b.nodes[dir] {
-			lines = append(lines, fmt.Sprintf("\t%s = %s.New(%q)", e.ID, pkg, e.Message))
+			lines = append(lines, fmt.Sprintf("\t%s = %s.New(%q)", e.GoName(), pkg, e.Message))
 			if e.HTTP != 0 {
-				cases = append(cases, fmt.Sprintf("\tcase %s.Is(err, %s):\n\t\treturn %d", pkg, e.ID, e.HTTP))
+				cases = append(cases, fmt.Sprintf("\tcase %s.Is(err, %s):\n\t\treturn %d", pkg, e.GoName(), e.HTTP))
 			}
 		}
 		f.add("var (\n%s\n)", strings.Join(lines, "\n"))
@@ -214,8 +214,12 @@ func (g *gen) methodSig(me *model.Method, dir string, f *goFile) string {
 	line := fmt.Sprintf("\t%s(%s)%s", model.GoName(me.Name), strings.Join(ps, ", "), ret)
 	if len(me.Errors) > 0 {
 		var names []string
-		for _, e := range me.Errors {
-			names = append(names, e.Name)
+		for _, r := range me.Errors {
+			if e := g.m.Error(r.Name); e != nil {
+				names = append(names, e.GoName())
+			} else {
+				names = append(names, r.Name)
+			}
 		}
 		line += " // " + strings.Join(names, ", ")
 	}

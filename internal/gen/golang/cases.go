@@ -96,7 +96,7 @@ func (g *gen) caseErr(id, dir string, f *goFile) string {
 	if e == nil {
 		return id
 	}
-	return g.qualify(e.In.Name, id, dir, f)
+	return g.qualify(e.In.Name, e.GoName(), dir, f)
 }
 
 // literal은 given·expect 노드를 Go 리터럴로 바꾼다. 맨 위 맵은 typ, 안쪽 맵은 map[string]any다.

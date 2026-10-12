@@ -48,11 +48,11 @@ func (mg *merger) consts(n *yaml.Node) {
 func (mg *merger) errors(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "errors", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "in", "gen", "summary", "satisfies", "message", "http")
+		d.allow(v, "in", "gen", "summary", "satisfies", "message", "http", "go")
 		if !mg.unique("에러", id, pos) {
 			return
 		}
-		e := &ErrorDef{Owned: d.owned(id, pos, v)}
+		e := &ErrorDef{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
 		if d.need(pos, v, "message") {
 			e.Message = d.str(v, "message")
 		}

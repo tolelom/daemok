@@ -122,3 +122,44 @@ events:
 		}
 	}
 }
+
+func TestErrorGoName(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  api:  { tier: b, depends_on: [core] }
+errors:
+  core_nf: { in: core, message: "nf", http: 404, go: { name: ErrNotFound } }
+  api_nf:  { in: api, message: "nf", go: { name: ErrNotFound } }
+contracts:
+  store:
+    in: api
+    methods:
+      get: { params: { id: uint }, returns: [], errors: [core_nf] }
+funcs:
+  get:
+    in: api
+    of: store.get
+    errors: [core_nf]
+    cases:
+      - { name: missing, given: { id: 1 }, error: core_nf }
+`)
+	all := ""
+	for _, c := range files {
+		all += c
+	}
+	for _, s := range []string{
+		`ErrNotFound = errors.New("nf")`,
+		"case errors.Is(err, ErrNotFound):",
+		"core.ErrNotFound",
+		"// ErrNotFound",
+	} {
+		if !strings.Contains(all, s) {
+			t.Errorf("생성 코드에 %q가 없다", s)
+		}
+	}
+	if strings.Contains(all, "core_nf") {
+		t.Errorf("생성 코드에 에러 ID가 남았다:\n%s", all)
+	}
+}

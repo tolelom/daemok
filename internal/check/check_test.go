@@ -580,3 +580,15 @@ func TestGoModuleAndDuration(t *testing.T) {
 	want(t, ds, model.Error, `필요한 키가 없다: "go_module"`)
 	want(t, ds, model.Error, `duration 형식이 아니다: 상수 wait "1.5h"`)
 }
+
+func TestErrorGoName(t *testing.T) {
+	// go.name이 있으면 ID에는 Go 이름 규칙이 없다. 다른 패키지라 같은 Go 이름도 된다
+	src := replace(t, "ErrLow:      { in: core, message: \"low\" }", "ErrLow:      { in: core, message: \"low\" }\n  vm_not_found: { in: vm, message: \"nf\", go: { name: ErrNotFound } }")
+	wantNone(t, run(t, src), model.Error)
+	// go.name은 export되는 Go 이름이어야 한다
+	src = replace(t, "ErrLow:      { in: core, message: \"low\" }", "ErrLow:      { in: core, message: \"low\" }\n  vm_not_found: { in: vm, message: \"nf\", go: { name: notFound } }")
+	want(t, run(t, src), model.Error, "Go 이름으로 쓸 수 없는 에러 이름: vm_not_found notFound")
+	// 같은 패키지에서 Go 이름이 겹치면 오류
+	src = replace(t, "ErrLow:      { in: core, message: \"low\" }", "ErrLow:      { in: core, message: \"low\" }\n  core_nf: { in: core, message: \"nf\", go: { name: ErrNotFound } }")
+	want(t, run(t, src), model.Error, "같은 패키지에서 생성 이름이 겹친다: core 패키지의 ErrNotFound (에러 ErrNotFound, 에러 core_nf)")
+}

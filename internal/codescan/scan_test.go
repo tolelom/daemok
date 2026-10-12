@@ -273,6 +273,7 @@ consts:
 errors:
   ErrNotFound: { gen: false, in: core, message: "not found" }
   ErrGone:     { gen: false, in: core, message: "gone" }
+  vm_gone:     { gen: false, in: vm, message: "gone", go: { name: ErrGone } }
 enums:
   tx_type: { gen: false, in: core, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
 types:
@@ -316,6 +317,7 @@ handler_kinds:
 	want := []string{
 		"오류: gen: false인데 코드에 선언이 없다: 모듈 config, 상수 max_tx_age (MaxTxAge) @d.yaml",
 		"오류: gen: false인데 코드에 선언이 없다: 모듈 core, enum tx_type (TxMintAsset) @d.yaml",
+		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 에러 vm_gone (ErrGone) @d.yaml",
 		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 핸들러 종류 tx_handler (TxHandler) @d.yaml",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {

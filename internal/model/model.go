@@ -121,6 +121,7 @@ type ErrorDef struct {
 	Owned
 	Message string
 	HTTP    int // 0이면 없음
+	Go      GoOpts
 }
 
 type Field struct {

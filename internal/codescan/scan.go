@@ -319,7 +319,7 @@ func (s *scanner) handWritten() {
 		need(k.Owned, "상수", k.GoName())
 	}
 	for _, e := range m.Errors {
-		need(e.Owned, "에러", e.ID)
+		need(e.Owned, "에러", e.GoName())
 	}
 	for _, t := range m.Types {
 		need(t.Owned, "타입", t.GoName())

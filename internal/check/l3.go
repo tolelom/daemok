@@ -118,7 +118,7 @@ func (c *checker) errorHTTP() {
 			continue
 		}
 		for _, s := range httpBySuffix {
-			if strings.HasSuffix(e.ID, s.suffix) && e.HTTP != s.code {
+			if strings.HasSuffix(e.GoName(), s.suffix) && e.HTTP != s.code {
 				c.warnf(e.Pos, "이름이 뜻하는 상태와 http가 다르다: %s (이름 %d, http %d)", e.ID, s.code, e.HTTP)
 			}
 		}

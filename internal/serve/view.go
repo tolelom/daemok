@@ -116,6 +116,7 @@ type vError struct {
 	In        string   `json:"in"`
 	Message   string   `json:"message"`
 	HTTP      *int     `json:"http"`
+	Go        vGo      `json:"go"`
 	Satisfies []string `json:"satisfies"`
 }
 
@@ -407,7 +408,7 @@ func toView(m *model.Model) *vModel {
 		v.Consts = append(v.Consts, vConst{c.ID, c.In.Name, c.Type, c.Value, vGoOf(c.Go), strsOrEmpty(c.Export), names(c.Satisfies)})
 	}
 	for _, e := range m.Errors {
-		ve := vError{ID: e.ID, In: e.In.Name, Message: e.Message, Satisfies: names(e.Satisfies)}
+		ve := vError{ID: e.ID, In: e.In.Name, Message: e.Message, Go: vGoOf(e.Go), Satisfies: names(e.Satisfies)}
 		if e.HTTP != 0 {
 			h := e.HTTP
 			ve.HTTP = &h

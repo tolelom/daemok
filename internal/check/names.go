@@ -156,10 +156,13 @@ func (c *checker) enumValues() {
 	}
 }
 
-// errorIDs는 에러 ID가 그대로 export되는 Go 이름인지 본다.
+// errorIDs는 에러의 Go 이름이 export되는 이름인지 본다. go.name이 없으면 ID가 Go 이름이다.
 func (c *checker) errorIDs() {
 	for _, e := range c.m.Errors {
-		if !exportedIdent.MatchString(e.ID) {
+		switch {
+		case e.Go.Name != "" && !exportedIdent.MatchString(e.Go.Name):
+			c.errorf(e.Pos, "Go 이름으로 쓸 수 없는 에러 이름: %s %s", e.ID, e.Go.Name)
+		case e.Go.Name == "" && !exportedIdent.MatchString(e.ID):
 			c.errorf(e.Pos, "Go 이름으로 쓸 수 없는 에러 ID: %s", e.ID)
 		}
 	}
@@ -238,7 +241,7 @@ func (c *checker) packageNames() {
 	}
 	for _, e := range m.Errors {
 		if e.Gen {
-			add(e.In.Name, e.ID, "에러 "+e.ID, e.Pos)
+			add(e.In.Name, e.GoName(), "에러 "+e.ID, e.Pos)
 		}
 	}
 	for _, t := range m.Types {
