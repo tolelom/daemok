@@ -83,7 +83,7 @@ tolelog에서 다섯 도메인은 서로 import하지 않습니다(`975ae34` 확
 
 ## 리터럴 검사의 SQL 자리표시자 인자
 
-지금 검사(쓸 수 있는 enum 값과 같은 문자열 리터럴을 비교나 case에 쓴 곳, 정보)에 자리 하나를 더합니다. 함수 호출의 인자 중 `?`가 들어간 문자열 리터럴이 있으면, 그 뒤 인자에 있는 enum 값 리터럴도 알립니다. `db.Where("status = ?", "published")`가 해당합니다. 쿼리 문자열 안에 값을 직접 쓴 `Where("status = 'published'")`와 `$1` 형식 자리표시자는 보지 않습니다. 로그 메시지 같은 다른 호출 인자는 지금처럼 보지 않습니다.
+지금 검사(쓸 수 있는 enum 값과 같은 문자열 리터럴을 비교나 case에 쓴 곳, 정보)에 자리 하나를 더합니다. GORM·database/sql 메서드(`Where`, `Or`, `Not`, `Having`, `Joins`, `Raw`, `Exec`, `Find`, `First`, `Take`, `Last`, `Delete`, `Query`, `QueryRow`, `QueryContext`, `QueryRowContext`, `ExecContext`) 호출의 인자 중 `?`가 든 문자열 리터럴이 있으면, 그 뒤 인자에 있는 enum 값 리터럴도 알립니다. 뒤 인자가 슬라이스 리터럴이면(`IN ?`) 원소를 봅니다. `db.Where("status = ?", "published")`가 해당합니다. 쿼리 문자열이 상수나 변수인 호출, 쿼리 문자열 안에 값을 직접 쓴 `Where("status = 'published'")`, `$1` 형식 자리표시자, 다른 이름의 호출은 보지 않습니다.
 
 ## 완료 조건
 

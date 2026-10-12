@@ -391,7 +391,7 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 }
 
 // enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문의 비교(==, !=),
-// switch case, SQL 자리표시자 값(placeholderArgs)에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
+// switch case, SQL 메서드의 자리표시자 값(placeholderArgs)에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
 // 로그 키나 외부 프로토콜 문자열처럼 다른 자리의 같은 문자열은 enum과 상관없을 때가 많아 보지 않는다.
 func (s *scanner) enumLiterals(id string, f *ast.File) {
 	consts := map[string]string{} // 값 → 상수 이름
@@ -440,16 +440,38 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 	}
 }
 
-// placeholderArgs는 ?가 든 문자열 리터럴 인자 뒤의 인자다. db.Where("status = ?", "published")의 값 자리다.
+// sqlMethods는 쿼리 문자열과 자리표시자 값을 함께 받는 GORM·database/sql 메서드다.
+var sqlMethods = map[string]bool{
+	"Where": true, "Or": true, "Not": true, "Having": true, "Joins": true, "Raw": true, "Exec": true,
+	"Find": true, "First": true, "Take": true, "Last": true, "Delete": true,
+	"Query": true, "QueryRow": true, "QueryContext": true, "QueryRowContext": true, "ExecContext": true,
+}
+
+// placeholderArgs는 SQL 메서드 호출에서 ?가 든 문자열 리터럴 인자 뒤의 인자다.
+// db.Where("status = ?", "published")의 값 자리다. IN ?에 넘긴 슬라이스 리터럴은 원소를 준다.
 func placeholderArgs(call *ast.CallExpr) []ast.Expr {
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || !sqlMethods[sel.Sel.Name] {
+		return nil
+	}
 	for i, a := range call.Args {
 		lit, ok := ast.Unparen(a).(*ast.BasicLit)
 		if !ok || lit.Kind != token.STRING {
 			continue
 		}
-		if q, err := strconv.Unquote(lit.Value); err == nil && strings.Contains(q, "?") {
-			return call.Args[i+1:]
+		q, err := strconv.Unquote(lit.Value)
+		if err != nil || !strings.Contains(q, "?") {
+			continue
 		}
+		var out []ast.Expr
+		for _, v := range call.Args[i+1:] {
+			if cl, ok := ast.Unparen(v).(*ast.CompositeLit); ok {
+				out = append(out, cl.Elts...)
+			} else {
+				out = append(out, v)
+			}
+		}
+		return out
 	}
 	return nil
 }

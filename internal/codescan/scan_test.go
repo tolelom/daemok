@@ -224,7 +224,7 @@ enums:
 		"api/api.go":   "package api\n\nimport _ \"example.com/l/core\"\n\nfunc Kind(s string) bool {\n\tlog(\"mint_asset\")\n\tswitch s {\n\tcase \"transfer\":\n\t\treturn true\n\t}\n\treturn s == \"mint_asset\" || s == \"other\"\n}\n\nfunc log(string) {}\n",
 		"free/free.go": "package free\n\nfunc F() string { return \"transfer\" }\n",
 		// ?가 든 쿼리 문자열 뒤의 인자는 자리표시자 값이다. 앞 인자와 값을 직접 쓴 쿼리는 보지 않는다
-		"api/query.go": "package api\n\ntype db struct{}\n\nfunc (db) Where(q string, args ...any) db { return db{} }\n\nfunc Q(d db) {\n\td.Where(\"kind = ? AND x = ?\", 1, \"mint_asset\")\n\td.Where(\"kind = 'transfer'\")\n\tpair(\"transfer\", \"a = ?\")\n}\n\nfunc pair(a, b string) {}\n",
+		"api/query.go": "package api\n\ntype db struct{}\n\nfunc (db) Where(q string, args ...any) db { return db{} }\n\nfunc Q(d db) {\n\td.Where(\"kind = ? AND x = ?\", 1, \"mint_asset\")\n\td.Where(\"kind = 'transfer'\")\n\tpair(\"transfer\", \"a = ?\")\n\tpair(\"ready? %s\", \"transfer\")\n\td.Where(\"kind IN ?\", []string{\"transfer\"})\n}\n\nfunc pair(a, b string) {}\n",
 	}
 	for p, c := range files {
 		writeFile(t, filepath.Join(root, p), c)
@@ -243,6 +243,7 @@ enums:
 		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @api.go:8`,
 		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @api.go:11`,
 		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @query.go:8`,
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @query.go:12`,
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("%q", got)
