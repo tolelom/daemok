@@ -224,7 +224,7 @@ enums:
 		"api/api.go":   "package api\n\nimport _ \"example.com/l/core\"\n\nfunc Kind(s string) bool {\n\tlog(\"mint_asset\")\n\tswitch s {\n\tcase \"transfer\":\n\t\treturn true\n\t}\n\treturn s == \"mint_asset\" || s == \"other\"\n}\n\nfunc log(string) {}\n",
 		"free/free.go": "package free\n\nfunc F() string { return \"transfer\" }\n",
 		// ?가 든 쿼리 문자열 뒤의 인자는 자리표시자 값이다. 앞 인자와 값을 직접 쓴 쿼리는 보지 않는다
-		"api/query.go": "package api\n\ntype db struct{}\n\nfunc (db) Where(q string, args ...any) db { return db{} }\n\nfunc Q(d db) {\n\td.Where(\"kind = ? AND x = ?\", 1, \"mint_asset\")\n\td.Where(\"kind = 'transfer'\")\n\tpair(\"transfer\", \"a = ?\")\n\tpair(\"ready? %s\", \"transfer\")\n\td.Where(\"kind IN ?\", []string{\"transfer\"})\n}\n\nfunc pair(a, b string) {}\n",
+		"api/query.go": "package api\n\ntype db struct{}\n\nfunc (db) Where(q string, args ...any) db { return db{} }\n\nfunc (db) Select(q string, args ...any) db { return db{} }\n\nfunc Q(d db) {\n\td.Where(\"kind = ? AND x = ?\", 1, \"mint_asset\")\n\td.Where(\"kind = 'transfer'\")\n\tpair(\"transfer\", \"a = ?\")\n\tpair(\"ready? %s\", \"transfer\")\n\td.Where(\"kind IN ?\", []string{\"transfer\"})\n\td.Select(\"CASE WHEN kind = ? THEN 1 END\", \"mint_asset\")\n}\n\nfunc pair(a, b string) {}\n",
 	}
 	for p, c := range files {
 		writeFile(t, filepath.Join(root, p), c)
@@ -242,8 +242,9 @@ enums:
 	want := []string{
 		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @api.go:8`,
 		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @api.go:11`,
-		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @query.go:8`,
-		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @query.go:12`,
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @query.go:10`,
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "transfer" (TxTransfer) @query.go:14`,
+		`정보: enum 상수 대신 문자열 리터럴을 쓴다: 모듈 api, "mint_asset" (TxMintAsset) @query.go:15`,
 	}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("%q", got)
@@ -435,7 +436,7 @@ modules:
 types:
   user:  { in: amodel, gen: false, fields: { name: string } }
   item:  { in: bmodel, gen: false, fields: { name: string } }
-  entry: { in: post, gen: false, fields: { name: string, raw: "yaml.Node" } }
+  entry: { in: post, gen: false, fields: { name: string, raw: "yaml.Node", doc: json.RawMessage } }
 contracts:
   service:
     in: svc
@@ -446,7 +447,7 @@ contracts:
 `,
 		"internal/a/model/m.go":  "package model\n\ntype User struct{ Name string }\n",
 		"internal/b/model/m.go":  "package model\n\ntype Item struct{ Name string }\n",
-		"internal/post/p.go":     "package post\n\nimport yaml \"gopkg.in/yaml.v3\"\n\ntype Entry struct {\n\tName string\n\tRaw  yaml.Node\n}\n",
+		"internal/post/p.go":     "package post\n\nimport (\n\tjs \"encoding/json\"\n\n\tyaml \"gopkg.in/yaml.v3\"\n)\n\ntype Entry struct {\n\tName string\n\tRaw  yaml.Node\n\tDoc  js.RawMessage\n}\n",
 		"internal/svc/post/s.go": "package post\n\nimport (\n\ta \"example.com/r/internal/a/model\"\n\tb \"example.com/r/internal/b/model\"\n\tp \"example.com/r/internal/post\"\n)\n\ntype Service interface {\n\tGet(u *a.User, i *b.Item) (*a.User, error)\n\tPeek(e *p.Entry) error\n}\n",
 	})
 	if len(got) != 0 {

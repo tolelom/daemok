@@ -12,6 +12,16 @@ var stdPackages = map[string]string{
 	"json": "encoding/json", "time": "time", "http": "net/http", "context": "context", "io": "io",
 }
 
+// StdImport는 생성 코드가 외부 타입 접두사로 import하는 표준 라이브러리 경로인지다.
+func StdImport(importPath string) bool {
+	for _, p := range stdPackages {
+		if p == importPath {
+			return true
+		}
+	}
+	return false
+}
+
 // gen은 한 번의 생성 상태다.
 type gen struct {
 	m     *model.Model

@@ -442,7 +442,7 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 
 // sqlMethods는 쿼리 문자열과 자리표시자 값을 함께 받는 GORM·database/sql 메서드다.
 var sqlMethods = map[string]bool{
-	"Where": true, "Or": true, "Not": true, "Having": true, "Joins": true, "Raw": true, "Exec": true,
+	"Where": true, "Or": true, "Not": true, "Having": true, "Joins": true, "Select": true, "Raw": true, "Exec": true,
 	"Find": true, "First": true, "Take": true, "Last": true, "Delete": true,
 	"Query": true, "QueryRow": true, "QueryContext": true, "QueryRowContext": true, "ExecContext": true,
 }

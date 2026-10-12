@@ -71,13 +71,13 @@ func typeExpr(e ast.Expr, f *ast.File, module string) (string, bool) {
 	return "", false
 }
 
-// importBase는 파일에서 패키지를 가리키는 이름이 설계 모듈(go_module 안) 패키지면 그 import 경로의
-// 마지막 요소로 바꾼다. 생성기가 그 이름으로 한정하기 때문이다. 별칭 없는 import의 패키지 이름은
+// importBase는 파일에서 패키지를 가리키는 이름이 설계 모듈(go_module 안) 패키지나 생성기가 쓰는
+// 표준 라이브러리면 그 import 경로의 마지막 요소로 바꾼다. 생성기가 그 이름으로 한정하기 때문이다. 별칭 없는 import의 패키지 이름은
 // 경로의 마지막 요소로 본다. go_module 밖 패키지는 설계에 코드와 같은 이름으로 적으므로 그대로 둔다.
 func importBase(f *ast.File, name, module string) string {
 	for _, im := range f.Imports {
 		p, _ := strconv.Unquote(im.Path.Value)
-		if p != module && !strings.HasPrefix(p, module+"/") {
+		if p != module && !strings.HasPrefix(p, module+"/") && !golang.StdImport(p) {
 			continue
 		}
 		local := path.Base(p)
