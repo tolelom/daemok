@@ -171,6 +171,7 @@ tolchain `feat/daemok` 브랜치(기준 `main` `29c1d3a`)에 형식 v0.4 설계 
 - `daemok check`: 오류 0, 경고 2(보류 요구사항 `REQ-random`에 연결된 요소, 케이스가 없는 에러 `ErrBalanceOverflow`), 정보 1(그룹 예외 `reward → asset`). import 대조와 이벤트 상수 참조에서 어긋난 곳이 없다.
 - 형식 0.5로 올린 뒤(`a8a41c6`, 첫 줄만 바꿈)에도 `daemok check` 결과는 오류 0, 경고 2, 정보 33으로 같다. `gen: false` 타입 `TransferPayload`의 필드 대조도 통과한다.
 - 경고 2개는 설계에서 정리했다. `handle_transfer`에 수신 잔액이 넘치는 케이스(`ErrBalanceOverflow`, `vm.SafeAdd` 경로)를 더했고(`7dafb63`), `REQ-random`은 구현돼 README에 소개된 기능이라 `held`를 `active`로 바꿨다(`842ff9e`). 이후 `daemok check`는 오류 0, 경고 0, 정보 33이다. `held`는 프로토타입 샘플에서 넘어온 값이었다.
+- `REQ-random`을 `active`로 바꾼 뒤 코드를 대조하자 요구사항("commit-reveal로 조작을 막는다")이 성립하지 않았다. 결과가 `hash(secret + 공개 블록의 PrevHash)`이고 공개 마감이 없어, 커밋한 쪽이 다음 블록의 결과를 미리 계산해 공개 시점을 고를 수 있었다. 결과를 커밋 높이+2 블록의 해시에 묶고 공개를 그 뒤 100블록 안으로 제한했다(`564cdbf`). 공개를 하지 않는 것은 체인에서 막지 못해 README에 마감 뒤 미공개 커밋은 몰수로 다루라고 적었다. 요구사항 문구도 실제 보장에 맞췄다(`0bd4478`). 이후 `daemok check`는 오류 0, 경고 0, 정보 34이고 늘어난 1개는 새 `errors.New`의 즉석 에러 정보다.
 - `go test ./...`는 `core`의 `TestHash_OnBehalfOf_BackwardCompatible` 하나만 실패한다. 이 실패는 도입 전 `29c1d3a`에서도 같다.
 - indexer는 이벤트 본문을 지금처럼 `ev.Data["키"]`로 읽는다. indexer 테스트가 키 일부가 빠진 이벤트를 건너뛰거나 처리하는 동작을 확인하고 있어, 키가 하나라도 없으면 오류를 내는 `<이벤트>DataFrom`으로 바꾸지 않았다.
 
