@@ -128,9 +128,10 @@ fiber_api_server `feat/daemok` 브랜치(기준 `main` `6df1865`)에 설계 파�
 |---|---|---|
 | 같은 이름의 sentinel | `ErrUnauthorized`, `ErrPostNotFound`는 `post` 쪽만 적음 | `comment`, `series` 쪽 4개를 따로 ID를 두고 `go.name`으로 적음. 에러 26개 |
 | 엔티티 | 이름만 대조. GORM 관리 필드는 적지 않음 | 엔티티 6개의 필드 전부를 적고 필드 타입까지 대조. 연관 `User`는 값 필드라 `ref`가 아니라 `type: user`로 적음 |
-| post 서비스 계약 | 올리지 않음 | `post_service`(`Service`) 메서드 9개를 시그니처까지 대조. `errors`는 코드의 `return` 기준 |
+| post 서비스 계약 | 올리지 않음 | `post_service`(`Service`) 메서드 10개를 시그니처까지 대조. `errors`는 코드의 `return` 기준 |
 
-- `daemok check`: 오류 0, 경고 1, 정보 0. 경고는 `IsLiked(postID, userID uint) bool`이다. 계약 메서드는 반환 끝에 `error`가 붙어 이 메서드를 적을 수 없다.
+- `daemok check`: 오류 0, 경고 0, 정보 0(`85fd642`).
+- `IsLiked(postID, userID uint) bool`은 계약 메서드의 반환 끝 `error` 규칙 때문에 처음에는 적지 못해 경고로 남았다. 이 메서드는 `Count`의 오류를 버려 조회가 실패하면 `false`를 돌려주고 있었다. `(bool, error)`로 바꾸고 좋아요 상태 조회 handler는 오류 시 500을 내게 했다(`85fd642`). 테스트 `TestIsLiked_DBError`, `TestGetLikeStatus_ServiceError`가 이 동작을 고정한다.
 - 엔티티 대조를 처음 돌렸을 때 `series`, `post`, `comment`의 `user`를 `ref`(포인터)로 적은 것이 코드의 값 필드와 달라 오류 3개가 나왔다. 0.4에서는 필드를 대조하지 않아 드러나지 않았다.
 - 같은 설계를 도입 전 코드(`main` `6df1865`)에 대면 리터럴 검사가 `Where` 인자 5곳을 포함해 6곳을 잡는다. 대입 1곳은 보지 않는다. 엔티티 대조는 `Post.Status`가 `string`이라 설계의 `PostStatus`와 다르다는 오류를 낸다.
 
