@@ -245,3 +245,80 @@ enums:
 		t.Fatalf("%q", got)
 	}
 }
+
+func TestHandWrittenDeclsExist(t *testing.T) {
+	root := t.TempDir()
+	files := map[string]string{
+		"design/d.yaml": `version: 0.4
+go_module: example.com/h
+tiers: [a, b, c]
+modules:
+  config: { tier: a }
+  core:   { tier: a }
+  vm:     { tier: b, depends_on: [core] }
+  later:  { tier: b }
+groups:
+  tx_modules:
+    tier: c
+    kind: tx_handler
+    path: vm/modules
+    depends_on: [core, vm]
+    members:
+      economy: { handles: [transfer, mint_asset] }
+consts:
+  max_block_txs: { gen: false, in: config, type: int, value: 500, go: { name: DefaultMaxBlockTxs } }
+  max_tx_age:    { gen: false, in: config, type: duration, value: 1h, go: { name: MaxTxAge } }
+  generated:     { in: config, type: int, value: 1 }
+  not_yet:       { gen: false, in: later, type: int, value: 1 }
+errors:
+  ErrNotFound: { gen: false, in: core, message: "not found" }
+  ErrGone:     { gen: false, in: core, message: "gone" }
+enums:
+  tx_type: { gen: false, in: core, go: { type: TxType, prefix: Tx }, values: [transfer, mint_asset] }
+types:
+  payload: { gen: false, in: core, fields: { to: string } }
+contracts:
+  store:
+    gen: false
+    in: core
+    methods:
+      get: { params: { id: string }, returns: [string], errors: [] }
+handler_kinds:
+  tx_handler:
+    gen: false
+    in: vm
+    params: { p: string }
+    returns: [error]
+    key: tx_type
+`,
+		"config/config.go":  "package config\n\nconst DefaultMaxBlockTxs = 500\n",
+		"core/core.go":      "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"not found\")\n\ntype TxType string\n\nconst TxTransfer TxType = \"transfer\"\n\ntype Payload struct{ To string }\n\ntype Store interface{ Get(id string) string }\n\nfunc ErrGone() {}\n",
+		"core/core_test.go": "package core\n\nconst TxMintAsset TxType = \"mint_asset\"\n",
+		"vm/vm.go":          "package vm\n\nimport _ \"example.com/h/core\"\n",
+	}
+	for p, c := range files {
+		writeFile(t, filepath.Join(root, p), c)
+	}
+	m, ds := model.Load(filepath.Join(root, "design"))
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	if cds := check.Run(m); cds.HasErrors() {
+		t.Fatalf("check: %v", cds)
+	}
+	var got []string
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "gen: false") {
+			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File))
+		}
+	}
+	sort.Strings(got)
+	want := []string{
+		"오류: gen: false인데 코드에 선언이 없다: 모듈 config, 상수 max_tx_age (MaxTxAge) @d.yaml",
+		"오류: gen: false인데 코드에 선언이 없다: 모듈 core, enum tx_type (TxMintAsset) @d.yaml",
+		"오류: gen: false인데 코드에 선언이 없다: 모듈 vm, 핸들러 종류 tx_handler (TxHandler) @d.yaml",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}

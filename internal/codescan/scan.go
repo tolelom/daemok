@@ -27,6 +27,8 @@ type scanner struct {
 	imports map[string]map[string]bool
 	// 모듈·멤버 ID → 쓴 이벤트 상수와 목록 함수의 이름
 	refs map[string]map[string]bool
+	// 모듈·멤버 ID → 패키지 최상위 선언 이름
+	decls map[string]map[string]bool
 }
 
 // unit은 코드 디렉토리를 가진 모듈이나 그룹 멤버다.
@@ -39,6 +41,7 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	s := &scanner{
 		m: m, root: root, fset: token.NewFileSet(),
 		units: map[string]string{}, imports: map[string]map[string]bool{}, refs: map[string]map[string]bool{},
+		decls: map[string]map[string]bool{},
 	}
 	us := s.unitList()
 	for _, u := range us {
@@ -50,6 +53,7 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	s.queryPackages()
 	s.unusedDeps(us)
 	s.eventRefs(us)
+	s.handWritten()
 	s.diags.Sort()
 	return s.diags
 }
@@ -89,8 +93,12 @@ func (s *scanner) pos(p token.Pos) yaml.Pos {
 func (s *scanner) scanUnit(u unit) {
 	s.imports[u.id] = map[string]bool{}
 	s.refs[u.id] = map[string]bool{}
+	s.decls[u.id] = map[string]bool{}
 	unmanaged := map[string]bool{}
 	for _, f := range s.goFiles(u.dir) {
+		for _, name := range gosrc.TopNames(f) {
+			s.decls[u.id][name] = true
+		}
 		for _, im := range f.Imports {
 			ip, _ := strconv.Unquote(im.Path.Value)
 			if ip != s.m.GoModule && !strings.HasPrefix(ip, s.m.GoModule+"/") {
@@ -282,6 +290,47 @@ func (s *scanner) eventRefs(us []unit) {
 				s.diags.Warnf(e.Pos, "발행자나 구독자로 적히지 않은 모듈이 이벤트를 쓴다: 모듈 %s, 이벤트 %s", id, e.ID)
 			}
 		}
+	}
+}
+
+// handWritten은 gen: false 노드가 생성 코드 대신 둔다고 한 선언이 소유 모듈 패키지에 있는지 본다.
+// 손으로 쓴 코드에 생성 코드와 같은 이름이 있다고 볼 수 있는 노드만 본다. 이벤트 종류, 흐름, 함수는 보지 않는다.
+// enum은 타입과 값 상수만 보고 목록 함수는 보지 않는다. 코드 디렉토리가 없는 모듈은 보지 않는다.
+func (s *scanner) handWritten() {
+	m := s.m
+	need := func(o model.Owned, what string, names ...string) {
+		if o.Gen || !s.dirExists(s.ownerDir(o.In.Name)) {
+			return
+		}
+		for _, n := range names {
+			if !s.decls[o.In.Name][n] {
+				s.diags.Errorf(o.Pos, "gen: false인데 코드에 선언이 없다: 모듈 %s, %s %s (%s)", o.In.Name, what, o.ID, n)
+			}
+		}
+	}
+	for _, e := range m.Enums {
+		names := []string{e.GoType()}
+		for _, v := range e.Values {
+			names = append(names, e.ConstName(v.Name))
+		}
+		need(e.Owned, "enum", names...)
+	}
+	for _, k := range m.Consts {
+		need(k.Owned, "상수", k.GoName())
+	}
+	for _, e := range m.Errors {
+		need(e.Owned, "에러", e.ID)
+	}
+	for _, t := range m.Types {
+		need(t.Owned, "타입", t.GoName())
+	}
+	for _, ct := range m.Contracts {
+		if ct.Kind == "call" {
+			need(ct.Owned, "계약", ct.GoName())
+		}
+	}
+	for _, hk := range m.HandlerKinds {
+		need(hk.Owned, "핸들러 종류", hk.GoName())
 	}
 }
 

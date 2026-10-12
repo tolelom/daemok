@@ -56,6 +56,36 @@ func ImportsOnly(fset *token.FileSet, path string) (*ast.File, error) {
 	return f, nil
 }
 
+// TopNames는 type, const, var, 메서드가 아닌 func의 이름이다. _, init, main은 뺀다.
+func TopNames(f *ast.File) []string {
+	var out []string
+	add := func(n string) {
+		if n != "_" && n != "init" && n != "main" {
+			out = append(out, n)
+		}
+	}
+	for _, d := range f.Decls {
+		switch x := d.(type) {
+		case *ast.FuncDecl:
+			if x.Recv == nil {
+				add(x.Name.Name)
+			}
+		case *ast.GenDecl:
+			for _, s := range x.Specs {
+				switch sp := s.(type) {
+				case *ast.TypeSpec:
+					add(sp.Name.Name)
+				case *ast.ValueSpec:
+					for _, n := range sp.Names {
+						add(n.Name)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
 // SkipDir는 코드를 읽지 않는 디렉토리다.
 func SkipDir(name string) bool {
 	return strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules"

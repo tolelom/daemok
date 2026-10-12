@@ -52,7 +52,7 @@ func Count(m *model.Model, root string) ([]Row, error) {
 		rel = filepath.ToSlash(rel)
 		row := Row{Pkg: rel}
 		for _, f := range files {
-			for _, name := range topNames(f) {
+			for _, name := range gosrc.TopNames(f) {
 				row.Decls++
 				if expected[rel][name] {
 					row.Matched++
@@ -121,7 +121,7 @@ func designNames(m *model.Model) (map[string]map[string]bool, error) {
 		if out[dir] == nil {
 			out[dir] = map[string]bool{}
 		}
-		for _, name := range topNames(f) {
+		for _, name := range gosrc.TopNames(f) {
 			out[dir][name] = true
 		}
 		for _, name := range handlerRefs(f) {
@@ -129,36 +129,6 @@ func designNames(m *model.Model) (map[string]map[string]bool, error) {
 		}
 	}
 	return out, nil
-}
-
-// topNames는 type, const, var, 메서드가 아닌 func의 이름이다. _, init, main은 뺀다.
-func topNames(f *ast.File) []string {
-	var out []string
-	add := func(n string) {
-		if n != "_" && n != "init" && n != "main" {
-			out = append(out, n)
-		}
-	}
-	for _, d := range f.Decls {
-		switch x := d.(type) {
-		case *ast.FuncDecl:
-			if x.Recv == nil {
-				add(x.Name.Name)
-			}
-		case *ast.GenDecl:
-			for _, s := range x.Specs {
-				switch sp := s.(type) {
-				case *ast.TypeSpec:
-					add(sp.Name.Name)
-				case *ast.ValueSpec:
-					for _, n := range sp.Names {
-						add(n.Name)
-					}
-				}
-			}
-		}
-	}
-	return out
 }
 
 // handlerRefs는 등록 파일의 `_ 패키지.종류 = 함수` 줄이 가리키는 손으로 쓴 함수 이름이다.
