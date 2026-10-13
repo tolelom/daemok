@@ -90,7 +90,7 @@ const Computed = PageSize * 2
 		`errors ErrNotFound: { in: core, gen: false, message: "not found" }`,
 		`errors ErrQuote: { in: core, gen: false, message: "say \"hi\"" }`,
 		`consts greeting: { in: core, gen: false, type: string, value: "hello" }`,
-		`consts http_port: { in: core, gen: false, type: int, value: 8080, go: { name: HTTPPort } }`,
+		`consts http_port: { in: core, gen: false, type: int, value: 8080 }`,
 		`consts max_user_id: { in: core, gen: false, type: int, value: 7 }`,
 		`consts page_size: { in: core, gen: false, type: int, value: 10 }`,
 		`consts timeout: { in: core, gen: false, type: duration, value: 5s }`,
@@ -175,13 +175,14 @@ func TestSnakeID(t *testing.T) {
 	for _, c := range []struct{ name, id, goName string }{
 		{"PageSize", "page_size", ""},
 		{"MaxUserID", "max_user_id", ""},
-		{"HTTPPort", "http_port", "HTTPPort"},
+		{"HTTPPort", "http_port", ""},
 		{"DefaultP2PPort", "default_p2p_port", "DefaultP2PPort"},
 		{"Sha256Size", "sha256_size", ""},
 		{"X", "x", ""},
-		{"PostIDs", "post_ids", "PostIDs"},
-		{"URLsByID", "urls_by_id", "URLsByID"},
-		{"IDs", "ids", "IDs"},
+		{"PostIDs", "post_ids", ""},
+		{"URLsByID", "urls_by_id", ""},
+		{"IDs", "ids", ""},
+		{"JWTSecret", "jwt_secret", "JWTSecret"},
 		{"Status", "status", ""},
 	} {
 		id, goName, ok := snakeID(c.name)
@@ -253,7 +254,7 @@ const SingleOnly Single = "only"
 		"core/msg_more.go": "package core\n\nconst MsgPing MsgType = \"ping\"\n",
 	})
 	want := strings.Join([]string{
-		"enums http_mode: { in: core, gen: false, values: [fast, slow], go: { type: HTTPMode } }",
+		"enums http_mode: { in: core, gen: false, values: [fast, slow] }",
 		"enums msg_type: { in: core, gen: false, values: [hello, get_blocks, ping], go: { prefix: Msg } }",
 		"enums post_status: { in: core, gen: false, values: [published, draft] }",
 	}, "\n")

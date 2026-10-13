@@ -660,7 +660,9 @@ contracts:
 }
 
 func TestGoName(t *testing.T) {
-	for in, want := range map[string]string{"asset_id": "AssetID", "list_published": "ListPublished", "id": "ID", "a__b": "AB"} {
+	for in, want := range map[string]string{"asset_id": "AssetID", "list_published": "ListPublished", "id": "ID", "a__b": "AB",
+		"rpc_port": "RPCPort", "tls": "TLS", "post_ids": "PostIDs", "extra_ips": "ExtraIPs", "avatar_url": "AvatarURL", "db_host": "DBHost",
+		"image_urls": "ImageURLs", "http_api": "HTTPAPI", "utf8_name": "UTF8Name", "idle": "Idle", "ui_state": "UIState"} {
 		if got := GoName(in); got != want {
 			t.Errorf("%s: %s", in, got)
 		}

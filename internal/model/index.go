@@ -305,19 +305,30 @@ func (c *Contract) Method(name string) *Method {
 
 func (e *Enum) HasValue(name string) bool { return hasRef(e.Values, name) }
 
-// GoName은 snake_case ID를 CamelCase로 바꾼다. 조각 id는 ID가 된다.
+// GoName은 snake_case ID를 CamelCase로 바꾼다. 약어 조각(id, url)과 그 복수(ids)는 ID, URL, IDs가 된다.
 func GoName(id string) string {
 	var b strings.Builder
 	for _, part := range strings.Split(id, "_") {
-		switch part {
-		case "":
-		case "id":
-			b.WriteString("ID")
+		switch {
+		case part == "":
+		case initialisms[part]:
+			b.WriteString(strings.ToUpper(part))
+		case strings.HasSuffix(part, "s") && initialisms[strings.TrimSuffix(part, "s")]:
+			b.WriteString(strings.ToUpper(strings.TrimSuffix(part, "s")) + "s")
 		default:
 			b.WriteString(strings.ToUpper(part[:1]) + part[1:])
 		}
 	}
 	return b.String()
+}
+
+// initialisms는 Go 이름에서 모두 대문자로 쓰는 약어다. staticcheck ST1003의 기본 목록이다.
+var initialisms = map[string]bool{}
+
+func init() {
+	for _, s := range strings.Fields("acl api ascii cpu css dns eof guid html http https id ip json qps ram rpc sla smtp sql ssh tcp tls ttl udp ui gid uid uuid uri url utf8 vm xml xmpp xsrf xss sip rtp amqp db ts") {
+		initialisms[s] = true
+	}
 }
 
 func (m *Model) EventKind(id string) *EventKind {
