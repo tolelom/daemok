@@ -7,6 +7,7 @@ import (
 	"path"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/model"
@@ -98,6 +99,12 @@ func (g *gen) consts() error {
 			name := c.GoName()
 			val := c.Value
 			switch c.Type {
+			case "int":
+				n, err := strconv.Atoi(c.Value)
+				if err != nil {
+					return fmt.Errorf("%s: 정수가 아니다: 상수 %s %q", c.ValuePos, c.ID, c.Value)
+				}
+				val = strconv.Itoa(n) // 앞자리 0을 8진수로 읽지 않게 한다
 			case "string":
 				val = fmt.Sprintf("%q", c.Value)
 			case "duration":
@@ -105,7 +112,11 @@ func (g *gen) consts() error {
 				if mm == nil {
 					return fmt.Errorf("%s: duration 값의 형식이 아니다: 상수 %s %q", c.ValuePos, c.ID, c.Value)
 				}
-				val = mm[1] + " * " + f.use("time") + "." + units[mm[2]]
+				n, err := strconv.Atoi(mm[1])
+				if err != nil {
+					return fmt.Errorf("%s: duration 값의 형식이 아니다: 상수 %s %q", c.ValuePos, c.ID, c.Value)
+				}
+				val = strconv.Itoa(n) + " * " + f.use("time") + "." + units[mm[2]]
 			}
 			lines = append(lines, fmt.Sprintf("\t%s = %s", name, val))
 		}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/model"
@@ -26,7 +27,12 @@ func Generate(m *model.Model) ([]byte, bool) {
 	for _, c := range consts {
 		b.WriteString("\n" + doc(c.Summary))
 		value := c.Value
-		if c.Type == "string" {
+		switch c.Type {
+		case "int":
+			if n, err := strconv.Atoi(c.Value); err == nil {
+				value = strconv.Itoa(n) // 앞자리 0은 TS 모듈에서 문법 오류다
+			}
+		case "string":
 			q, _ := json.Marshal(c.Value)
 			value = string(q)
 		}

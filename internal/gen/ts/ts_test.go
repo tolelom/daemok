@@ -3,6 +3,7 @@ package ts
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tolelom/daemok/internal/model"
@@ -61,6 +62,17 @@ func TestGenerateNothing(t *testing.T) {
 	} {
 		if got, ok := Generate(load(t, src)); ok {
 			t.Errorf("%q\n%s", src, got)
+		}
+	}
+}
+
+// 앞자리 0은 TS 모듈에서 문법 오류다. 설계 검사가 읽은 10진수 값으로 쓴다.
+func TestGenerateDecimalValue(t *testing.T) {
+	m := load(t, "ts_out: x.gen.ts\nconsts:\n  a: { in: core, type: int, value: 010, export: [ts] }\n  b: { in: core, type: int, value: +5, export: [ts] }\n")
+	got, _ := Generate(m)
+	for _, want := range []string{"export const A = 10;\n", "export const B = 5;\n"} {
+		if !strings.Contains(string(got), want) {
+			t.Errorf("%q가 없다:\n%s", want, got)
 		}
 	}
 }

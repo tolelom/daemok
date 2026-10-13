@@ -163,3 +163,22 @@ funcs:
 		t.Errorf("생성 코드에 에러 ID가 남았다:\n%s", all)
 	}
 }
+
+// 설계 검사는 값을 10진수로 읽는다. Go 리터럴의 앞자리 0은 8진수라 그대로 쓰면 값이 바뀐다.
+func TestConstDecimalValue(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a]
+modules:
+  core: { tier: a }
+consts:
+  a: { in: core, type: int, value: 010 }
+  b: { in: core, type: int, value: +5 }
+  c: { in: core, type: duration, value: 010s }
+`)
+	got := files["core/consts.gen.go"]
+	for _, want := range []string{"\tA = 10\n", "\tB = 5\n", "\tC = 10 * time.Second\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%q가 없다:\n%s", want, got)
+		}
+	}
+}
