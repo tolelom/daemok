@@ -119,7 +119,12 @@ func has(rs []model.Ref, name string) bool {
 }
 
 // depsOf는 id가 설계상 의존하는 ID 목록이다. 멤버는 그룹의 의존과 자기 예외를 따른다.
-func (c *checker) depsOf(id string) []string {
+func (c *checker) depsOf(id string) []string { return c.deps(id, c.needTargets) }
+
+// layerDepsOf는 depsOf에서 query needs를 뺀 것이다. 순환 검사가 쓴다.
+func (c *checker) layerDepsOf(id string) []string { return c.deps(id, c.layerTargets) }
+
+func (c *checker) deps(id string, targets func([]model.Need) []model.Ref) []string {
 	m := c.m
 	var out []string
 	add := func(rs []model.Ref) {
@@ -139,7 +144,7 @@ func (c *checker) depsOf(id string) []string {
 			out = append(out, e.DependsOn.Name)
 		}
 	}
-	for _, r := range c.needTargets(c.needsOf(id)) {
+	for _, r := range targets(c.needsOf(id)) {
 		out = append(out, r.Name)
 	}
 	return out
@@ -168,6 +173,18 @@ func (c *checker) needsOf(id string) []model.Need {
 }
 
 // needTargets는 needs가 가리키는 계약의 모듈을 참조 위치와 함께 준다.
+// layerTargets는 tier 방향과 순환에 넣는 needs 대상이다. query 구현은 data 모듈만 import하는 끝 패키지라
+// 다시 부르는 쪽이 없으므로 query 계약은 뺀다.
+func (c *checker) layerTargets(ns []model.Need) []model.Ref {
+	var kept []model.Need
+	for _, n := range ns {
+		if ct := c.m.Contract(n.Contract.Name); ct == nil || ct.Kind != "query" {
+			kept = append(kept, n)
+		}
+	}
+	return c.needTargets(kept)
+}
+
 func (c *checker) needTargets(ns []model.Need) []model.Ref {
 	var out []model.Ref
 	for _, n := range ns {

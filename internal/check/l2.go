@@ -17,7 +17,7 @@ func (c *checker) l2() {
 	c.exceptions()
 }
 
-// tierDirection은 자기보다 위 tier에 의존하면 오류다. 같은 tier는 허용한다.
+// tierDirection은 자기보다 위 tier에 의존하면 오류다. 같은 tier는 허용한다. query needs는 보지 않는다.
 func (c *checker) tierDirection() {
 	m := c.m
 	check := func(fromID, fromTier string, deps []model.Ref) {
@@ -34,13 +34,13 @@ func (c *checker) tierDirection() {
 	}
 	for _, mod := range m.Modules {
 		check(mod.ID, mod.Tier.Name, mod.DependsOn)
-		check(mod.ID, mod.Tier.Name, c.needTargets(mod.Needs))
+		check(mod.ID, mod.Tier.Name, c.layerTargets(mod.Needs))
 	}
 	for _, g := range m.Groups {
 		check(g.ID, g.Tier.Name, g.DependsOn)
-		check(g.ID, g.Tier.Name, c.needTargets(g.Needs))
+		check(g.ID, g.Tier.Name, c.layerTargets(g.Needs))
 		for _, mem := range g.Members {
-			check(mem.ID, g.Tier.Name, c.needTargets(mem.Needs))
+			check(mem.ID, g.Tier.Name, c.layerTargets(mem.Needs))
 			for _, e := range mem.Exceptions {
 				check(mem.ID, g.Tier.Name, []model.Ref{e.DependsOn})
 			}
@@ -114,7 +114,7 @@ func (c *checker) cycles() {
 				out = append(out, d)
 			}
 		}
-		for _, d := range c.depsOf(id) {
+		for _, d := range c.layerDepsOf(id) {
 			add(d)
 		}
 		if g := m.Group(id); g != nil {
@@ -122,7 +122,7 @@ func (c *checker) cycles() {
 				for _, e := range mem.Exceptions {
 					add(e.DependsOn.Name)
 				}
-				for _, r := range c.needTargets(mem.Needs) {
+				for _, r := range c.layerTargets(mem.Needs) {
 					add(r.Name)
 				}
 			}
@@ -146,7 +146,7 @@ func (c *checker) siblingCycles() {
 			for _, e := range mem.Exceptions {
 				targets = append(targets, e.DependsOn.Name)
 			}
-			for _, r := range c.needTargets(mem.Needs) {
+			for _, r := range c.layerTargets(mem.Needs) {
 				targets = append(targets, r.Name)
 			}
 			for _, d := range targets {
@@ -242,6 +242,10 @@ func (c *checker) exceptions() {
 func (c *checker) contractRoles() {
 	want := map[string]string{"port": "infra", "external": "adapter"}
 	for _, ct := range c.m.Contracts {
+		// query 구현은 <모듈 path>/query에 두므로 path가 이미 /query로 끝나면 query/query가 된다.
+		if o, ok := c.m.Owner(ct.In.Name); ct.Kind == "query" && ok && (o.Path == "query" || strings.HasSuffix(o.Path, "/query")) {
+			c.errorf(ct.Pos, "query 계약의 모듈 경로가 /query로 끝난다: %s(%s). 구현이 %s/query에 생긴다", ct.ID, o.Path, o.Path)
+		}
 		role, ok := want[ct.Kind]
 		if !ok {
 			continue

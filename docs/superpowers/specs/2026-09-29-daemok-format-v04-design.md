@@ -75,7 +75,8 @@ contracts:
 | 대상 | 검사 |
 |---|---|
 | 참조 | `needs`의 계약, `uses`의 메서드가 있는지 |
-| L2 | `needs`로 생긴 관계도 tier 방향과 순환 검사에 넣는다 |
+| L2 | `needs`로 생긴 관계도 tier 방향과 순환 검사에 넣는다. query 계약은 뺀다. 구현이 data 모듈만 import하는 끝 패키지라 다시 부르는 쪽이 없다 |
+| L2 | 경로가 `/query`로 끝나는 모듈에 query 계약이 있으면 오류다. 구현 패키지가 `<path>/query/query`가 된다 |
 | L2 | `port` 계약의 모듈은 `role: infra`, `external` 계약의 모듈은 `role: adapter`다 |
 | L3 | 계약 시그니처의 타입이 속한 모듈에 받는 쪽이 의존한다. 기존 타입 의존 검사를 `needs`로 넓힌 것이다 |
 | import | 받는 쪽이 `needs`로만 이어진 모듈을 직접 import하면 오류다 |

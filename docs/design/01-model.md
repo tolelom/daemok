@@ -206,7 +206,7 @@ flows:
 | 핸들러 | 키 enum의 모든 값이 정확히 한 멤버에서 처리되는지 |
 | L4 | `handles`가 멤버의 `handles`에 있는지, 케이스의 에러가 `errors`에 있는지, 케이스가 없는 에러(`gen: false` 제외), 일반 함수의 `go.name`은 export되는 이름이고 일반 함수에만 씀 |
 | R | 충족 요소가 없는 active 요구사항, held·dropped 요구사항에 매달린 요소 |
-| 관계 | `needs`의 관계도 tier 방향과 순환(형제 멤버 포함)에 넣음, 자기 계약을 받는 needs, 같은 계약을 두 번 받음(경고), 빈 `uses`, port·external 계약의 모듈 role, 받은 계약의 시그니처 타입에 대한 의존 |
+| 관계 | `needs`의 관계도 tier 방향과 순환(형제 멤버 포함)에 넣음(query 계약 제외. query 구현은 data 모듈만 import하는 끝 패키지), 경로가 `/query`로 끝나는 모듈의 query 계약, 자기 계약을 받는 needs, 같은 계약을 두 번 받음(경고), 빈 `uses`, port·external 계약의 모듈 role, 받은 계약의 시그니처 타입에 대한 의존 |
 | 이벤트 | key enum의 값마다 이벤트가 있는지, 한 enum을 여러 이벤트 종류가 쓰는지, 발행자가 있는지, 발행자·구독자가 모듈이나 그룹 멤버인지, 이벤트 종류의 모듈에 의존하는지 |
 | 흐름 | 빈 흐름, 단계 ID와 undo 형식, 단계 중복, Go 메서드 이름 충돌, commit 하나, commit 단계와 커밋 뒤 단계의 undo, `calls`의 계약과 `uses`, `emits`의 발행자, `on`의 구독자 |
 | 외부 타입 | `모듈.이름` 형식의 외부 타입은 그 모듈에 대한 의존으로 본다 |

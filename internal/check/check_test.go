@@ -632,3 +632,32 @@ func TestL4FreeFunc(t *testing.T) {
 	ds = run(t, base+"  safe_add: { in: core, go: { name: safeAdd }, errors: [] }\n")
 	want(t, ds, model.Error, "Go 이름으로 쓸 수 없는 함수 이름: safe_add safeAdd")
 }
+
+// query 구현은 data 모듈만 import하는 끝 패키지라 query needs는 tier 방향과 순환에 넣지 않는다.
+func TestQueryNeedsOutsideLayering(t *testing.T) {
+	src := `tiers: [low, high]
+modules:
+  a: { tier: low, needs: [bq] }
+  b: { tier: high, needs: [aq] }
+contracts:
+  aq: { in: a, kind: query, methods: { get: { errors: [] } } }
+  bq: { in: b, kind: query, methods: { get: { errors: [] } } }
+  ac: { in: a, methods: { do: { errors: [] } } }
+  bc: { in: b, methods: { do: { errors: [] } } }
+`
+	wantNone(t, run(t, src), model.Error)
+	ds := run(t, strings.Replace(strings.Replace(src, "needs: [bq]", "needs: [bq, bc]", 1), "needs: [aq]", "needs: [aq, ac]", 1))
+	want(t, ds, model.Error, "상위 tier 의존: a(low) → b(high)")
+	want(t, ds, model.Error, "의존 순환")
+}
+
+// 경로가 /query로 끝나는 모듈에 query 계약을 두면 구현 패키지가 <path>/query/query가 된다.
+func TestQueryContractInQueryPath(t *testing.T) {
+	ds := run(t, `tiers: [low]
+modules:
+  x_query: { tier: low, path: x/query }
+contracts:
+  xq: { in: x_query, kind: query, methods: { get: { errors: [] } } }
+`)
+	want(t, ds, model.Error, "query 계약의 모듈 경로가 /query로 끝난다: xq(x/query)")
+}
