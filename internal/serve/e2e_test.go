@@ -164,7 +164,10 @@ func TestUIMapDenseE2E(t *testing.T) {
 		write("box/core/"+p+"/x.go", "package "+filepath.Base(p)+"\n"+imp)
 	}
 	// 같은 줄 관계선: shop → reg는 이웃 칸, worker → shop은 reg를 건너는 칸이다. reg → shop은 반대 방향이다.
-	write("box/core/shop/up.go", "package shop\nimport _ \"example.com/d/box/core/reg\"\n")
+	write("box/core/shop/up.go", "package shop\nimport \"example.com/d/box/core/reg\"\nvar _ = reg.ErrGone\n")
+	// 모듈 탭 연결 표: shop/query가 reg/service의 이름을 별칭 import로 쓴다.
+	write("box/core/reg/service/api.go", "package service\n\ntype Service struct{}\n\nfunc Find() {}\n")
+	write("box/core/shop/query/use.go", "package query\nimport rs \"example.com/d/box/core/reg/service\"\nvar _ = rs.Find\nvar _ rs.Service\n")
 	write("box/core/reg/svc.go", "package reg\nimport _ \"example.com/d/box/core/shop/query\"\n")
 	write("box/core/inventory_reconciliation_worker/x.go", "package worker\n"+imp+"import _ \"example.com/d/box/core/shop\"\n")
 	write("box/main.go", "package box\nimport _ \"example.com/d/box/core/reg\"\n")

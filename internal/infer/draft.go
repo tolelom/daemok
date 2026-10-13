@@ -57,6 +57,8 @@ type Report struct {
 	External []External `json:"external"`
 	// Hints는 L3 노드(gen: false)로 올릴 만한 손으로 쓴 선언이다.
 	Hints []Hint `json:"hints"`
+	// Uses는 모듈·실행 단위가 다른 모듈에서 쓰는 export 이름이다.
+	Uses []Use `json:"uses,omitempty"`
 }
 
 // External은 외부 모듈 하나와 그걸 쓰는 모듈·실행 단위 ID다.
@@ -93,6 +95,13 @@ func Analyze(root string) (*Analysis, error) {
 	d, rep := build(module, pkgs, skips)
 	rep.External = external(requires, pkgs, d)
 	return &Analysis{Draft: d, YAML: Render(d), Report: rep}, nil
+}
+
+func dirOfMod(m Mod) string {
+	if m.Path != "" {
+		return m.Path
+	}
+	return m.ID
 }
 
 func systemID(module string) string {
@@ -246,6 +255,14 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		}
 		return rep.FanIn[i].ID < rep.FanIn[j].ID
 	})
+	ids := map[string]string{}
+	for _, m := range d.Mods {
+		ids[dirOfMod(m)] = m.ID
+	}
+	for _, e := range d.Exes {
+		ids[e.Dir] = e.ID
+	}
+	rep.Uses = uses(byDir, ids, libIDs)
 	if len(rep.FanIn) > 5 {
 		rep.FanIn = rep.FanIn[:5]
 	}

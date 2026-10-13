@@ -3,21 +3,29 @@
 function renderDraft() {
   setSide('');
   const d = S.draft, r = d.report;
-  const skipped = (r.skipped || []).map(x => `<li><span class="id">${esc(x.path)}</span> <span class="muted">${esc(x.reason)}</span></li>`).join('') || '<li class="muted">없음</li>';
+  const skipped = (r.skipped || []).map(x => `<li><span class="id">${esc(x.path)}</span> <span class="muted">${esc(x.reason)}</span></li>`).join('');
+  // 외부 의존을 쓰는 곳은 지도처럼 뿌리 모듈로 접는다. 하위 패키지까지 다 적으면 한 줄이 수십 개가 된다.
+  const ext = (r.external || []).map(e => {
+    const users = [...new Set((e.users || []).map(u => mapUnit(u) || u))].sort();
+    return `<tr><td class="id">${esc(e.module)}</td><td>${users.length ? inlineList(users.map(unitLink)) : '<span class="muted">쓰는 모듈 없음</span>'}</td></tr>`;
+  });
+  // L3 후보는 지도의 영역 순서로 놓는다.
+  const order = areaRows(topUnits()).flatMap(x => x.ids);
+  const hints = [...(r.hints || [])].sort((a, b) => order.indexOf(a.module) - order.indexOf(b.module)).map(h => `<tr><td>${unitLink(h.module)}</td><td>${esc(h.kind)}${h.type ? ` <span class="id">${esc(h.type)}</span>` : ''}</td><td class="id">${h.names.map(esc).join(', ')}</td><td class="muted id">${esc(h.where)}</td></tr>`);
   const fan = (r.fanIn || []).map(x => `${unitLink(x.id)} ${x.count}`).join(', ') || '<span class="muted">없음</span>';
   const cycles = (r.cycles || []).map(c => `<li>${c.map(unitLink).join(', ')}</li>`).join('');
-  const groups = (r.groupCandidates || []).map(g => `<li><span class="id">${esc(g.path)}</span>: ${g.members.map(unitLink).join(', ')} <span class="muted">공통 의존</span> ${g.common.map(unitLink).join(', ')}${g.exceptions.length ? ` <span class="muted">예외 후보</span> ${g.exceptions.map(esc).join(', ')}` : ''}</li>`).join('');
+  const groups = (r.groupCandidates || []).map(g => `<li><span class="id">${esc(g.path)}</span>: ${g.members.map(unitLink).join(', ')} <span class="muted">공통 의존</span> ${g.common.map(unitLink).join(', ')}${(g.exceptions || []).length ? ` <span class="muted">예외 후보</span> ${g.exceptions.map(esc).join(', ')}` : ''}</li>`).join('');
   $('#main').innerHTML = `<h1 class="plain">초안</h1>
 <p class="sub">설계 파일이 없어 코드의 패키지와 import에서 추정했다. tier 이름과 묶음은 사람이 정한다.</p>
-<dl class="facts"><dt>패키지</dt><dd>${r.packages}</dd><dt>모듈</dt><dd>${r.modules}</dd><dt>실행 단위</dt><dd>${r.executables}</dd><dt>많이 쓰이는 패키지</dt><dd>${fan}</dd></dl>
-${cycles ? `<h3 style="margin-top:22px">서로 import하는 패키지</h3><ul>${cycles}</ul>` : ''}
-${groups ? `<h3 style="margin-top:22px">그룹 후보</h3><p class="muted" style="margin:0 0 6px">그룹은 핸들러 종류가 있어야 해서 초안에 넣지 않았다. 묶을지는 사람이 정한다.</p><ul>${groups}</ul>` : ''}
-${(r.external || []).length ? `<h3 style="margin-top:22px">외부 의존</h3><ul>${r.external.map(e => `<li><span class="id">${esc(e.module)}</span> ${(e.users || []).length ? e.users.map(unitLink).join(', ') : '<span class="muted">쓰는 모듈 없음</span>'}</li>`).join('')}</ul>` : ''}
-${(r.hints || []).length ? `<h3 style="margin-top:22px">L3 노드 후보</h3><p class="muted" style="margin:0 0 6px">이미 손으로 쓴 선언이다. 설계에 올릴 때는 gen: false로 둔다.</p><ul>${r.hints.map(h => `<li>${esc(h.kind)}${h.type ? ' <span class="id">' + esc(h.type) + '</span>' : ''} ${unitLink(h.module)} <span class="id">${h.names.map(esc).join(', ')}</span> <span class="muted">${esc(h.where)}</span></li>`).join('')}</ul>` : ''}
-<h3 style="margin-top:22px">건너뛴 것</h3><ul>${skipped}</ul>
+<dl class="facts"><dt>패키지</dt><dd>${r.packages}</dd><dt>모듈</dt><dd>${r.modules}</dd><dt>실행 단위</dt><dd>${r.executables}</dd><dt>많이 쓰이는 패키지</dt><dd>${fan}</dd><dt>건너뛴 것</dt><dd>${skipped ? `<details><summary>${r.skipped.length}개</summary><ul>${skipped}</ul></details>` : '없음'}</dd></dl>
+${cycles ? `<h2 class="sect">서로 import하는 패키지</h2><ul>${cycles}</ul>` : ''}
+${groups ? `<h2 class="sect">그룹 후보</h2><p class="muted">그룹은 핸들러 종류가 있어야 해서 초안에 넣지 않았다. 묶을지는 사람이 정한다.</p><ul>${groups}</ul>` : ''}
+${ext.length ? `<h2 class="sect">외부 의존</h2><table class="ext"><thead><tr><th>모듈</th><th>쓰는 곳</th></tr></thead><tbody>${ext.join('')}</tbody></table>` : ''}
+${hints.length ? `<h2 class="sect">L3 노드 후보</h2><p class="muted">이미 손으로 쓴 선언이다. 설계에 올릴 때는 gen: false로 둔다.</p><table class="hints"><thead><tr><th>패키지</th><th>종류</th><th>이름</th><th>위치</th></tr></thead><tbody>${hints.join('')}</tbody></table>` : ''}
+<h2 class="sect">초안 YAML</h2>
 <div class="draftbar"><button type="button" class="primary" id="savedraft">design/에 저장</button><code>${esc(d.command)}</code><button type="button" id="copycmd">명령 복사</button></div>
 <p id="savemsg" class="muted"></p>
-<pre class="yaml">${esc(d.yaml)}</pre>`;
+<details class="yaml"><summary>${d.yaml.split('\n').length}줄 보기</summary><pre class="yaml">${esc(d.yaml)}</pre></details>`;
 }
 
 /* ---------- L3 초안 ---------- */

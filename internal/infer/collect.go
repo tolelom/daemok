@@ -24,10 +24,13 @@ var ErrNotModule = errors.New("Go 모듈이 아니다")
 type pkg struct {
 	dir     string
 	main    bool
-	imports []string // 같은 모듈 안의 패키지 디렉토리, 정렬
-	ext     []string // 표준 라이브러리가 아닌 다른 모듈의 import 경로, 정렬
-	doc     string   // 패키지 doc 주석의 첫 문장
-	hints   []Hint   // Module은 build가 채운다
+	imports []string          // 같은 모듈 안의 패키지 디렉토리, 정렬
+	ext     []string          // 표준 라이브러리가 아닌 다른 모듈의 import 경로, 정렬
+	doc     string            // 패키지 doc 주석의 첫 문장
+	hints   []Hint            // Module은 build가 채운다
+	name    string            // package 절의 이름
+	decls   map[string]string // export된 최상위 선언 이름 → 종류
+	refs    []fileRef
 }
 
 // Skip은 초안에 넣지 않은 디렉토리나 파일과 그 이유다.
@@ -159,7 +162,10 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 		types := typeNames(files)
 		for _, f := range files {
 			pk.hints = append(pk.hints, fileHints(fset, root, f, types)...)
+			pk.name = f.Name.Name
+			pk.refs = append(pk.refs, fileRefOf(f, module))
 		}
+		pk.decls = exportedDecls(files)
 		pkgs = append(pkgs, pk)
 		return nil
 	})

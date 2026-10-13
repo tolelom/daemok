@@ -37,5 +37,7 @@ const steps = [
     relSub([], [{ kind: 'register', labels: L('hk') }]),
   ]; const want = ['제공 / 발행 · A, B 외 1', '제공 · call 계약 C / 구독 · E / 등록 · hk', '등록받음 · hk']; return JSON.stringify(got) === JSON.stringify(want) ? 'ok' : JSON.stringify(got); })()`],
   ['module_diag_group', `(() => { go('module', 'p'); const g = document.querySelectorAll('#main details.igroup'); return g.length === 1 && g[0].textContent.includes('3개') ? 'ok' : '묶음 ' + g.length + ': ' + document.querySelector('#main').textContent.slice(0, 200); })()`],
+  ['conn_design', `(() => { go('module', 'x'); const sec = [...document.querySelectorAll('#main table.conn tr.sec')].map(r => r.textContent.trim()); const bare = document.querySelector('#main table.conn tr.bare')?.textContent.trim(); return JSON.stringify(sec) === '["쓰는 것"]' && bare === 'q' ? 'ok' : JSON.stringify([sec, bare]); })()`],
+  ['conn_words', `(() => { const t = connSections('m', [{ from: 'm', to: 'a', kind: 'event', label: 'E' }, { from: 'b', to: 'm', kind: 'event', label: 'F' }, { from: 'm', to: 'c', kind: 'depends' }, { from: 'd', to: 'm', kind: 'register', label: 'hk' }]).map(s => s.title + ':' + s.rows.map(r => r.other + '=' + r.what.join('|')).join(',')); const want = ['쓰는 것:c=', '발행:a=E', '구독:b=F', '등록받음:d=hk']; return JSON.stringify(t) === JSON.stringify(want) ? 'ok' : JSON.stringify(t); })()`],
 ];
 await runSteps(b, steps, 300);

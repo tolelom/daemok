@@ -26,8 +26,9 @@ func TestCollect(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := map[string]pkg{}
+	// 이름 사용(name, decls, refs)은 TestAnalyzeUses가 본다.
 	for _, p := range pkgs {
-		got[p.dir] = *p
+		got[p.dir] = pkg{dir: p.dir, main: p.main, imports: p.imports, ext: p.ext, doc: p.doc, hints: p.hints}
 	}
 	want := map[string]pkg{
 		"api":           {dir: "api", imports: []string{"bad-name", "core", "util"}},

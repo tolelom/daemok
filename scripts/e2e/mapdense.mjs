@@ -65,6 +65,21 @@ const steps = [
   ['side_nested', `(() => { const li = document.querySelector('#side button[data-go="reg"]').closest('li'); const kids = [...li.querySelectorAll(':scope > ul button')].map(x => [x.dataset.go, x.textContent, x.title]); return JSON.stringify(kids) === JSON.stringify([['reg_query', 'query', 'reg_query'], ['reg_service', 'service', 'reg_service']]) ? 'ok' : JSON.stringify(kids); })()`],
   ['side_no_hscroll', `(() => { const s = document.querySelector('#side'); const cut = [...s.querySelectorAll('button')].filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.dataset.go); return s.scrollWidth <= s.clientWidth && !cut.length ? 'ok' : 'side ' + s.scrollWidth + '/' + s.clientWidth + ' 잘린 이름 ' + cut; })()`],
   ['module_header', `(() => { const t = document.querySelector('#main .sub').textContent; return t.includes('영역 box/core') && !t.includes('tier') ? 'ok' : t; })()`],
-  ['module_facts', `(() => { const f = {}; document.querySelectorAll('#main dl.facts dt').forEach(dt => { f[dt.textContent] = dt.nextElementSibling.textContent; }); const ok = (f['하위 패키지'] || '').includes('reg_query') && (f['하위 패키지'] || '').includes('reg_service') && (f['외부 의존'] || '').includes('example.org/ext') && (f['L3 후보'] || '').includes('ErrGone'); return ok ? 'ok' : JSON.stringify(f); })()`],
+  ['module_facts', `(() => { const f = {}; document.querySelectorAll('#main dl.facts dt').forEach(dt => { f[dt.textContent] = dt.nextElementSibling.textContent; }); const ok = (f['하위 패키지'] || '').includes('reg_query') && (f['하위 패키지'] || '').includes('reg_service') && (f['외부 의존'] || '').includes('example.org/ext') && !f['L3 후보']; return ok ? 'ok' : JSON.stringify(f); })()`],
+  ['module_l3', `(() => { const t = document.querySelector('#main table.hints'); return t && t.textContent.includes('ErrGone') && t.textContent.includes('ErrBusy') ? 'ok' : 'L3 표 ' + (t && t.textContent); })()`],
+  ['conn_sections', `(() => { const l = [...document.querySelectorAll('#main table.conn tr.sec')].map(r => r.textContent.trim()); return JSON.stringify(l) === JSON.stringify(['쓰는 것', '쓰는 쪽']) ? 'ok' : JSON.stringify(l); })()`],
+  ['conn_names', `(() => {
+    const rows = [...document.querySelectorAll('#main table.conn tr[data-other]')].map(r => [r.dataset.other, r.querySelector('td.side').textContent, r.querySelector('td.what').textContent]);
+    const has = (o, side, ...w) => rows.some(([a, b, c]) => a === o && b === side && w.every(x => c.includes(x)));
+    const out = [];
+    if (!has('shop', '', 'ErrGone', '에러')) out.push('shop → reg ErrGone');
+    if (!has('shop_query', 'service', 'Find', '함수', 'Service', '타입')) out.push('shop_query → reg_service Find, Service');
+    if (rows.some(([a]) => a === 'reg_query' || a === 'reg_service')) out.push('자기 하위 패키지가 상대로 나옴');
+    return out.length ? out.join(', ') + ' ' + JSON.stringify(rows) : 'ok';
+  })()`],
+  ['conn_bare', `(() => { const r = document.querySelector('#main table.conn tr.bare'); const t = r ? r.textContent : ''; return t.includes('이름 없이 import') && t.includes('leafa') && t.includes('leafm') ? 'ok' : '이름 없는 줄 ' + t; })()`],
+  ['draft_ext', `(() => { go('draft'); const r = [...document.querySelectorAll('#main table.ext tbody tr')].map(t => [...t.cells].map(c => c.textContent.trim())); return JSON.stringify(r) === JSON.stringify([['example.org/ext', 'reg']]) ? 'ok' : JSON.stringify(r); })()`],
+  ['draft_hints', `(() => { const r = [...document.querySelectorAll('#main table.hints tbody tr')].map(t => t.textContent); return r.length === 1 && r[0].includes('reg') && r[0].includes('ErrGone, ErrBusy') && r[0].includes('box/core/reg/errs.go') ? 'ok' : JSON.stringify(r); })()`],
+  ['draft_yaml_folded', `(() => { const d = document.querySelector('#main details.yaml'); return d && !d.open && d.querySelector('pre.yaml') && document.querySelector('#savedraft') ? 'ok' : 'YAML ' + (d ? 'open ' + d.open : '없음'); })()`],
 ];
 await runSteps(b, steps, 200);

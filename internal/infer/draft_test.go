@@ -128,3 +128,17 @@ func TestExternalRequires(t *testing.T) {
 		t.Fatalf("%+v", a.Report.External)
 	}
 }
+
+func TestAnalyzeUses(t *testing.T) {
+	a, err := Analyze(filepath.Join("testdata", "uses"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Use{
+		{From: "app", To: "svc", Names: []Name{{"Run", "함수"}}},
+		{From: "svc", To: "store", Names: []Name{{"ErrGone", "에러"}, {"Limit", "상수"}, {"New", "함수"}, {"Reader", "인터페이스"}, {"Store", "타입"}}},
+	}
+	if !reflect.DeepEqual(a.Report.Uses, want) {
+		t.Fatalf("got  %+v\nwant %+v", a.Report.Uses, want)
+	}
+}
