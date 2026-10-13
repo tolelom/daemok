@@ -3,6 +3,8 @@ package lift
 import (
 	"fmt"
 	"go/ast"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -56,6 +58,9 @@ func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, loc
 			return
 		}
 		typ, reason := c.fieldType(fd.Type, f, local)
+		if reason == "" && omitempty(fd.Tag) {
+			typ = optionalField(typ)
+		}
 		for _, n := range fd.Names {
 			if !n.IsExported() {
 				continue
@@ -86,6 +91,35 @@ func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, loc
 		out = append(out, "go: { name: "+goName+" }")
 	}
 	c.add("types", module, id, ts.Name, out...)
+}
+
+// omitempty는 필드 태그의 json 옵션에 omitempty가 있는지 본다.
+func omitempty(tag *ast.BasicLit) bool {
+	if tag == nil {
+		return false
+	}
+	raw, _ := strconv.Unquote(tag.Value)
+	v, _ := reflect.StructTag(raw).Lookup("json")
+	_, opts, _ := strings.Cut(v, ",")
+	return slices.Contains(strings.Split(opts, ","), "omitempty")
+}
+
+// optionalField는 omitempty인 필드의 설계 타입 문자열을 optional 필드로 바꾼다. 생성 코드는 optional 필드에
+// omitempty를 붙이고, 포인터·슬라이스가 아니면 포인터로 감싼다. 그래서 *T는 T로, []T와 bytes는 그대로 쓴다.
+// 값 타입은 생성 코드가 포인터로 바꿔 모양이 달라지므로 그대로 둔다.
+func optionalField(typ string) string {
+	t := strings.Trim(typ, `"`)
+	switch {
+	case strings.HasPrefix(t, "*") && !strings.HasPrefix(t, "*[]") && t != "*bytes":
+		t = t[1:]
+	case strings.HasPrefix(t, "*") || strings.HasPrefix(t, "[]") || t == "bytes":
+	default:
+		return typ
+	}
+	if strings.ContainsAny(t, "*[") {
+		t = `"` + t + `"`
+	}
+	return "{ type: " + t + ", optional: true }"
 }
 
 // contract는 interface를 call 계약으로 옮긴다. 메서드는 반환 끝이 error여야 한다(생성 계약이 error를 붙인다).

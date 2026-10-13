@@ -500,3 +500,14 @@ func TestPlatformVariants(t *testing.T) {
 		t.Fatalf("%+v", r.Skipped)
 	}
 }
+
+// 포인터·슬라이스·bytes 필드에 omitempty가 있으면 optional로 옮긴다. 생성 코드가 optional에 omitempty를 붙이므로
+// export: [ts]를 붙여도 코드 대조의 태그 비교를 통과한다. 값 타입의 omitempty는 설계 문법이 없어 타입 문자열 그대로 둔다.
+func TestOmitemptyOptional(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/core.go": "package core\n\ntype SeriesInfo struct{ ID int }\n\ntype Post struct {\n\tSeries *SeriesInfo `json:\"series,omitempty\"`\n\tTags   []string `json:\"tags,omitempty\"`\n\tMsg    string `json:\"msg,omitempty\"`\n\tData   []byte `json:\"data,omitempty\"`\n\tBoth   *[]int `json:\"both,omitempty\"`\n\tPlain  *int `json:\"plain\"`\n}\n"})
+	want := `types post: { in: core, gen: false, fields: { series: { type: series_info, optional: true }, tags: { type: "[]string", optional: true }, msg: string, data: { type: bytes, optional: true }, both: { type: "*[]int", optional: true }, plain: "*int" } }
+types series_info: { in: core, gen: false, fields: { id: int } }`
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
+	}
+}
