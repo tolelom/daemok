@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -102,5 +103,64 @@ func TestWorktrees(t *testing.T) {
 	}
 	if b := Branch(t.TempDir()); b != "" {
 		t.Fatalf("저장소 밖 Branch %q", b)
+	}
+}
+
+func TestNewWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	if _, err := NewWorktree(t.TempDir(), "daemok/design"); err == nil {
+		t.Fatal("저장소 밖에서 만들었다")
+	}
+	repo := t.TempDir()
+	run(t, repo, "init", "-q", "-b", "main")
+	if _, err := NewWorktree(repo, "daemok/design"); err == nil {
+		t.Fatal("커밋 없는 저장소에서 만들었다")
+	}
+	os.WriteFile(filepath.Join(repo, "a.txt"), []byte("a"), 0o644)
+	run(t, repo, "add", ".")
+	run(t, repo, "commit", "-q", "-m", "init")
+	if n := Dirty(repo); n != 0 {
+		t.Fatalf("Dirty %d", n)
+	}
+	os.WriteFile(filepath.Join(repo, "a.txt"), []byte("b"), 0o644)
+	os.WriteFile(filepath.Join(repo, "new.txt"), []byte("n"), 0o644)
+	if n := Dirty(repo); n != 2 {
+		t.Fatalf("Dirty %d", n)
+	}
+	for _, bad := range []string{"", "a b", "../x", "-x"} {
+		if _, err := NewWorktree(repo, bad); err == nil {
+			t.Fatalf("브랜치 이름 %q를 받았다", bad)
+		}
+	}
+	p, err := NewWorktree(repo, "daemok/design")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p != filepath.Join(repo, ".worktrees", "daemok-design") || Branch(p) != "daemok/design" {
+		t.Fatalf("%s %s", p, Branch(p))
+	}
+	if b, _ := os.ReadFile(filepath.Join(p, "a.txt")); string(b) != "a" {
+		t.Fatalf("HEAD에서 시작해야 한다: %q", b)
+	}
+	// 다른 worktree 안에서 불러도 주 worktree 아래에 만든다.
+	p2, err := NewWorktree(p, "other")
+	if err != nil || p2 != filepath.Join(repo, ".worktrees", "other") {
+		t.Fatalf("%s %v", p2, err)
+	}
+	ex, _ := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude"))
+	if strings.Count(string(ex), "/.worktrees/\n") != 1 {
+		t.Fatalf("exclude:\n%s", ex)
+	}
+	if n := Dirty(repo); n != 2 {
+		t.Fatalf("원래 작업 폴더가 바뀌었다: Dirty %d", n)
+	}
+	if _, err := NewWorktree(repo, "daemok/design"); err == nil || !strings.Contains(err.Error(), "이미 있는 브랜치") {
+		t.Fatalf("이미 있는 브랜치: %v", err)
+	}
+	os.MkdirAll(filepath.Join(repo, ".worktrees", "taken"), 0o755)
+	if _, err := NewWorktree(repo, "taken"); err == nil || !strings.Contains(err.Error(), "이미 있는 경로") {
+		t.Fatalf("이미 있는 경로: %v", err)
 	}
 }

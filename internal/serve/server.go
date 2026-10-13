@@ -55,6 +55,13 @@ type vDraft struct {
 	YAML    string       `json:"yaml"`
 	Report  infer.Report `json:"report"`
 	Command string       `json:"command"`
+	Git     *vDraftGit   `json:"git,omitempty"` // 새 worktree에 저장할 수 있을 때만
+}
+
+// vDraftGit은 초안을 새 worktree에 저장할 때 보이는 정보다.
+type vDraftGit struct {
+	Branch string `json:"branch"` // 제안하는 브랜치 이름
+	Dirty  int    `json:"dirty"`  // 새 worktree에 들어가지 않는 커밋 안 된 변경 수
 }
 
 // Server는 설계 디렉토리 하나의 지도를 제공한다.
@@ -113,6 +120,9 @@ func (s *Server) refresh() {
 		name := filepath.Join(design, a.Draft.System+".yaml")
 		fill(&st, workspace.RunSources(map[string][]byte{name: a.YAML}, design, root), root)
 		st.Draft = &vDraft{Path: name, YAML: string(a.YAML), Report: a.Report, Command: "daemok init --root " + shellQuote(root)}
+		if s.options().Local && gitbase.HasHead(root) {
+			st.Draft.Git = &vDraftGit{Branch: draftBranch, Dirty: gitbase.Dirty(root)}
+		}
 	} else {
 		st.Mode, st.Fatal, st.Problem = "none", true, err.Error()
 	}
@@ -293,6 +303,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects", s.projects)
 	mux.HandleFunc("POST /api/open", s.open)
 	mux.HandleFunc("POST /api/init", s.initDraft)
+	mux.HandleFunc("POST /api/init-worktree", s.initWorktree)
 	mux.HandleFunc("POST /api/edit", s.editDesign)
 	mux.HandleFunc("GET /api/l3", s.l3Draft)
 	mux.HandleFunc("POST /api/l3", s.l3Save)

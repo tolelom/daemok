@@ -211,3 +211,31 @@ func TestUIWorktreeE2E(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 }
+
+// 분석 모드 초안을 새 worktree에 저장하고 연다. DAEMOK_E2E=1일 때만 돈다.
+func TestUIInitWorktreeE2E(t *testing.T) {
+	if os.Getenv("DAEMOK_E2E") != "1" {
+		t.Skip("DAEMOK_E2E=1일 때만 돈다")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node가 없다")
+	}
+	root := goModule(t)
+	gitRun(t, root, "init", "-q", "-b", "main")
+	gitRun(t, root, "add", ".")
+	gitRun(t, root, "commit", "-q", "-m", "init")
+	os.WriteFile(filepath.Join(root, "core", "extra.go"), []byte("package core\n"), 0o644)
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	out, err := exec.Command(node, filepath.Join("..", "..", "scripts", "e2e", "initwt.mjs"), srv.URL+"/").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".worktrees", "try-one", "design", "demo.yaml")); err != nil {
+		t.Fatal(err)
+	}
+}

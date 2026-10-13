@@ -123,6 +123,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | `GET /api/projects` | 현재 프로젝트, 같은 저장소의 worktree, 최근 목록, 작업 폴더 목록. worktree와 최근 항목은 브랜치, 모드(`check`, `analyze`), 지금 연 것인지를 함께 줍니다 | |
 | `POST /api/open` `{"path": "..."}` | 위 열기 | 400과 이유 |
 | `POST /api/init` | 분석 모드의 초안을 infer의 쓰기 함수로 저장 | 분석 모드가 아니거나 `design/`에 `*.yaml`이 있으면 409 |
+| `POST /api/init-worktree` `{"branch": "..."}` | 지금 저장소 HEAD에서 브랜치를 만들어 `<주 worktree>/.worktrees/<브랜치의 /를 ->`에 꺼내고, 그 코드로 다시 추정한 초안을 그 안의 `design/`에 쓴 뒤 엽니다. 저장소의 `info/exclude`에 `/.worktrees/`가 없으면 더합니다 | `design/`에 `*.yaml`이 있으면 409. 브랜치 이름이 아니거나, 브랜치·경로가 이미 있거나, 커밋이 없거나, git 저장소가 아니면 400 |
 
 - 경로가 `~`나 `~/`로 시작하면 홈 디렉토리로 바꿉니다.
 - 같은 저장소의 worktree: 지금 연 루트에서 `git worktree list`로 읽습니다. 하나뿐이거나 git 저장소가 아니면 비어 있습니다.
@@ -137,7 +138,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 |---|---|
 | 모든 요청 | `Host`의 호스트 부분이 `127.0.0.1` 같은 루프백 IP나 `localhost`가 아니면 403 |
 | POST | `Origin`의 호스트가 `Host`와 다르거나 없으면 403. `Content-Type`이 `application/json`이 아니면 415 |
-| 쓰기 | `design/` 생성과 파일 하나의 `O_EXCL` 생성뿐입니다. 덮어쓰기 없음 |
+| 쓰기 | `design/` 생성과 파일 하나의 `O_EXCL` 생성, 그리고 새 worktree 저장의 브랜치·worktree 생성과 `info/exclude` 한 줄 추가뿐입니다. 덮어쓰기 없음 |
 
 루프백이 아닌 `--addr`에서는 `open`과 `init`이 403이고, 시작할 때 경고를 출력합니다. Host·Origin 검사는 하지 않습니다.
 
@@ -164,7 +165,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 |---|---|
 | 지도, 모듈 | 초안 모델 |
 | 흐름, 요구사항 | 숨김 |
-| 초안 (새) | 분석 메모, 초안 YAML(읽기 전용), "design/에 저장" 버튼, 같은 일을 하는 `daemok init --root <경로>` 명령 복사 |
+| 초안 (새) | 분석 메모, 초안 YAML(읽기 전용), "design/에 저장" 버튼, 같은 일을 하는 `daemok init --root <경로>` 명령 복사. 커밋이 있는 git 저장소를 루프백 주소로 띄웠으면 "새 worktree에 저장" 버튼과 브랜치 입력(기본 `daemok/design`), 새 worktree에 들어가지 않는 커밋 안 된 변경 수 |
 
 - 저장에 성공하면 서버가 다시 읽고 SSE로 대조 모드 화면이 그려집니다. 만든 파일 경로를 짧은 알림으로 보여 줍니다.
 - 409면 "design/에 이미 설계 파일이 있다"를 보여 줍니다.
@@ -190,8 +191,8 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | 불변식 | infer fixture와 설계를 뺀 `codescan/testdata/scan`마다 초안을 `workspace.RunSources`로 대조해 파싱 실패 파일의 오류 말고는 오류 0 |
 | `daemok init` | 위 표의 종료 코드 |
 | serve | 열기 후 `mode`와 경로, Host·Origin 403, 루프백이 아닌 주소에서 `open`·`init` 꺼짐, `init`의 409, 최근 목록 저장, 작업 폴더의 깊이 제한과 건너뛰기, `~` 경로, 임시 저장소의 worktree 목록과 브랜치·모드·지금 표시 |
-| `gitbase` | worktree 목록의 경로·브랜치, detached, 저장소 밖 |
-| 화면 | headless 브라우저 캡처로 완료 조건 4, 5 확인. e2e `worktree.mjs`로 분석 모드 머리 링크 전환과 서랍의 같은 저장소 목록 |
+| `gitbase` | worktree 목록의 경로·브랜치, detached, 저장소 밖. 새 worktree의 경로와 브랜치, HEAD에서 시작, 다른 worktree에서 불러도 주 worktree 아래, exclude 한 번만, 브랜치 이름 검사, 이미 있는 브랜치·경로, 커밋 없는 저장소, 커밋 안 된 변경 수 |
+| 화면 | headless 브라우저 캡처로 완료 조건 4, 5 확인. e2e `worktree.mjs`로 분석 모드 머리 링크 전환과 서랍의 같은 저장소 목록, `initwt.mjs`로 초안 탭의 커밋 안 된 변경 경고, 잘못된 브랜치 이름, 새 worktree 저장 후 대조 모드 |
 
 ## 위험
 

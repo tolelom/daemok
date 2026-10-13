@@ -56,6 +56,15 @@ async function openProject(path) {
   history.replaceState(null, '', '#map');
   await load();
 }
+async function saveWorktree() {
+  const btn = $('#savewt'); if (btn) btn.disabled = true;
+  const res = await post('/api/init-worktree', { branch: $('#wtbranch').value });
+  if (!res.ok) { $('#savemsg').textContent = res.error; if (btn) btn.disabled = false; return; }
+  toast(`새 worktree에 ${res.path}을 만들었다`);
+  view = 'map'; current = ''; mapFocus = '';
+  history.replaceState(null, '', '#map');
+  await load();
+}
 async function saveDraft() {
   const btn = $('#savedraft'); if (btn) btn.disabled = true;
   const res = await post('/api/init', {});
@@ -111,6 +120,7 @@ document.addEventListener('click', e => {
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
   if (t.closest('#savedraft')) return saveDraft();
+  if (t.closest('#savewt')) return saveWorktree();
   if (t.closest('#savel3')) return saveL3();
   const gf = t.closest('[data-genfile]'); if (gf) return showGenFile(gf.dataset.genfile);
   if (t.closest('#copyl3')) { navigator.clipboard.writeText(l3.yaml).then(() => toast('YAML을 복사했다'), () => toast('복사할 수 없다')); return; }

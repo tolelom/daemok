@@ -276,6 +276,53 @@ func (s *Server) initDraft(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"path": p})
 }
 
+// draftBranch는 초안을 새 worktree에 저장할 때 제안하는 브랜치 이름이다.
+const draftBranch = "daemok/design"
+
+// initWorktree는 분석 모드의 초안을 지금 저장소 HEAD에서 만든 새 worktree의 design/에 저장하고 그 worktree를 연다.
+// 원래 작업 폴더에는 쓰지 않는다. 초안은 새 worktree의 코드(HEAD)로 다시 추정한다.
+func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
+	if !s.options().Local {
+		writeErr(w, http.StatusForbidden, "루프백 주소로 띄웠을 때만 저장할 수 있다")
+		return
+	}
+	var req struct {
+		Branch string `json:"branch"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&req); err != nil {
+		writeErr(w, http.StatusBadRequest, "요청 본문을 읽을 수 없다")
+		return
+	}
+	design, root := s.paths()
+	if infer.HasDesignFiles(design) {
+		writeErr(w, http.StatusConflict, "design/에 이미 설계 파일이 있다")
+		return
+	}
+	wt, err := gitbase.NewWorktree(root, strings.TrimSpace(req.Branch))
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	a, err := infer.Analyze(wt)
+	if err != nil {
+		writeErr(w, http.StatusConflict, fmt.Sprintf("worktree를 만들었지만 분석하지 못했다(%s): %v", wt, err))
+		return
+	}
+	p, err := infer.Write(filepath.Join(wt, "design"), a)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, fmt.Sprintf("worktree를 만들었지만 초안을 쓰지 못했다(%s): %v", wt, err))
+		return
+	}
+	if err := s.Open(wt); err != nil {
+		writeErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if rel, err := filepath.Rel(wt, p); err == nil {
+		p = filepath.ToSlash(rel)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"root": wt, "path": p})
+}
+
 func writeJSON(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")

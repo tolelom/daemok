@@ -24,6 +24,8 @@ ${ext.length ? `<h2 class="sect">외부 의존</h2><table class="ext"><thead><tr
 ${hints.length ? `<h2 class="sect">L3 노드 후보</h2><p class="muted">이미 손으로 쓴 선언이다. 설계에 올릴 때는 gen: false로 둔다.</p><table class="hints"><thead><tr><th>패키지</th><th>종류</th><th>이름</th><th>위치</th></tr></thead><tbody>${hints.join('')}</tbody></table>` : ''}
 <h2 class="sect">초안 YAML</h2>
 <div class="draftbar"><button type="button" class="primary" id="savedraft">design/에 저장</button><code>${esc(d.command)}</code><button type="button" id="copycmd">명령 복사</button></div>
+${d.git ? `<div class="draftbar"><button type="button" class="primary" id="savewt">새 worktree에 저장</button><label class="muted">브랜치 <input id="wtbranch" type="text" value="${esc(d.git.branch)}" spellcheck="false" autocomplete="off" aria-label="새 브랜치 이름"></label></div>
+<p class="muted">지금 HEAD에서 브랜치를 만들어 저장소의 .worktrees/ 아래에 꺼내고 그 안의 design/에 저장한 뒤 연다. 이 작업 폴더에는 쓰지 않는다.${d.git.dirty ? ` <span class="sev warn">커밋 안 된 변경 ${d.git.dirty}개는 새 worktree에 들어가지 않는다.</span>` : ''}</p>` : ''}
 <p id="savemsg" class="muted"></p>
 <details class="yaml"><summary>${d.yaml.split('\n').length}줄 보기</summary><pre class="yaml">${esc(d.yaml)}</pre></details>`;
 }

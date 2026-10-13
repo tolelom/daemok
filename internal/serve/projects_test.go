@@ -258,3 +258,60 @@ func TestOpenTilde(t *testing.T) {
 		t.Fatalf("%d %v", code, out)
 	}
 }
+
+// 분석 모드의 초안을 새 worktree에 저장하고 그 worktree를 연다. 원래 작업 폴더는 그대로다.
+func TestInitWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	root := goModule(t)
+	gitRun(t, root, "init", "-q", "-b", "main")
+	gitRun(t, root, "add", ".")
+	gitRun(t, root, "commit", "-q", "-m", "init")
+	os.WriteFile(filepath.Join(root, "core", "extra.go"), []byte("package core\n"), 0o644)
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	st := getState(t, s)
+	g, _ := st["draft"].(map[string]any)["git"].(map[string]any)
+	if g == nil || g["dirty"] != float64(1) || g["branch"] != "daemok/design" {
+		t.Fatalf("초안의 git 정보: %v", st["draft"].(map[string]any)["git"])
+	}
+	code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`)
+	wt := filepath.Join(root, ".worktrees", "daemok-design")
+	if code != 200 || out["root"] != wt || out["path"] != "design/demo.yaml" {
+		t.Fatalf("%d %v", code, out)
+	}
+	if st := getState(t, s); st["mode"] != "check" || st["root"] != wt || st["branch"] != "daemok/design" {
+		t.Fatalf("%v %v %v", st["mode"], st["root"], st["branch"])
+	}
+	if _, err := os.Stat(filepath.Join(root, "design")); !os.IsNotExist(err) {
+		t.Fatal("원래 작업 폴더에 design/이 생겼다")
+	}
+	if code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`); code != 409 {
+		t.Fatalf("대조 모드에서 다시: %d %v", code, out)
+	}
+	body, _ := json.Marshal(map[string]string{"path": root})
+	post(t, s, "/api/open", string(body))
+	if code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`); code != 400 || !strings.Contains(out["error"].(string), "이미 있는 브랜치") {
+		t.Fatalf("이미 있는 브랜치: %d %v", code, out)
+	}
+}
+
+// git 저장소가 아니면 초안에 git 정보가 없고 worktree 저장은 거부한다.
+func TestInitWorktreeNeedsGit(t *testing.T) {
+	root := goModule(t)
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	if g := getState(t, s)["draft"].(map[string]any)["git"]; g != nil {
+		t.Fatalf("%v", g)
+	}
+	if code, _ := post(t, s, "/api/init-worktree", `{"branch":"x"}`); code != 400 {
+		t.Fatalf("%d", code)
+	}
+	s.SetOptions(Options{Local: false})
+	if code, _ := post(t, s, "/api/init-worktree", `{"branch":"x"}`); code != 403 {
+		t.Fatalf("%d", code)
+	}
+}

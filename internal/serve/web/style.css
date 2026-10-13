@@ -55,6 +55,7 @@ nav.tabs button[aria-current="true"] { color: var(--ink); border-bottom-color: v
 .linklike.on { text-decoration: underline; }
 pre.yaml { background: var(--bg-2); border: 1px solid var(--rule); padding: 14px 16px; overflow-x: auto; font: 13px/1.6 var(--mono); }
 .draftbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 8px; }
+.draftbar input { font: 13px var(--mono); padding: 4px 8px; border: 1px solid var(--rule-2); border-radius: 4px; background: var(--bg); color: var(--ink); }
 .draftbar code { font: 13px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
 .draftbar button, #openform button { border: 1px solid var(--rule-2); background: var(--bg-3); padding: 4px 12px; border-radius: 4px; cursor: pointer; }
 .draftbar button.primary { border-color: var(--accent); color: var(--accent); }
