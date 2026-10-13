@@ -86,3 +86,18 @@ func TestEditRejects(t *testing.T) {
 		t.Fatalf("%d", code)
 	}
 }
+
+func TestEditRemoveModule(t *testing.T) {
+	s, dir := setup(t, design)
+	local(t, s)
+	if code, out := editReq(t, s, "remove_module", "api", "", s.Version()); code != 200 {
+		t.Fatalf("%d %v", code, out)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "d.yaml"))
+	if strings.Contains(string(b), "api:") || !strings.Contains(string(b), "core:") {
+		t.Fatal(string(b))
+	}
+	if modTier(t, s, "api") != "" {
+		t.Fatal("지운 모듈이 상태에 남았다")
+	}
+}

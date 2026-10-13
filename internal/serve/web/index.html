@@ -140,6 +140,8 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .kgroup p { margin: 4px 0 0; }
 .why { color: var(--ink-3); font-size: 14px; }
 .labels { font-size: 14px; color: var(--ink-2); }
+.rmmod { border: 1px solid var(--rule-2); background: none; color: var(--ink-3); padding: 2px 10px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.rmmod:hover, .rmmod[data-armed="1"] { border-color: var(--err); color: var(--err); }
 .diag { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .diag li { display: flex; gap: 10px; }
 .sev { flex: none; font-size: 13px; font-weight: 600; }
@@ -577,12 +579,13 @@ function renderModule() {
   const dirs = ids.map(id => (unitNode(id) || {}).path).filter(Boolean);
   const gen = S.files.filter(f => dirs.includes(f.path.slice(0, f.path.lastIndexOf('/'))));
   if (gen.length) facts.push(['생성 파일', `<span class="list">${gen.map(f => `<span class="id">${esc(f.path)}</span>`).join('')}</span>`]);
-  if (S.canEdit && kind === 'mod') {
+  if (S.canEdit && (kind === 'mod' || kind === 'grp')) {
     const opts = M.tiers.map(t => `<option ${t === u.tier ? 'selected' : ''}>${esc(t)}</option>`).join('');
     facts.unshift(['tier', `<select data-edit="tier" data-id="${esc(current)}" aria-label="tier 바꾸기">${opts}</select>`]);
     const deps = u.depends_on || [];
     const cands = topUnits().map(x => x.id).filter(x => x !== current && !deps.includes(x)).sort();
     facts.push(['depends_on', `<span class="deps">${deps.map(d => `<span class="dep">${unitLink(d)}<button type="button" class="x" data-rmdep="${esc(d)}" aria-label="${esc(d)} 의존 지우기">×</button></span>`).join('')}<select data-adddep="${esc(current)}" aria-label="의존 추가"><option value="">의존 추가</option>${cands.map(x => `<option>${esc(x)}</option>`).join('')}</select></span>`]);
+    if (kind === 'mod') facts.push(['', `<button type="button" class="rmmod" data-rmmod="${esc(current)}">모듈 지우기</button>`]);
   }
   const iss = issuesFor(ownedKeys(current));
   if (iss.length) facts.push(['진단', `<div class="issuelist">${issueRows(iss)}</div>`]);
@@ -917,6 +920,12 @@ document.addEventListener('click', e => {
   if (t.closest('#projbtn')) return openProjects();
   if (t.closest('#changesbtn')) return openChanges();
   const rd = t.closest('[data-rmdep]'); if (rd) return editOp('remove_dep', current, rd.dataset.rmdep);
+  // 모듈 지우기는 두 번 눌러야 한다. 다른 곳의 참조는 남고 설계 검사가 없는 참조로 알린다.
+  const rm = t.closest('[data-rmmod]');
+  if (rm) {
+    if (rm.dataset.armed !== '1') { rm.dataset.armed = '1'; rm.textContent = '한 번 더 누르면 지운다(참조는 남는다)'; return; }
+    return editOp('remove_module', rm.dataset.rmmod).then(ok => { if (ok) go('map'); });
+  }
   const cp = t.closest('[data-copy]'); if (cp) { navigator.clipboard.writeText(cp.dataset.copy).then(() => toast('경로를 복사했다'), () => toast('복사할 수 없다')); return; }
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);

@@ -25,6 +25,11 @@ modules:
   core: { tier: a }
   util: { tier: a }
   api:  { tier: b, depends_on: [core] }
+  gone: { tier: a }
+groups:
+  grp:
+    tier: a
+    kind: hk
 `)
 	local(t, s)
 	srv := httptest.NewServer(s.Handler())
@@ -35,10 +40,13 @@ modules:
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "d.yaml"))
 	got := string(b)
-	for _, want := range []string{"api:  { tier: a, depends_on: [util] }", "  web: { tier: b }\n"} {
+	for _, want := range []string{"api:  { tier: a, depends_on: [util] }", "  web: { tier: b }\n", "  grp:\n    tier: b\n"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("%q가 없다\n%s\n%s", want, got, out)
 		}
+	}
+	if strings.Contains(got, "gone:") {
+		t.Fatalf("지운 모듈이 남았다\n%s\n%s", got, out)
 	}
 }
 

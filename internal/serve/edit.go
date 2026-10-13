@@ -27,6 +27,8 @@ func editFile(op string, src []byte, file, id, value string) ([]byte, error) {
 		return edit.RemoveDep(src, file, id, value)
 	case "add_module":
 		return edit.AddModule(src, file, id, value)
+	case "remove_module":
+		return edit.RemoveModule(src, file, id)
 	}
 	return nil, errors.New("알 수 없는 작업: " + op)
 }

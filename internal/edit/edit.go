@@ -1,4 +1,4 @@
-// Package edit는 설계 파일의 L2 모듈을 줄 단위로 고친다. 파일 전체를 다시 쓰지 않고
+// Package edit는 설계 파일의 L2 모듈과 그룹을 줄 단위로 고친다. 파일 전체를 다시 쓰지 않고
 // 파서가 남긴 노드 시작 위치에서 원본 텍스트를 읽어 해당 토큰이나 줄만 바꾼다. 주석과 정렬은 그대로다.
 package edit
 
@@ -171,11 +171,32 @@ func AddModule(src []byte, file, id, tier string) ([]byte, error) {
 	return t.insertLine(at, spaces(indent)+id+": { tier: "+tier+" }"), nil
 }
 
+// RemoveModule은 modules 블록에서 모듈 항목을 지운다. 키 줄부터 그 항목의 마지막 내용 줄까지다.
+// 다른 곳에 남은 참조는 고치지 않는다. 설계 검사가 없는 참조로 알린다.
+func RemoveModule(src []byte, file, id string) ([]byte, error) {
+	t, err := parse(src, file)
+	if err != nil {
+		return nil, err
+	}
+	if t.mods == nil || t.mods.Kind != yaml.Map {
+		return nil, fmt.Errorf("%w: %s", ErrModuleNotInFile, id)
+	}
+	e := entry(t.mods, id)
+	if e == nil {
+		return nil, fmt.Errorf("%w: %s", ErrModuleNotInFile, id)
+	}
+	if t.flow(t.mods) {
+		return nil, fmt.Errorf("modules가 플로우 맵이라 지울 수 없다: %s", file)
+	}
+	return splice(src, t.lineStart(e.Pos.Line), t.blockEnd(e.Pos.Line, e.Pos.Col), ""), nil
+}
+
 type text struct {
 	src    []byte
 	starts []int // 줄마다 시작 바이트. BOM이 있으면 첫 줄은 BOM 뒤에서 시작한다(파서가 BOM을 떼고 열을 센다).
 	mods   *yaml.Node
-	val    *yaml.Node // 고칠 모듈의 값
+	groups *yaml.Node
+	val    *yaml.Node // 고칠 모듈이나 그룹의 값
 }
 
 func parse(src []byte, file string) (*text, error) {
@@ -183,7 +204,7 @@ func parse(src []byte, file string) (*text, error) {
 	if err != nil {
 		return nil, err
 	}
-	t := &text{src: src, starts: []int{0}, mods: root.Get("modules")}
+	t := &text{src: src, starts: []int{0}, mods: root.Get("modules"), groups: root.Get("groups")}
 	if bytes.HasPrefix(src, []byte("\xef\xbb\xbf")) {
 		t.starts[0] = 3
 	}
@@ -200,7 +221,11 @@ func open(src []byte, file, module string) (*text, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 모듈과 그룹은 depends_on이 함께 가리키는 이름공간이라 ID가 겹치지 않는다.
 	t.val = t.mods.Get(module)
+	if t.val == nil {
+		t.val = t.groups.Get(module)
+	}
 	if t.val == nil || t.val.Kind != yaml.Map {
 		return nil, fmt.Errorf("%w: %s", ErrModuleNotInFile, module)
 	}
