@@ -41,7 +41,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	}
 	s.SetOptions(serve.Options{Workspace: *workspaceDir, ConfigDir: cfg, Local: local})
 	if !local {
-		fmt.Fprintln(stderr, "루프백이 아닌 주소라 프로젝트 열기와 초안 저장을 끈다")
+		fmt.Fprintln(stderr, "루프백이 아닌 주소라 프로젝트 열기, 초안 저장, 설계 편집을 끈다")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -14,6 +14,7 @@ await sleep(1500);
 
 const opacity = (sel) => `getComputedStyle(document.querySelector('${sel}')).opacity`;
 const steps = [
+  ['updated_label', `(() => { const t = document.querySelector('#status').textContent; return t.includes('갱신 ') ? 'ok' : '머리 상태: ' + t; })()`],
   ['faint_edges', `(() => { const o = +${opacity('path.edge')}; return o > 0 && o < .5 ? 'ok' : '처음 관계선 opacity ' + o; })()`],
   ['no_labels', `(() => { const l = [...document.querySelectorAll('text.edge-label')].filter(e => +getComputedStyle(e).opacity > 0); return l.length === 0 ? 'ok' : '처음 보이는 라벨 ' + l.length; })()`],
   ['hidden_kind', `(async () => { const cb = document.querySelector('#mappanel input[data-kind="depends"]'); if (!cb) return '종류 칸 없음'; cb.click(); await new Promise(r => setTimeout(r, 300)); const o = +${opacity('path.edge.k-depends')}; cb.click(); return o === 0 ? 'ok' : '감춘 종류 opacity ' + o; })()`],

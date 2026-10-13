@@ -360,7 +360,7 @@ function renderHeader() {
   $('#modebadge').hidden = S.mode !== 'analyze';
   const changed = S.mode === 'check' && meta.hasBase ? changeCount() : 0;
   const base = S.mode !== 'check' ? '' : !meta.hasBase ? '기준 없음' : changed ? `<button type="button" class="link chgbtn" id="changesbtn">HEAD 대비 변경 ${changed}개</button>` : 'HEAD와 같음';
-  const status = S.mode === 'none' ? [esc(S.problem)] : [esc(t.toLocaleTimeString()), S.fatal ? '설계 파일을 읽지 못했다' : '', base];
+  const status = S.mode === 'none' ? [esc(S.problem)] : ['갱신 ' + esc(t.toLocaleTimeString()), S.fatal ? '설계 파일을 읽지 못했다' : '', base];
   $('#status').innerHTML = status.filter(Boolean).join('  ');
   $('#status').className = S.fatal ? 'bad' : '';
   const views = VIEWS[S.mode] || VIEWS.check;
