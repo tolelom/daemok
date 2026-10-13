@@ -112,8 +112,12 @@ var enumValue = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 // errorVar는 var ErrX = errors.New("문자열")를 에러 노드로 옮긴다.
 func (c *collector) errorVar(module string, n *ast.Ident, sp *ast.ValueSpec, i int) {
 	msg, ok := errorsNew(sp, i)
-	if !ok {
-		c.skip(n.Pos(), n.Name, "var는 errors.New(문자열) 에러만 옮긴다")
+	switch {
+	case !ok && makesError(sp, i):
+		c.skip(n.Pos(), n.Name, "에러는 errors.New(문자열 리터럴)만 옮긴다")
+		return
+	case !ok:
+		c.skip(n.Pos(), n.Name, "에러가 아닌 var는 대응하는 설계 노드가 없다")
 		return
 	}
 	q, ok := quote(msg)
@@ -141,6 +145,23 @@ func errorsNew(sp *ast.ValueSpec, i int) (string, bool) {
 		return "", false
 	}
 	return stringLit(call.Args[0])
+}
+
+// makesError는 var 값이 errors 패키지 함수나 fmt.Errorf 호출인지 본다.
+func makesError(sp *ast.ValueSpec, i int) bool {
+	if len(sp.Values) != len(sp.Names) {
+		return false
+	}
+	call, ok := sp.Values[i].(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	return ok && (pkg.Name == "errors" || pkg.Name == "fmt" && sel.Sel.Name == "Errorf")
 }
 
 var durationUnits = map[string]string{"Millisecond": "ms", "Second": "s", "Minute": "m", "Hour": "h"}

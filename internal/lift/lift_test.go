@@ -196,8 +196,21 @@ func TestNegativeAndVarReason(t *testing.T) {
 	if got := lines(r); got != "consts code_parse_error: { in: core, gen: false, type: int, value: -32700 }" {
 		t.Fatalf("got\n%s", got)
 	}
-	if len(r.Skipped) != 1 || r.Skipped[0].Reason != "var는 errors.New(문자열) 에러만 옮긴다" {
+	if len(r.Skipped) != 1 || r.Skipped[0].Reason != "에러가 아닌 var는 대응하는 설계 노드가 없다" {
 		t.Fatalf("%+v", r.Skipped)
+	}
+}
+
+// 에러를 만드는 var라도 errors.New(문자열 리터럴)가 아니면 메시지를 설계에 적을 수 없다.
+func TestErrorVarReason(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/core.go": "package core\n\nimport (\n\t\"errors\"\n\t\"fmt\"\n)\n\nconst msg = \"m\"\n\nvar ErrA = errors.New(msg)\n\nvar ErrB = fmt.Errorf(\"b: %w\", ErrA)\n"})
+	if len(r.Skipped) != 2 {
+		t.Fatalf("%+v", r.Skipped)
+	}
+	for _, s := range r.Skipped {
+		if s.Reason != "에러는 errors.New(문자열 리터럴)만 옮긴다" {
+			t.Errorf("%+v", s)
+		}
 	}
 }
 
