@@ -592,3 +592,17 @@ func TestErrorGoName(t *testing.T) {
 	src = replace(t, "ErrLow:      { in: core, message: \"low\" }", "ErrLow:      { in: core, message: \"low\" }\n  core_nf: { in: core, message: \"nf\", go: { name: ErrNotFound } }")
 	want(t, run(t, src), model.Error, "같은 패키지에서 생성 이름이 겹친다: core 패키지의 ErrNotFound (에러 ErrNotFound, 에러 core_nf)")
 }
+
+// 타입 참조는 내장 타입을 먼저 찾으므로 내장 타입 이름의 타입·enum은 가리킬 수 없다.
+func TestBuiltinNameShadow(t *testing.T) {
+	ds := run(t, `tiers: [a]
+modules:
+  core: { tier: a }
+types:
+  error: { in: core, fields: { code: int } }
+enums:
+  time: { in: core, values: [a, b] }
+`)
+	want(t, ds, model.Error, "내장 타입 이름과 같은 ID: 타입 error")
+	want(t, ds, model.Error, "내장 타입 이름과 같은 ID: enum time")
+}

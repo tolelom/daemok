@@ -208,7 +208,7 @@ flows:
 | 이벤트 | key enum의 값마다 이벤트가 있는지, 한 enum을 여러 이벤트 종류가 쓰는지, 발행자가 있는지, 발행자·구독자가 모듈이나 그룹 멤버인지, 이벤트 종류의 모듈에 의존하는지 |
 | 흐름 | 빈 흐름, 단계 ID와 undo 형식, 단계 중복, Go 메서드 이름 충돌, commit 하나, commit 단계와 커밋 뒤 단계의 undo, `calls`의 계약과 `uses`, `emits`의 발행자, `on`의 구독자 |
 | 외부 타입 | `모듈.이름` 형식의 외부 타입은 그 모듈에 대한 의존으로 본다 |
-| Go 이름 | 생성 코드가 있으면 `go_module` 필요, path 요소는 Go 식별자이고 `testdata`·`vendor`·`.`·`_`로 시작하지 않음, 노드 ID는 소문자 snake_case, enum 값은 Go 상수 이름이 되고 enum 안에서 겹치지 않음, 에러의 Go 이름(`go.name`, 없으면 ID)은 export되는 이름, 필드 이름과 이벤트의 `Map` 충돌, duration 형식, 같은 패키지의 생성 이름 충돌 |
+| Go 이름 | 생성 코드가 있으면 `go_module` 필요, path 요소는 Go 식별자이고 `testdata`·`vendor`·`.`·`_`로 시작하지 않음, 노드 ID는 소문자 snake_case, 타입·enum ID는 내장 타입 이름(`error`, `time` 등)이 아님, enum 값은 Go 상수 이름이 되고 enum 안에서 겹치지 않음, 에러의 Go 이름(`go.name`, 없으면 ID)은 export되는 이름, 필드 이름과 이벤트의 `Map` 충돌, duration 형식, 같은 패키지의 생성 이름 충돌 |
 | TS | `export` 값은 `ts`만, `export: [ts]`에는 `ts_out` 필요, `ts_out`은 상대 경로이고 `.ts`, duration 상수는 내보내지 않음, TS 파일 안 이름 충돌, 내보낼 것 없는 `ts_out`(경고) |
 | 코드 | 설계에 없는 의존의 import, needs로만 이어진 모듈의 직접 import, query 패키지의 data 아닌 모듈 import, 관리하지 않는 패키지(정보), 쓰지 않는 depends_on(정보), 발행자·구독자의 이벤트 상수 참조, 적히지 않은 모듈의 이벤트 상수 참조(경고), 쓸 수 있는 설계 에러가 있는 모듈의 함수 본문에서 부르는 즉석 `errors.New`(정보), 쓸 수 있는 enum의 값과 같은 문자열 리터럴을 비교(`==`, `!=`), switch case, GORM·database/sql 메서드 호출에서 `?`가 든 쿼리 문자열 인자 뒤의 인자에 쓴 곳(정보) |
 

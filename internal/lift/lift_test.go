@@ -162,7 +162,7 @@ func TestValidateDropsBadNode(t *testing.T) {
 	}
 	var reason string
 	for _, s := range r.Skipped {
-		if s.Name == "limit" {
+		if s.Name == "Limit" {
 			reason = s.Reason
 		}
 	}
@@ -254,5 +254,88 @@ const SingleOnly Single = "only"
 		if _, ok := reasons[n]; ok {
 			t.Errorf("enum 값 상수 %s는 따로 알리지 않는다", n)
 		}
+	}
+}
+
+func TestTypes(t *testing.T) {
+	r := draft(t, "  web: { tier: a, depends_on: [core] }\ntypes:\n  account: { in: core, gen: false, fields: { id: uint } }\n", map[string]string{
+		"core/core.go": `package core
+
+import (
+	"encoding/json"
+	"time"
+)
+
+type Account struct{ ID uint }
+
+type Status string
+
+const (
+	StatusOn  Status = "on"
+	StatusOff Status = "off"
+)
+
+type Post struct {
+	ID        uint
+	Title     string
+	AvatarURL string ` + "`json:\"avatar_url\"`" + `
+	Owner     *Account
+	Tags      []string
+	Raw       json.RawMessage
+	Data      []byte
+	Created   time.Time
+	TTL       time.Duration
+	Status    Status
+	Extra     any
+	hidden    int
+}
+
+type WithMap struct{ M map[string]int }
+
+type WithEmbed struct {
+	Account
+	N int
+}
+
+type Counter int
+`,
+		"web/web.go": `package web
+
+import "example.com/x/core"
+
+type Page struct {
+	Items []*core.Account
+	Post  core.Post
+}
+`,
+	})
+	want := strings.Join([]string{
+		"enums status: { in: core, gen: false, values: [on, off] }",
+		`types post: { in: core, gen: false, fields: { id: uint, title: string, avatar_url: string, owner: "*account", tags: "[]string", raw: json.RawMessage, data: bytes, created: time, ttl: duration, status: status, extra: any } }`,
+		`types page: { in: web, gen: false, fields: { items: "[]*account", post: core.Post } }`,
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s\nskipped %+v", got, want, r.Skipped)
+	}
+	reasons := map[string]string{}
+	for _, s := range r.Skipped {
+		reasons[s.Name] = s.Reason
+	}
+	for name, part := range map[string]string{"WithMap": "map", "WithEmbed": "끼워 넣은", "Counter": "struct"} {
+		if !strings.Contains(reasons[name], part) {
+			t.Errorf("%s 이유 %q에 %q가 없다", name, reasons[name], part)
+		}
+	}
+}
+
+// 내장 타입 이름이 되는 struct(Error → error)는 설계 검사가 막는다. 빠진 노드는 Go 이름으로 알리고,
+// 그 struct를 쓰는 필드는 외부 타입처럼 코드 이름 그대로 가리킨다.
+func TestBuiltinNamedStruct(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/core.go": "package core\n\ntype Error struct{ Code int }\n\ntype Response struct{ Err *Error }\n"})
+	if got := lines(r); got != `types response: { in: core, gen: false, fields: { err: "*Error" } }` {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
+	}
+	if len(r.Skipped) != 1 || r.Skipped[0].Name != "Error" || !strings.Contains(r.Skipped[0].Reason, "내장 타입 이름") {
+		t.Fatalf("%+v", r.Skipped)
 	}
 }

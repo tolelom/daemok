@@ -100,22 +100,29 @@ func (c *checker) paths() {
 	}
 }
 
-// nodeIDs는 Go 이름과 파일 이름이 되는 ID가 소문자 snake_case인지 본다.
+// nodeIDs는 Go 이름과 파일 이름이 되는 ID가 소문자 snake_case인지, 타입·enum ID가 내장 타입 이름과 겹치지 않는지 본다.
 func (c *checker) nodeIDs() {
 	check := func(kind string, meta model.Meta) {
 		if !snakeName.MatchString(meta.ID) {
 			c.errorf(meta.Pos, "Go 이름으로 바꿀 수 없는 ID: %s %s", kind, meta.ID)
 		}
 	}
+	shadow := func(kind string, meta model.Meta) {
+		if model.Builtins[meta.ID] != "" {
+			c.errorf(meta.Pos, "내장 타입 이름과 같은 ID: %s %s (타입 참조는 내장 타입을 먼저 찾는다)", kind, meta.ID)
+		}
+	}
 	m := c.m
 	for _, x := range m.Enums {
 		check("enum", x.Meta)
+		shadow("enum", x.Meta)
 	}
 	for _, x := range m.Consts {
 		check("상수", x.Meta)
 	}
 	for _, x := range m.Types {
 		check("타입", x.Meta)
+		shadow("타입", x.Meta)
 	}
 	for _, x := range m.Contracts {
 		check("계약", x.Meta)
