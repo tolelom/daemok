@@ -61,7 +61,7 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 | 필드 | 받는 종류 |
 |---|---|
 | `depends_on`, `composes`, 예외의 `depends_on` | 모듈, 그룹, 그룹 멤버 |
-| 타입 필드, 파라미터, 반환 | enum, 타입, 내장 타입, 외부 타입(`json.RawMessage` 등) |
+| 타입 필드, 파라미터, 반환 | enum, 타입, 내장 타입, 외부 타입(`json.RawMessage` 등). 앞에 `*`, `[]`를 붙일 수 있고, `map[K]V`는 K가 내장 타입이나 enum, V가 이 칸의 타입 문자열이다. `*`, `[`가 들어가면 따옴표로 감싼다 |
 | `ref` | 타입 |
 | `errors`, 케이스의 `error` | 에러 |
 | `satisfies` | 요구사항 |

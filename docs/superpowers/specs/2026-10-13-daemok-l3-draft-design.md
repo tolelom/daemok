@@ -17,12 +17,12 @@
 | `errors` | `var ErrX = errors.New("문자열")` | ID는 Go 이름, `message`는 문자열 |
 | `consts` | 정수 리터럴, 문자열 리터럴, `N * time.Unit`(Millisecond, Second, Minute, Hour) | `type`과 `value` |
 | `enums` | `type T string`과 `T` 타입 문자열 리터럴 상수 2개 이상 | `values`는 리터럴. 값은 소문자 snake_case만 받고, 상수 이름이 같은 `접두사 + GoName(값)`이 아니면 옮기지 않습니다. 값 순서는 파일 이름, 선언 순입니다 |
-| `types` | struct | 내보내는 필드가 있고 모두 설계 타입 문자열로 옮길 수 있을 때만. 끼워 넣은 필드, map, 길이 있는 배열, 메서드 있는 interface, 제네릭은 옮기지 않습니다 |
+| `types` | struct | 내보내는 필드가 있고 모두 설계 타입 문자열로 옮길 수 있을 때만. 끼워 넣은 필드, 길이 있는 배열, 메서드 있는 interface, 제네릭은 옮기지 않습니다 |
 | `contracts` | interface | `kind: call`. 메서드는 반환 끝이 `error`여야 하고 그 앞이 `returns`, 파라미터가 `params`(이름 없으면 `arg1`부터)입니다. 메서드마다 `errors: []`를 붙입니다. 가변 인자와 끼워 넣은 interface는 옮기지 않습니다 |
 
 - 모든 노드는 `gen: false`와 `in: <모듈 또는 멤버>`를 가집니다. Go 문서 주석이 있으면 첫 단락의 첫 문장을 `summary`로 넣고, 160자가 넘으면 넣지 않습니다.
 - ID는 Go 이름을 snake_case로 바꾼 것입니다(에러는 Go 이름 그대로). `GoName(ID)`가 Go 이름과 다르면 `go.name`(enum은 `go.type`)을 붙이고, enum 접두사가 타입 이름과 다르면 `go.prefix`를 붙입니다.
-- 필드 타입은 내장 타입(`time.Duration`은 `duration`, `time.Time`은 `time`, `[]byte`는 `bytes`), 설계에 있거나 함께 옮기는 타입·enum의 ID, 다른 설계 모듈 패키지의 타입은 `모듈.이름`, 그 밖은 코드에 쓴 이름입니다. `*`, `[]`는 접두사로 붙이고 따옴표로 감쌉니다.
+- 필드 타입은 내장 타입(`time.Duration`은 `duration`, `time.Time`은 `time`, `[]byte`는 `bytes`), 설계에 있거나 함께 옮기는 타입·enum의 ID, 다른 설계 모듈 패키지의 타입은 `모듈.이름`, 그 밖은 코드에 쓴 이름입니다. `*`, `[]`는 접두사로, map은 `map[K]V`로 쓰고 따옴표로 감쌉니다.
 - 초안 안에서 같은 종류의 ID가 겹치면(모듈마다 있는 `Config`, `Service`) 모듈 ID를 앞에 붙이고 `go.name`으로 Go 이름을 지킵니다. 에러와 enum은 그대로 두고 검증에 맡깁니다.
 - 위 형태가 아닌 선언은 옮기지 않고 이유와 함께 알립니다. 함수는 L4 형식에 맞출 수 없어 옮기지 않고 수만 알립니다.
 - 정수는 Go 리터럴 규칙(16진수, 앞자리 0의 8진수, 밑줄, 음수)으로 읽어 10진수로 씁니다.

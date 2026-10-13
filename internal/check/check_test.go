@@ -606,3 +606,17 @@ enums:
 	want(t, ds, model.Error, "내장 타입 이름과 같은 ID: 타입 error")
 	want(t, ds, model.Error, "내장 타입 이름과 같은 ID: enum time")
 }
+
+// map의 키·값 타입도 의존 검사를 받고, 키는 내장 타입이나 enum만 된다.
+func TestMapFieldTypes(t *testing.T) {
+	ds := run(t, `tiers: [a, b]
+modules:
+  core: { tier: a }
+  web: { tier: b }
+types:
+  post: { in: core, fields: { n: int } }
+  page: { in: web, fields: { posts: "map[string]post", bad: "map[post]int" } }
+`)
+	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: web → core.post")
+	want(t, ds, model.Error, `알 수 없는 타입 "map[post]int"`)
+}

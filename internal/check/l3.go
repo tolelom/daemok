@@ -69,7 +69,7 @@ func (c *checker) useNeededType(owner string, r model.Ref, n model.Need, contrac
 	}
 }
 
-// typeOwner는 r이 설계 enum·struct거나 "모듈.이름" 외부 타입이면 그 모듈과 이름을 준다.
+// typeOwner는 r이 설계 enum·struct거나 "모듈.이름" 외부 타입이면 그 모듈과 이름을 준다. map은 값, 키 순으로 본다.
 func (c *checker) typeOwner(r model.Ref) (string, string) {
 	if r.Name == "" {
 		return "", ""
@@ -86,6 +86,13 @@ func (c *checker) typeOwner(r model.Ref) (string, string) {
 				return pkg, name
 			}
 		}
+	case model.MapType:
+		// 값 타입이 먼저다. 키는 enum만 모듈에 속한다.
+		key, value, _ := model.MapParts(base)
+		if owner, name := c.typeOwner(model.Ref{Name: value}); owner != "" {
+			return owner, name
+		}
+		return c.typeOwner(model.Ref{Name: key})
 	}
 	return "", base
 }

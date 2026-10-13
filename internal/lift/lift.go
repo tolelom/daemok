@@ -529,8 +529,17 @@ var builtinGo = map[string]string{
 }
 
 // fieldType은 필드의 Go 타입식을 설계 타입 문자열로 바꾼다. 바꿀 수 없으면 이유를 준다.
-// *, []가 붙으면 YAML 평문이 될 수 없어 따옴표로 감싼다.
+// *, [가 들어가면 YAML 평문이 될 수 없어 따옴표로 감싼다.
 func (c *collector) fieldType(e ast.Expr, f *ast.File, local map[string]string) (string, string) {
+	t, reason := c.typeString(e, f, local)
+	if reason == "" && strings.ContainsAny(t, "*[") {
+		t = `"` + t + `"`
+	}
+	return t, reason
+}
+
+// typeString은 fieldType의 따옴표 없는 설계 타입 문자열이다.
+func (c *collector) typeString(e ast.Expr, f *ast.File, local map[string]string) (string, string) {
 	prefix := ""
 	for {
 		switch x := e.(type) {
@@ -593,14 +602,19 @@ func (c *collector) fieldType(e ast.Expr, f *ast.File, local map[string]string) 
 		}
 		base = "any"
 	case *ast.MapType:
-		return "", "map 필드는 설계 문법이 없다"
+		key, reason := c.typeString(x.Key, f, local)
+		if reason != "" {
+			return "", reason
+		}
+		value, reason := c.typeString(x.Value, f, local)
+		if reason != "" {
+			return "", reason
+		}
+		base = "map[" + key + "]" + value
 	default:
 		return "", "설계 문법이 없는 타입식이다"
 	}
-	if prefix == "" {
-		return base, ""
-	}
-	return `"` + prefix + base + `"`, ""
+	return prefix + base, ""
 }
 
 // importPath는 파일에서 패키지 이름이 가리키는 import 경로다. 별칭이 없으면 경로의 마지막 요소로 맞춘다.

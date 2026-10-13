@@ -182,3 +182,28 @@ consts:
 		}
 	}
 }
+
+func TestMapField(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a, b]
+modules:
+  core: { tier: a }
+  web: { tier: b, depends_on: [core] }
+enums:
+  kind: { in: core, values: [x] }
+types:
+  post: { in: core, fields: { tags: "map[string]int", by_kind: "map[kind][]*post" } }
+  page: { in: web, fields: { posts: "map[uint]post", raw: "map[string]json.RawMessage" } }
+`)
+	for path, want := range map[string]string{
+		"core/types.gen.go": "ByKind map[Kind][]*Post",
+		"web/types.gen.go":  "Posts map[uint]core.Post",
+	} {
+		if !strings.Contains(strings.Join(strings.Fields(files[path]), " "), want) {
+			t.Errorf("%s에 %q가 없다:\n%s", path, want, files[path])
+		}
+	}
+	if !strings.Contains(files["web/types.gen.go"], "encoding/json") {
+		t.Errorf("json import가 없다:\n%s", files["web/types.gen.go"])
+	}
+}

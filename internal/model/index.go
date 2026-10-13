@@ -216,6 +216,7 @@ const (
 	EnumType
 	StructType
 	ExternalType
+	MapType // map[K]V. K는 내장 타입이나 enum, V는 설계 타입 문자열
 )
 
 // Builtins는 설계 타입 이름과 Go 타입의 대응이다.
@@ -240,10 +241,46 @@ func SplitType(t string) (prefix, base string) {
 	}
 }
 
+// MapParts는 "map[K]V"를 K와 V로 나눈다. K 안의 대괄호 짝을 맞춘다.
+func MapParts(base string) (key, value string, ok bool) {
+	rest, found := strings.CutPrefix(base, "map[")
+	if !found {
+		return "", "", false
+	}
+	depth := 1
+	for i, r := range rest {
+		switch r {
+		case '[':
+			depth++
+		case ']':
+			depth--
+			if depth == 0 {
+				key, value = rest[:i], rest[i+1:]
+				return key, value, key != "" && value != ""
+			}
+		}
+	}
+	return "", "", false
+}
+
 // ResolveType은 타입 이름의 종류와 접두사를 뗀 이름을 준다.
 // 대문자로 시작하거나 '.'이 있으면 외부 타입으로 본다.
 func (m *Model) ResolveType(t string) (TypeKind, string) {
 	_, base := SplitType(t)
+	if strings.HasPrefix(base, "map[") {
+		key, value, ok := MapParts(base)
+		if !ok {
+			return UnknownType, base
+		}
+		_, kb := SplitType(key)
+		if k, _ := m.ResolveType(key); kb != key || (k != BuiltinType && k != EnumType) {
+			return UnknownType, base
+		}
+		if k, _ := m.ResolveType(value); k == UnknownType {
+			return UnknownType, base
+		}
+		return MapType, base
+	}
 	switch {
 	case Builtins[base] != "":
 		return BuiltinType, base

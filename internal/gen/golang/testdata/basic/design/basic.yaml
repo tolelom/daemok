@@ -44,7 +44,7 @@ types:
     fields: { address: address, balance: uint64, status: status, nick: { type: string, optional: true, max: 20 } }
   block:
     in: core
-    fields: { height: int64, txs: { ref: account, many: true }, owner: { ref: account } }
+    fields: { height: int64, txs: { ref: account, many: true }, owner: { ref: account }, by_status: "map[status][]*account", meta: "map[string]json.RawMessage" }
 
 contracts:
   ledger:

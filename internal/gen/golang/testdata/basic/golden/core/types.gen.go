@@ -2,6 +2,10 @@
 
 package core
 
+import (
+	"encoding/json"
+)
+
 type Account struct {
 	Address string  `json:"address"`
 	Balance uint64  `json:"balance"`
@@ -10,7 +14,9 @@ type Account struct {
 }
 
 type Block struct {
-	Height int64     `json:"height"`
-	Txs    []Account `json:"txs"`
-	Owner  *Account  `json:"owner"`
+	Height   int64                      `json:"height"`
+	Txs      []Account                  `json:"txs"`
+	Owner    *Account                   `json:"owner"`
+	ByStatus map[Status][]*Account      `json:"by_status"`
+	Meta     map[string]json.RawMessage `json:"meta"`
 }

@@ -312,6 +312,7 @@ type Page struct {
 	want := strings.Join([]string{
 		"enums status: { in: core, gen: false, values: [on, off] }",
 		`types post: { in: core, gen: false, fields: { id: uint, title: string, avatar_url: string, owner: "*account", tags: "[]string", raw: json.RawMessage, data: bytes, created: time, ttl: duration, status: status, extra: any } }`,
+		`types with_map: { in: core, gen: false, fields: { m: "map[string]int" } }`,
 		`types page: { in: web, gen: false, fields: { items: "[]*account", post: core.Post } }`,
 	}, "\n")
 	if got := lines(r); got != want {
@@ -321,7 +322,7 @@ type Page struct {
 	for _, s := range r.Skipped {
 		reasons[s.Name] = s.Reason
 	}
-	for name, part := range map[string]string{"WithMap": "map", "WithEmbed": "끼워 넣은", "Counter": "struct"} {
+	for name, part := range map[string]string{"WithEmbed": "끼워 넣은", "Counter": "struct"} {
 		if !strings.Contains(reasons[name], part) {
 			t.Errorf("%s 이유 %q에 %q가 없다", name, reasons[name], part)
 		}
@@ -421,5 +422,40 @@ type Variadic interface {
 	}
 	if !strings.Contains(reasons["NoError"], "error") || !strings.Contains(reasons["Variadic"], "가변") {
 		t.Fatalf("%+v", r.Skipped)
+	}
+}
+
+func TestMapFields(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/c.go": `package core
+
+type Kind string
+
+const (
+	KindA Kind = "a"
+	KindB Kind = "b"
+)
+
+type Item struct{ N int }
+
+type Bag struct {
+	Counts  map[string]int
+	ByKind  map[Kind][]*Item
+	Nested  map[string]map[uint]Item
+	BadKey  map[Item]int
+}
+
+type Ok struct{ Props map[string]any }
+`})
+	want := strings.Join([]string{
+		`enums kind: { in: core, gen: false, values: [a, b] }`,
+		`types item: { in: core, gen: false, fields: { n: int } }`,
+		`types ok: { in: core, gen: false, fields: { props: "map[string]any" } }`,
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s\n%+v", got, want, r.Skipped)
+	}
+	r = draft(t, "", map[string]string{"core/c.go": "package core\n\ntype Kind string\n\nconst (\n\tKindA Kind = \"a\"\n\tKindB Kind = \"b\"\n)\n\ntype Item struct{ N int }\n\ntype Bag struct {\n\tCounts map[string]int\n\tByKind map[Kind][]*Item\n\tNested map[string]map[uint]Item\n}\n"})
+	if !strings.Contains(lines(r), `types bag: { in: core, gen: false, fields: { counts: "map[string]int", by_kind: "map[kind][]*item", nested: "map[string]map[uint]item" } }`) {
+		t.Fatalf("got\n%s\n%+v", lines(r), r.Skipped)
 	}
 }

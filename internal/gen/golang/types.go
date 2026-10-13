@@ -79,6 +79,9 @@ func (g *gen) goType(t string, fromDir string, f *goFile) string {
 	case model.StructType:
 		st := g.m.Type(base)
 		return prefix + g.qualify(st.In.Name, st.GoName(), fromDir, f)
+	case model.MapType:
+		key, value, _ := model.MapParts(base)
+		return prefix + "map[" + g.goType(key, fromDir, f) + "]" + g.goType(value, fromDir, f)
 	}
 	if pkg, name, ok := strings.Cut(base, "."); ok {
 		if _, isOwner := g.m.Owner(pkg); isOwner {

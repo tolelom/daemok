@@ -466,6 +466,18 @@ types:
 	if k, _ := m.ResolveType("nothing"); k != UnknownType {
 		t.Fatal("unknown")
 	}
+	for typ, want := range map[string]TypeKind{
+		"map[string]int": MapType, "map[tx_type]*payload": MapType, "[]map[string][]payload": MapType,
+		"map[string]map[uint]json.RawMessage": MapType,
+		"map[payload]int": UnknownType, "map[string]nothing": UnknownType, "map[string": UnknownType, "map[]int": UnknownType,
+	} {
+		if k, _ := m.ResolveType(typ); k != want {
+			t.Errorf("ResolveType(%q) = %v, want %v", typ, k, want)
+		}
+	}
+	if k, v, ok := MapParts("map[string]map[uint]int"); !ok || k != "string" || v != "map[uint]int" {
+		t.Fatalf("MapParts: %q %q %v", k, v, ok)
+	}
 }
 
 func TestMemberViaGroupDependency(t *testing.T) {
