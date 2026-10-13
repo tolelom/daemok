@@ -79,7 +79,9 @@ function legend(kinds) {
 /* ---------- 머리 ---------- */
 function renderHeader() {
   const t = new Date(S.updated);
-  $('#projbtn').textContent = (S.root || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || '프로젝트 열기';
+  // 다른 worktree는 폴더 이름(.worktrees/daemok)이 저장소를 알려 주지 못해 주 worktree 이름을 쓴다.
+  const name = S.repo || (S.root || '').replace(/[\\/]+$/, '').split(/[\\/]/).pop();
+  $('#projbtn').textContent = name ? name + (S.branch ? ' · ' + S.branch : '') : '프로젝트 열기';
   $('#projbtn').title = S.root || '';
   $('#modebadge').hidden = S.mode !== 'analyze';
   const changed = S.mode === 'check' && meta.hasBase ? changeCount() : 0;

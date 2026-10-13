@@ -190,3 +190,24 @@ func TestUIMapDenseE2E(t *testing.T) {
 		t.Fatalf("%v\n%s", err, out)
 	}
 }
+
+// 분석 모드에서 같은 저장소의 설계 있는 worktree로 옮겨 간다. DAEMOK_E2E=1일 때만 돈다.
+func TestUIWorktreeE2E(t *testing.T) {
+	if os.Getenv("DAEMOK_E2E") != "1" {
+		t.Skip("DAEMOK_E2E=1일 때만 돈다")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node가 없다")
+	}
+	main, _ := worktreeRepo(t)
+	s := New(filepath.Join(main, "design"), main)
+	s.Poll()
+	local(t, s)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	out, err := exec.Command(node, filepath.Join("..", "..", "scripts", "e2e", "worktree.mjs"), srv.URL+"/").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+}

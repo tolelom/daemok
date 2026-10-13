@@ -14,18 +14,37 @@ function toast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 4000);
 }
+const MODE_LABEL = { check: '설계 있음', analyze: '분석' };
+// projectItem은 프로젝트 목록의 한 줄이다. 경로, 브랜치, 모드, 지금 연 것인지를 적는다.
+function projectItem(x, ok) {
+  const tags = [x.branch ? `<span class="id">${esc(x.branch)}</span>` : '', MODE_LABEL[x.mode] || '', x.current ? '지금' : ''].filter(Boolean);
+  return `<button type="button" data-openpath="${esc(x.path)}" ${ok ? '' : 'disabled'}><span class="id">${esc(x.path)}</span>${tags.length ? `<span class="muted projtags">${tags.join(' · ')}</span>` : ''}</button>`;
+}
+// worktreeHint는 분석 모드에서 같은 저장소의 다른 worktree에 설계가 있으면 머리에 바로 여는 링크를 둔다.
+let hintRoot = null;
+async function worktreeHint() {
+  const el = $('#wthint');
+  if (S.mode !== 'analyze') { el.hidden = true; hintRoot = null; return; }
+  if (hintRoot === S.root) return;
+  hintRoot = S.root;
+  let p = { worktrees: [], canOpen: false };
+  try { p = await (await fetch('/api/projects', { cache: 'no-store' })).json(); } catch (e) {}
+  const hits = p.canOpen ? p.worktrees.filter(x => x.mode === 'check' && !x.current) : [];
+  el.innerHTML = hits.map(x => `<button type="button" class="link" data-openpath="${esc(x.path)}" title="${esc(x.path)}">설계 있음: ${esc(x.branch || x.path.split(/[\\/]/).pop())}</button>`).join(' ');
+  el.hidden = !hits.length;
+}
 async function openProjects() {
   drawerOpen = '#projects';
-  let p = { recent: [], workspace: [], canOpen: false };
+  let p = { worktrees: [], recent: [], workspace: [], canOpen: false };
   try { p = await (await fetch('/api/projects', { cache: 'no-store' })).json(); } catch (e) {}
-  const item = (path, ok) => `<button type="button" data-openpath="${esc(path)}" ${ok ? '' : 'disabled'}><span class="id">${esc(path)}</span></button>`;
   const form = p.canOpen
-    ? `<form id="openform"><input id="openpath" type="text" placeholder="E:\\dev\\projects\\tolchain" autocomplete="off" spellcheck="false" aria-label="프로젝트 경로"><button type="submit">열기</button></form><p id="openerr"></p>`
+    ? `<form id="openform"><input id="openpath" type="text" placeholder="${esc(p.current || '~/src/project')}" autocomplete="off" spellcheck="false" aria-label="프로젝트 경로"><button type="submit">열기</button></form><p id="openerr"></p>`
     : `<p class="muted">루프백이 아닌 주소로 띄워서 프로젝트를 열 수 없다</p>`;
   $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="프로젝트 열기"><div class="head"><h2>프로젝트 열기</h2><button type="button" class="close" data-close="1">닫기</button></div>
 ${form}
-<div><h3>최근</h3><div class="issuelist">${p.recent.map(x => item(x.path, x.exists && p.canOpen)).join('') || '<span class="muted">없음</span>'}</div></div>
-${p.workspace.length ? `<div><h3>작업 폴더</h3><div class="issuelist">${p.workspace.map(x => item(x, p.canOpen)).join('')}</div></div>` : ''}
+${p.worktrees.length ? `<div><h3>같은 저장소</h3><div class="issuelist" id="worktrees">${p.worktrees.map(x => projectItem(x, x.exists && !x.current && p.canOpen)).join('')}</div></div>` : ''}
+<div><h3>최근</h3><div class="issuelist">${p.recent.map(x => projectItem(x, x.exists && p.canOpen)).join('') || '<span class="muted">없음</span>'}</div></div>
+${p.workspace.length ? `<div><h3>작업 폴더</h3><div class="issuelist">${p.workspace.map(x => projectItem({ path: x }, p.canOpen)).join('')}</div></div>` : ''}
 </aside>`;
   ($('#openpath') || $('#drawer .close')).focus();
 }
@@ -143,6 +162,7 @@ async function load() {
   M = toMaps(st.model);
   B = st.hasBase ? toMaps(st.base) : M;
   render();
+  worktreeHint();
   if (drawerOpen === '#issues') openIssues(); else if (drawerOpen === '#changes') openChanges(); else if (drawerOpen && drawerOpen[0] !== '#') openDrawer(drawerOpen);
   if (S.mode === 'none' && !autoOpened) { autoOpened = true; openProjects(); }
 }

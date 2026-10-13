@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -146,5 +147,114 @@ func TestRelativeRootBecomesAbsolute(t *testing.T) {
 	s.Poll()
 	if st := getState(t, s); st["root"] != root || st["mode"] != "analyze" {
 		t.Fatalf("%v %v", st["root"], st["mode"])
+	}
+}
+
+func gitRun(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// worktreeRepo는 설계가 없는 주 worktree와 설계가 있는 feat/daemok worktree를 만든다.
+func worktreeRepo(t *testing.T) (main, wt string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	main = goModule(t)
+	gitRun(t, main, "init", "-q", "-b", "main")
+	gitRun(t, main, "add", ".")
+	gitRun(t, main, "commit", "-q", "-m", "init")
+	wt = filepath.Join(main, ".worktrees", "daemok")
+	gitRun(t, main, "worktree", "add", "-q", "-b", "feat/daemok", wt)
+	os.MkdirAll(filepath.Join(wt, "design"), 0o755)
+	os.WriteFile(filepath.Join(wt, "design", "d.yaml"), []byte(design), 0o644)
+	return main, wt
+}
+
+type projectItem struct {
+	Path    string `json:"path"`
+	Exists  bool   `json:"exists"`
+	Branch  string `json:"branch"`
+	Mode    string `json:"mode"`
+	Current bool   `json:"current"`
+}
+
+func getProjects(t *testing.T, s *Server) (worktrees, recent []projectItem) {
+	t.Helper()
+	req := httptest.NewRequest("GET", "/api/projects", nil)
+	req.Host = "localhost:7412"
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	var out struct {
+		Worktrees []projectItem `json:"worktrees"`
+		Recent    []projectItem `json:"recent"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	return out.Worktrees, out.Recent
+}
+
+// 같은 저장소의 worktree를 브랜치·모드와 함께 보이고, 최근 목록에도 브랜치·모드를 붙인다.
+func TestProjectsWorktrees(t *testing.T) {
+	main, wt := worktreeRepo(t)
+	s := New(filepath.Join(main, "design"), main)
+	s.Poll()
+	local(t, s)
+	for _, p := range []string{wt, main} {
+		body, _ := json.Marshal(map[string]string{"path": p})
+		if code, out := post(t, s, "/api/open", string(body)); code != 200 {
+			t.Fatalf("%d %v", code, out)
+		}
+	}
+	if st := getState(t, s); st["branch"] != "main" || st["repo"] != "" {
+		t.Fatalf("주 worktree: %v %v", st["branch"], st["repo"])
+	}
+	body, _ := json.Marshal(map[string]string{"path": wt})
+	post(t, s, "/api/open", string(body))
+	if st := getState(t, s); st["branch"] != "feat/daemok" || st["repo"] != filepath.Base(main) {
+		t.Fatalf("다른 worktree는 저장소 이름을 준다: %v %v", st["branch"], st["repo"])
+	}
+	body, _ = json.Marshal(map[string]string{"path": main})
+	post(t, s, "/api/open", string(body))
+	wts, recent := getProjects(t, s)
+	want := []projectItem{{main, true, "main", "analyze", true}, {wt, true, "feat/daemok", "check", false}}
+	if len(wts) != 2 || wts[0] != want[0] || wts[1] != want[1] {
+		t.Fatalf("worktrees %+v", wts)
+	}
+	if len(recent) != 2 || recent[0] != want[0] || recent[1] != want[1] {
+		t.Fatalf("recent %+v", recent)
+	}
+}
+
+// 저장소가 아니거나 worktree가 하나뿐이면 worktree 목록은 비어 있다.
+func TestProjectsNoWorktrees(t *testing.T) {
+	s, _ := setup(t, design)
+	local(t, s)
+	if wts, _ := getProjects(t, s); len(wts) != 0 {
+		t.Fatalf("%+v", wts)
+	}
+}
+
+// 경로의 ~는 홈 디렉토리다.
+func TestOpenTilde(t *testing.T) {
+	s, _ := setup(t, design)
+	local(t, s)
+	root := goModule(t)
+	t.Setenv("HOME", filepath.Dir(root))
+	body, _ := json.Marshal(map[string]string{"path": "~/" + filepath.Base(root)})
+	if code, out := post(t, s, "/api/open", string(body)); code != 200 {
+		t.Fatalf("%d %v", code, out)
+	}
+	if st := getState(t, s); st["root"] != root {
+		t.Fatalf("%v", st["root"])
+	}
+	if code, out := post(t, s, "/api/open", `{"path":"~"}`); code != 400 || !strings.Contains(out["error"].(string), filepath.Dir(root)) {
+		t.Fatalf("%d %v", code, out)
 	}
 }

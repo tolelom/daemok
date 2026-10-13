@@ -253,6 +253,7 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
 .issuelist button { display: flex; gap: 10px; text-align: left; border: 0; border-bottom: 1px solid var(--rule); background: none; padding: 8px 0; cursor: pointer; font-size: 14px; }
 .issuelist button:hover:not([disabled]) { background: var(--bg-3); }
 .issuelist button[disabled] { cursor: default; }
+.issuelist .projtags { flex: none; margin-left: auto; white-space: nowrap; }
 .igroup > summary { display: flex; gap: 10px; font-family: var(--sans); padding: 8px 0; border-bottom: 1px solid var(--rule); cursor: pointer; font-size: 14px; list-style: none; }
 .igroup > summary::-webkit-details-marker { display: none; }
 .igroup > summary::before { content: "+"; color: var(--ink-3); width: 1ch; }

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tolelom/daemok/internal/gitbase"
 	"github.com/tolelom/daemok/internal/gosrc"
 	"github.com/tolelom/daemok/internal/infer"
 )
@@ -45,6 +46,7 @@ func (s *Server) Open(path string) error {
 	if path == "" {
 		return errors.New("경로가 없다")
 	}
+	path = expandHome(path)
 	abs, err := filepath.Abs(path)
 	if err != nil {
 		return err
@@ -64,6 +66,18 @@ func (s *Server) Open(path string) error {
 	s.remember(abs)
 	s.Poll()
 	return nil
+}
+
+// expandHome은 ~와 ~/로 시작하는 경로의 ~를 홈 디렉토리로 바꾼다.
+func expandHome(path string) string {
+	if path != "~" && !strings.HasPrefix(path, "~/") && !strings.HasPrefix(path, "~"+string(filepath.Separator)) {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	return filepath.Join(home, path[1:])
 }
 
 func (s *Server) recentPath() string {
@@ -131,8 +145,58 @@ func findModules(dir string, maxDepth int) []string {
 }
 
 type vProject struct {
-	Path   string `json:"path"`
-	Exists bool   `json:"exists"`
+	Path    string `json:"path"`
+	Exists  bool   `json:"exists"`
+	Branch  string `json:"branch"`
+	Mode    string `json:"mode"` // check(설계 있음), analyze(go.mod만), 없거나 열 수 없으면 빈 값
+	Current bool   `json:"current"`
+}
+
+// project는 경로 하나의 목록 항목이다. 브랜치를 모르면 branch를 git으로 읽는다.
+func project(path, branch, current string, branchKnown bool) vProject {
+	p := vProject{Path: path, Current: samePath(path, current)}
+	st, err := os.Stat(path)
+	if err != nil || !st.IsDir() {
+		return p
+	}
+	p.Exists = true
+	switch {
+	case infer.HasDesignFiles(filepath.Join(path, "design")):
+		p.Mode = "check"
+	case fileExists(filepath.Join(path, "go.mod")):
+		p.Mode = "analyze"
+	}
+	if branchKnown {
+		p.Branch = branch
+	} else {
+		p.Branch = gitbase.Branch(path)
+	}
+	return p
+}
+
+// repoName은 root가 주 worktree가 아닌 worktree면 주 worktree의 폴더 이름을 준다. worktree 폴더 이름은
+// 저장소를 알려 주지 못한다(.worktrees/daemok).
+func repoName(root string) string {
+	wts, _ := gitbase.Worktrees(root)
+	if len(wts) < 2 || samePath(wts[0].Path, root) {
+		return ""
+	}
+	return filepath.Base(wts[0].Path)
+}
+
+// samePath는 심볼릭 링크를 푼 두 경로가 같은지 본다. git은 링크를 푼 경로를 준다.
+func samePath(a, b string) bool {
+	if a == b {
+		return true
+	}
+	ra, err1 := filepath.EvalSymlinks(a)
+	rb, err2 := filepath.EvalSymlinks(b)
+	return err1 == nil && err2 == nil && ra == rb
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 func (s *Server) projects(w http.ResponseWriter, r *http.Request) {
@@ -140,13 +204,19 @@ func (s *Server) projects(w http.ResponseWriter, r *http.Request) {
 	_, root := s.paths()
 	body := struct {
 		Current   string     `json:"current"`
+		Worktrees []vProject `json:"worktrees"`
 		Recent    []vProject `json:"recent"`
 		Workspace []string   `json:"workspace"`
 		CanOpen   bool       `json:"canOpen"`
-	}{Current: root, Recent: []vProject{}, Workspace: []string{}, CanOpen: o.Local}
+	}{Current: root, Worktrees: []vProject{}, Recent: []vProject{}, Workspace: []string{}, CanOpen: o.Local}
+	// worktree가 하나뿐이면 지금 연 것뿐이라 보이지 않는다.
+	if wts, _ := gitbase.Worktrees(root); len(wts) > 1 {
+		for _, wt := range wts {
+			body.Worktrees = append(body.Worktrees, project(wt.Path, wt.Branch, root, true))
+		}
+	}
 	for _, p := range s.recent() {
-		st, err := os.Stat(p)
-		body.Recent = append(body.Recent, vProject{p, err == nil && st.IsDir()})
+		body.Recent = append(body.Recent, project(p, "", root, false))
 	}
 	if o.Workspace != "" {
 		body.Workspace = append(body.Workspace, findModules(o.Workspace, 3)...)

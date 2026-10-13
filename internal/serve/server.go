@@ -33,6 +33,8 @@ type state struct {
 	Version   int         `json:"version"`
 	Design    string      `json:"design"`
 	Root      string      `json:"root"`
+	Branch    string      `json:"branch"` // git 브랜치. 저장소가 아니거나 detached면 비어 있다
+	Repo      string      `json:"repo"`   // 주 worktree가 아닌 worktree면 주 worktree의 폴더 이름
 	Model     *vModel     `json:"model"`
 	Base      *vModel     `json:"base"`
 	HasBase   bool        `json:"hasBase"`
@@ -96,6 +98,7 @@ func (s *Server) Refresh() {
 func (s *Server) refresh() {
 	design, root := s.paths()
 	st := state{Design: design, Root: root, Updated: time.Now(), designSum: designSum(design)}
+	st.Branch, st.Repo = gitbase.Branch(root), repoName(root)
 	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
 		st.Mode, st.Fatal, st.Problem = "none", true, "코드 루트가 없다: "+root
 	} else if infer.HasDesignFiles(design) {

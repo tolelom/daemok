@@ -67,3 +67,40 @@ func TestNonASCIIPath(t *testing.T) {
 		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
 	}
 }
+
+func TestWorktrees(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	if wts, err := Worktrees(t.TempDir()); wts != nil || err != nil {
+		t.Fatalf("저장소 밖: %v %v", wts, err)
+	}
+	repo := t.TempDir()
+	run(t, repo, "init", "-q", "-b", "main")
+	os.WriteFile(filepath.Join(repo, "a.txt"), []byte("a"), 0o644)
+	run(t, repo, "add", ".")
+	run(t, repo, "commit", "-q", "-m", "init")
+	wt := filepath.Join(repo, ".worktrees", "feat")
+	run(t, repo, "worktree", "add", "-q", "-b", "feat/x", wt)
+	det := filepath.Join(t.TempDir(), "det")
+	run(t, repo, "worktree", "add", "-q", "--detach", det)
+	wts, err := Worktrees(wt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Worktree{{repo, "main"}, {wt, "feat/x"}, {det, ""}}
+	if len(wts) != len(want) {
+		t.Fatalf("%+v", wts)
+	}
+	for i := range want {
+		if wts[i] != want[i] {
+			t.Fatalf("%d: %+v, want %+v", i, wts[i], want[i])
+		}
+	}
+	if b := Branch(wt); b != "feat/x" {
+		t.Fatalf("Branch %q", b)
+	}
+	if b := Branch(t.TempDir()); b != "" {
+		t.Fatalf("저장소 밖 Branch %q", b)
+	}
+}
