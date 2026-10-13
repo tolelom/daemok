@@ -45,6 +45,15 @@ type Result struct {
 	Nodes   []Node `json:"nodes"`
 	Skipped []Skip `json:"skipped"`
 	Funcs   int    `json:"funcs"`
+	// Coverage는 초안을 더하기 전과 뒤에 설계에 대응하는 최상위 선언 수다(daemok coverage의 합계).
+	Coverage Coverage `json:"coverage"`
+}
+
+// Coverage는 최상위 선언 수와, 초안 전후의 설계 대응 선언 수다.
+type Coverage struct {
+	Decls  int `json:"decls"`
+	Before int `json:"before"`
+	After  int `json:"after"`
 }
 
 // ErrDesign은 설계를 읽지 못했거나 설계 검사 오류가 있다는 뜻이다.
@@ -82,8 +91,35 @@ func Draft(designDir, root string) (*Result, error) {
 	}
 	c.res.Nodes = nodes
 	c.res.YAML = render(nodes)
+	if c.res.Coverage, err = coverageDelta(m, sources, designDir, root, c.res.YAML); err != nil {
+		return nil, err
+	}
 	sort.Slice(c.res.Skipped, func(i, j int) bool { return c.res.Skipped[i].Where < c.res.Skipped[j].Where })
 	return c.res, nil
+}
+
+// coverageDelta는 설계만으로 센 coverage와 초안을 더해 센 coverage다.
+func coverageDelta(m *model.Model, sources map[string][]byte, designDir, root string, yaml []byte) (Coverage, error) {
+	total := func(m *model.Model) (decls, matched int, err error) {
+		rows, _, err := coverage.Count(m, root)
+		for _, r := range rows {
+			decls += r.Decls
+			matched += r.Matched
+		}
+		return decls, matched, err
+	}
+	var cov Coverage
+	var err error
+	if cov.Decls, cov.Before, err = total(m); err != nil {
+		return cov, err
+	}
+	files := map[string][]byte{filepath.Join(designDir, draftName): yaml}
+	for k, v := range sources {
+		files[k] = v
+	}
+	withDraft, _ := model.LoadSources(files)
+	_, cov.After, err = total(withDraft)
+	return cov, err
 }
 
 func readSources(designDir string) (map[string][]byte, error) {

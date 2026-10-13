@@ -372,7 +372,7 @@ func draftL3Tool(design, root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	rep, _ := json.MarshalIndent(map[string]any{"skipped": r.Skipped, "funcs": r.Funcs}, "", "  ")
+	rep, _ := json.MarshalIndent(map[string]any{"skipped": r.Skipped, "funcs": r.Funcs, "coverage": r.Coverage}, "", "  ")
 	return string(r.YAML) + "\n---\n" + string(rep), nil
 }
 

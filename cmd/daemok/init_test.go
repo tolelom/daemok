@@ -83,7 +83,7 @@ func TestInitL3(t *testing.T) {
 	if !strings.Contains(out.String(), `ErrGone: { in: core, gen: false, message: "gone" }`) || !strings.Contains(out.String(), "limit: { in: core, gen: false, type: int, value: 3 }") {
 		t.Fatal(out.String())
 	}
-	if !strings.Contains(errb.String(), "Computed") || !strings.Contains(errb.String(), "함수 1개") {
+	if !strings.Contains(errb.String(), "Computed") || !strings.Contains(errb.String(), "함수 1개") || !strings.Contains(errb.String(), "coverage 0% → 50% (선언 4개 중 0 → 2)") {
 		t.Fatal(errb.String())
 	}
 	if err := os.WriteFile(filepath.Join(root, "design", "l3.yaml"), out.Bytes(), 0o644); err != nil {

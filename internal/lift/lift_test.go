@@ -463,3 +463,11 @@ type Ok struct{ Props map[string]any }
 		t.Fatalf("got\n%s\n%+v", lines(r), r.Skipped)
 	}
 }
+
+// 초안을 더하기 전과 뒤의 coverage(설계 대응 선언 수)를 함께 준다.
+func TestCoverageBeforeAfter(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/c.go": "package core\n\nconst Limit = 3\n\nconst Twice = Limit * 2\n\nfunc Do() {}\n"})
+	if r.Coverage.Decls != 3 || r.Coverage.Before != 0 || r.Coverage.After != 1 {
+		t.Fatalf("%+v", r.Coverage)
+	}
+}

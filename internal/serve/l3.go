@@ -19,7 +19,7 @@ func (s *Server) l3Draft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"yaml": string(res.YAML), "nodes": res.Nodes, "skipped": res.Skipped, "funcs": res.Funcs,
+		"yaml": string(res.YAML), "nodes": res.Nodes, "skipped": res.Skipped, "funcs": res.Funcs, "coverage": res.Coverage,
 		"canSave": s.options().Local,
 	})
 }
