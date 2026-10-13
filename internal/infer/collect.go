@@ -159,7 +159,7 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 		}
 		sort.Strings(pk.imports)
 		sort.Strings(pk.ext)
-		types := typeNames(files)
+		types := stringTypes(files)
 		for _, f := range files {
 			pk.hints = append(pk.hints, fileHints(fset, root, f, types)...)
 			pk.name = f.Name.Name

@@ -89,7 +89,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | 건너뛴 것 | 중첩 모듈, Go 식별자가 아닌 경로, 파싱에 실패한 파일과 이유 |
 | 많이 쓰이는 패키지 | 내부 import 수(fan-in) 상위 5개. 판정 없이 순위만 |
 | 순환 import | 서로 import하는 모듈 묶음 |
-| L3 노드 후보 | 손으로 쓴 `var Err… = errors.New(…)`·`fmt.Errorf(…)` 묶음과, 같은 패키지에 선언된 exported 타입으로 쓴 상수 블록(exported 값 2개 이상, iota 포함). 설계 노드는 exported Go 이름을 만들어서 unexported 타입과 값은 넣지 않습니다(`init --l3`와 같은 기준). 초안에는 넣지 않고 `gen: false` 후보로 알립니다 |
+| L3 노드 후보 | 손으로 쓴 `var Err… = errors.New(…)`·`fmt.Errorf(…)` 묶음과, 같은 패키지에 선언된 exported string 기반 타입으로 쓴 상수 블록(exported 값 2개 이상). 설계 노드는 exported Go 이름과 문자열 enum을 만들어서 unexported 타입·값과 int 기반 enum(iota 등)은 넣지 않습니다(`init --l3`와 같은 기준). 초안에는 넣지 않고 `gen: false` 후보로 알립니다 |
 | 외부 의존 | go.mod의 직접 require(`// indirect` 제외)마다 그 모듈을 import하는 모듈·실행 단위 |
 | 쓰는 이름 | 모듈·실행 단위마다 같은 Go 모듈의 다른 모듈에서 `패키지.이름`으로 쓴 export 최상위 선언과 그 종류(함수, 인터페이스, 타입, 에러, 상수, 변수). import 이름은 별칭, 없으면 대상 패키지의 package 절 이름이고, 대상 패키지에 그 이름의 export 선언이 있을 때만 셉니다. `_test.go`와 빈 import는 넣지 않습니다. 메서드 호출은 패키지 이름으로 쓰지 않아 잡히지 않습니다 |
 | 그룹 후보 | 루트가 아닌 같은 부모 디렉토리 아래 형제 모듈 3개 이상이 형제 밖 모듈을 하나 이상 공통으로 쓰는 묶음. 형제끼리의 의존은 그룹 예외 후보. 그룹은 핸들러 종류(L3)가 있어야 해서 초안 YAML에는 넣지 않습니다 |

@@ -18,7 +18,7 @@ type Hint struct {
 }
 
 // fileHints는 파일 하나에서 에러 변수 묶음과 enum처럼 쓰는 상수 블록을 찾는다.
-// types는 같은 패키지에 선언된 타입 이름이다.
+// types는 같은 패키지에 선언된, 기반 타입이 string인 타입 이름이다.
 func fileHints(fset *token.FileSet, root string, f *ast.File, types map[string]bool) []Hint {
 	where := func(p token.Pos) string {
 		pos := fset.Position(p)
@@ -96,14 +96,18 @@ func isErrorCtor(e ast.Expr) bool {
 	return ok && ((pkg.Name == "errors" && sel.Sel.Name == "New") || (pkg.Name == "fmt" && sel.Sel.Name == "Errorf"))
 }
 
-// typeNames는 파일들의 최상위 타입 이름이다.
-func typeNames(files []*ast.File) map[string]bool {
+// stringTypes는 파일들의 최상위 타입 중 기반 타입이 string인 것이다. 설계 enum은 문자열 값이라 이것만 enum 후보다.
+// init --l3와 같은 기준이다(별칭과 제네릭 제외).
+func stringTypes(files []*ast.File) map[string]bool {
 	out := map[string]bool{}
 	for _, f := range files {
 		for _, d := range f.Decls {
 			if g, ok := d.(*ast.GenDecl); ok && g.Tok == token.TYPE {
 				for _, s := range g.Specs {
-					out[s.(*ast.TypeSpec).Name.Name] = true
+					ts := s.(*ast.TypeSpec)
+					if under, ok := ts.Type.(*ast.Ident); ok && under.Name == "string" && ts.Assign == 0 && ts.TypeParams == nil {
+						out[ts.Name.Name] = true
+					}
 				}
 			}
 		}

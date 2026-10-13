@@ -31,6 +31,7 @@ const (
 	TxMint     TxType = "mint"
 )
 
+// 설계 enum은 문자열 값이라 iota로 만든 int enum은 후보가 아니다.
 type Level int
 
 const (
@@ -69,8 +70,7 @@ const (
 	want := []Hint{
 		{Kind: "에러", Module: "core", Names: []string{"ErrNotFound", "ErrBad"}, Where: "core/core.go:9"},
 		{Kind: "enum", Module: "core", Names: []string{"TxTransfer", "TxMint"}, Type: "TxType", Where: "core/core.go:17"},
-		{Kind: "enum", Module: "core", Names: []string{"LevelLow", "LevelHigh"}, Type: "Level", Where: "core/core.go:24"},
-		{Kind: "enum", Module: "core", Names: []string{"ModeOn", "ModeOff"}, Type: "Mode", Where: "core/core.go:47"},
+		{Kind: "enum", Module: "core", Names: []string{"ModeOn", "ModeOff"}, Type: "Mode", Where: "core/core.go:48"},
 	}
 	if !reflect.DeepEqual(a.Report.Hints, want) {
 		t.Fatalf("%+v", a.Report.Hints)
