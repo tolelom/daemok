@@ -1,0 +1,490 @@
+// Package lift는 설계 모듈 패키지에 손으로 쓴 선언 중 설계에 없는 것을 gen: false L3 노드 초안으로 만든다.
+// 초안은 기존 설계와 합쳐 검사했을 때 새 오류·경고를 내지 않는 노드만 남긴다.
+package lift
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"unicode"
+
+	"github.com/tolelom/daemok/internal/check"
+	"github.com/tolelom/daemok/internal/coverage"
+	"github.com/tolelom/daemok/internal/gen/golang"
+	"github.com/tolelom/daemok/internal/gosrc"
+	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/workspace"
+)
+
+// Node는 초안 노드 하나다. Line은 "ID: { ... }" 한 줄이다.
+type Node struct {
+	Kind   string `json:"kind"` // errors, consts, enums, types
+	Module string `json:"module"`
+	ID     string `json:"id"`
+	Line   string `json:"line"`
+	Where  string `json:"where"` // 코드 루트 기준 "경로:줄"
+}
+
+// Skip은 옮기지 않은 선언과 그 이유다.
+type Skip struct {
+	Where  string `json:"where"`
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+}
+
+// Result는 초안 YAML과 노드, 옮기지 않은 선언이다. Funcs는 설계에 없는 exported 함수의 수다.
+type Result struct {
+	YAML    []byte `json:"-"`
+	Nodes   []Node `json:"nodes"`
+	Skipped []Skip `json:"skipped"`
+	Funcs   int    `json:"funcs"`
+}
+
+// ErrDesign은 설계를 읽지 못했거나 설계 검사 오류가 있다는 뜻이다.
+var ErrDesign = errors.New("설계에 오류가 있어 초안을 만들 수 없다")
+
+// draftName은 검증할 때 초안에 붙이는 설계 파일 이름이다.
+const draftName = "daemok-l3-draft.yaml"
+
+var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3}
+
+// Draft는 designDir의 설계와 root의 코드로 초안을 만든다.
+func Draft(designDir, root string) (*Result, error) {
+	sources, err := readSources(designDir)
+	if err != nil {
+		return nil, err
+	}
+	m, diags := model.LoadSources(sources)
+	if !diags.HasErrors() {
+		diags = append(diags, check.Run(m)...)
+	}
+	if diags.HasErrors() {
+		return nil, ErrDesign
+	}
+	expected, err := coverage.DesignNames(m)
+	if err != nil {
+		return nil, err
+	}
+	c := &collector{root: root, fset: token.NewFileSet(), res: &Result{}}
+	for _, u := range units(m) {
+		c.unit(u.id, u.path, expected[u.path])
+	}
+	nodes, err := validate(sources, designDir, root, c.nodes, c.res)
+	if err != nil {
+		return nil, err
+	}
+	c.res.Nodes = nodes
+	c.res.YAML = render(nodes)
+	sort.Slice(c.res.Skipped, func(i, j int) bool { return c.res.Skipped[i].Where < c.res.Skipped[j].Where })
+	return c.res, nil
+}
+
+func readSources(designDir string) (map[string][]byte, error) {
+	paths, _ := filepath.Glob(filepath.Join(designDir, "*.yaml"))
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("%w: 설계 파일이 없다: %s", ErrDesign, designDir)
+	}
+	out := map[string][]byte{}
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		out[p] = b
+	}
+	return out, nil
+}
+
+type unit struct{ id, path string }
+
+// units는 모듈과 그룹 멤버를 ID 순으로 준다.
+func units(m *model.Model) []unit {
+	var out []unit
+	for _, mod := range m.Modules {
+		out = append(out, unit{mod.ID, mod.Path})
+	}
+	for _, g := range m.Groups {
+		for _, mem := range g.Members {
+			out = append(out, unit{mem.ID, mem.Path()})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].id < out[j].id })
+	return out
+}
+
+type collector struct {
+	root  string
+	fset  *token.FileSet
+	nodes []Node
+	res   *Result
+}
+
+func (c *collector) where(p token.Pos) string {
+	pos := c.fset.Position(p)
+	rel, err := filepath.Rel(c.root, pos.Filename)
+	if err != nil {
+		rel = pos.Filename
+	}
+	return filepath.ToSlash(rel) + ":" + strconv.Itoa(pos.Line)
+}
+
+func (c *collector) skip(p token.Pos, name, reason string) {
+	c.res.Skipped = append(c.res.Skipped, Skip{c.where(p), name, reason})
+}
+
+func (c *collector) add(kind, module, id string, p token.Pos, fields ...string) {
+	line := id + ": { " + strings.Join(append([]string{"in: " + module, "gen: false"}, fields...), ", ") + " }"
+	c.nodes = append(c.nodes, Node{Kind: kind, Module: module, ID: id, Line: line, Where: c.where(p)})
+}
+
+// unit은 모듈 하나의 패키지에서 설계에 없는 exported 선언을 옮긴다. known은 설계가 만드는 이름이다.
+func (c *collector) unit(module, dir string, known map[string]bool) {
+	files, _ := gosrc.Files(c.fset, filepath.Join(c.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
+	fresh := func(n *ast.Ident) bool { return n.IsExported() && !known[n.Name] }
+	for _, f := range files {
+		if generated(f) {
+			continue
+		}
+		for _, d := range f.Decls {
+			switch d := d.(type) {
+			case *ast.FuncDecl:
+				if d.Recv == nil && fresh(d.Name) {
+					c.res.Funcs++
+				}
+			case *ast.GenDecl:
+				for _, s := range d.Specs {
+					switch sp := s.(type) {
+					case *ast.TypeSpec:
+						if fresh(sp.Name) {
+							c.skip(sp.Name.Pos(), sp.Name.Name, "타입은 아직 옮기지 않는다")
+						}
+					case *ast.ValueSpec:
+						for i, n := range sp.Names {
+							if !fresh(n) {
+								continue
+							}
+							if d.Tok == token.VAR {
+								c.errorVar(module, n, sp, i)
+							} else {
+								c.constant(module, n, sp, i)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func generated(f *ast.File) bool {
+	return len(f.Comments) > 0 && f.Comments[0].List[0].Text == golang.Header && f.Comments[0].Pos() < f.Package
+}
+
+// errorVar는 var ErrX = errors.New("문자열")를 에러 노드로 옮긴다.
+func (c *collector) errorVar(module string, n *ast.Ident, sp *ast.ValueSpec, i int) {
+	msg, ok := errorsNew(sp, i)
+	if !ok {
+		c.skip(n.Pos(), n.Name, "var는 errors.New(문자열) 에러만 옮긴다")
+		return
+	}
+	q, ok := quote(msg)
+	if !ok {
+		c.skip(n.Pos(), n.Name, "메시지에 설계 문자열로 쓸 수 없는 문자가 있다")
+		return
+	}
+	c.add("errors", module, n.Name, n.Pos(), "message: "+q)
+}
+
+func errorsNew(sp *ast.ValueSpec, i int) (string, bool) {
+	if len(sp.Values) != len(sp.Names) || sp.Type != nil {
+		return "", false
+	}
+	call, ok := sp.Values[i].(*ast.CallExpr)
+	if !ok || len(call.Args) != 1 {
+		return "", false
+	}
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return "", false
+	}
+	pkg, ok := sel.X.(*ast.Ident)
+	if !ok || pkg.Name != "errors" || sel.Sel.Name != "New" {
+		return "", false
+	}
+	return stringLit(call.Args[0])
+}
+
+var durationUnits = map[string]string{"Millisecond": "ms", "Second": "s", "Minute": "m", "Hour": "h"}
+
+// constant는 정수·문자열 리터럴과 N * time.Unit 상수를 상수 노드로 옮긴다.
+func (c *collector) constant(module string, n *ast.Ident, sp *ast.ValueSpec, i int) {
+	typ, value, ok := constValue(sp, i)
+	if !ok {
+		c.skip(n.Pos(), n.Name, "정수·문자열 리터럴이나 N * time.Unit 상수가 아니다")
+		return
+	}
+	id, goName, ok := snakeID(n.Name)
+	if !ok {
+		c.skip(n.Pos(), n.Name, "snake_case ID로 바꿀 수 없다")
+		return
+	}
+	fields := []string{"type: " + typ, "value: " + value}
+	if goName != "" {
+		fields = append(fields, "go: { name: "+goName+" }")
+	}
+	c.add("consts", module, id, n.Pos(), fields...)
+}
+
+func constValue(sp *ast.ValueSpec, i int) (typ, value string, ok bool) {
+	if len(sp.Values) != len(sp.Names) {
+		return "", "", false
+	}
+	declared := typeName(sp.Type)
+	expr := sp.Values[i]
+	sign := ""
+	if u, ok := expr.(*ast.UnaryExpr); ok && u.Op == token.SUB {
+		if lit, ok := u.X.(*ast.BasicLit); ok && lit.Kind == token.INT {
+			expr, sign = lit, "-"
+		}
+	}
+	switch v := expr.(type) {
+	case *ast.BasicLit:
+		switch {
+		case v.Kind == token.INT && (declared == "" || declared == "int"):
+			// Go 리터럴 규칙(0x, 0o, 앞자리 0의 8진수, 밑줄)으로 읽어 10진수로 쓴다.
+			n, err := strconv.ParseInt(sign+v.Value, 0, 0)
+			if err != nil {
+				return "", "", false
+			}
+			return "int", strconv.FormatInt(n, 10), true
+		case v.Kind == token.STRING && sign == "" && (declared == "" || declared == "string"):
+			s, ok := stringLit(v)
+			if !ok {
+				return "", "", false
+			}
+			q, ok := quote(s)
+			return "string", q, ok
+		}
+	case *ast.BinaryExpr:
+		if v.Op != token.MUL || (declared != "" && declared != "time.Duration") {
+			return "", "", false
+		}
+		num, unit := v.X, v.Y
+		if _, isLit := num.(*ast.BasicLit); !isLit {
+			num, unit = unit, num
+		}
+		lit, ok := num.(*ast.BasicLit)
+		if !ok || lit.Kind != token.INT {
+			return "", "", false
+		}
+		n, err := strconv.ParseInt(lit.Value, 0, 0)
+		if err != nil || n < 0 {
+			return "", "", false
+		}
+		if sel, ok := unit.(*ast.SelectorExpr); ok && typeName(sel) != "" {
+			if pkg, _ := sel.X.(*ast.Ident); pkg != nil && pkg.Name == "time" && durationUnits[sel.Sel.Name] != "" {
+				return "duration", strconv.FormatInt(n, 10) + durationUnits[sel.Sel.Name], true
+			}
+		}
+	}
+	return "", "", false
+}
+
+// typeName은 타입 식이 이름이나 패키지.이름이면 그 글자를 준다.
+func typeName(e ast.Expr) string {
+	switch t := e.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		if x, ok := t.X.(*ast.Ident); ok {
+			return x.Name + "." + t.Sel.Name
+		}
+	}
+	return ""
+}
+
+func stringLit(e ast.Expr) (string, bool) {
+	lit, ok := e.(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return "", false
+	}
+	s, err := strconv.Unquote(lit.Value)
+	return s, err == nil
+}
+
+// quote는 설계 YAML의 큰따옴표 문자열로 쓴다. 파서가 받는 이스케이프(\" \\ \n \t)만 쓴다.
+func quote(s string) (string, bool) {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range s {
+		switch {
+		case r == '"' || r == '\\':
+			b.WriteRune('\\')
+			b.WriteRune(r)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case !unicode.IsPrint(r):
+			return "", false
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String(), true
+}
+
+var snakeName = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
+
+// snakeID는 Go 이름을 snake_case ID로 바꾼다. GoName(ID)가 원래 이름과 다르면 goName에 원래 이름을 준다.
+// 대문자 연속(HTTPPort)은 마지막 대문자 앞에서 끊는다.
+func snakeID(name string) (id, goName string, ok bool) {
+	rs := []rune(name)
+	var parts []string
+	start := 0
+	for i := 1; i < len(rs); i++ {
+		// 숫자 뒤의 대문자는 숫자 앞이 소문자일 때만 끊는다(Sha256Size, P2PPort).
+		j := i - 1
+		for j > 0 && unicode.IsDigit(rs[j]) {
+			j--
+		}
+		lowerToUpper := unicode.IsUpper(rs[i]) && unicode.IsLower(rs[j])
+		acronymEnd := unicode.IsUpper(rs[i]) && unicode.IsUpper(rs[i-1]) && i+1 < len(rs) && unicode.IsLower(rs[i+1])
+		if lowerToUpper || acronymEnd {
+			parts = append(parts, string(rs[start:i]))
+			start = i
+		}
+	}
+	parts = append(parts, string(rs[start:]))
+	id = strings.ToLower(strings.Join(parts, "_"))
+	if !snakeName.MatchString(id) {
+		return "", "", false
+	}
+	if model.GoName(id) != name {
+		goName = name
+	}
+	return id, goName, true
+}
+
+// validate는 초안을 설계에 합쳐 돌리고, 초안 줄을 가리키는 오류·경고가 나온 노드를 빼고 다시 돌린다.
+// 초안 밖에 새 오류·경고가 생기면 어느 노드 탓인지 알 수 없어 오류로 끝낸다.
+func validate(sources map[string][]byte, designDir, root string, nodes []Node, res *Result) ([]Node, error) {
+	sort.SliceStable(nodes, func(i, j int) bool {
+		a, b := nodes[i], nodes[j]
+		if a.Kind != b.Kind {
+			return kindOrder[a.Kind] < kindOrder[b.Kind]
+		}
+		if a.Module != b.Module {
+			return a.Module < b.Module
+		}
+		return a.ID < b.ID
+	})
+	base := counts(workspace.RunSources(sources, designDir, root).Diags)
+	key := filepath.Join(designDir, draftName)
+	for len(nodes) > 0 {
+		files := map[string][]byte{key: render(nodes)}
+		for k, v := range sources {
+			files[k] = v
+		}
+		r := workspace.RunSources(files, designDir, root)
+		lineOf := lineNodes(nodes)
+		bad := map[int]string{}
+		var outside []string
+		for _, d := range r.Diags {
+			if d.Level == model.Info {
+				continue
+			}
+			if d.Pos.File == key {
+				if i, ok := lineOf[d.Pos.Line]; ok {
+					if _, seen := bad[i]; !seen {
+						bad[i] = d.Msg
+					}
+					continue
+				}
+			}
+			outside = append(outside, d.String())
+		}
+		if len(bad) == 0 {
+			if extra := added(base, outside); len(extra) > 0 {
+				return nil, fmt.Errorf("초안이 설계의 다른 곳에 진단을 낸다: %s", strings.Join(extra, "; "))
+			}
+			return nodes, nil
+		}
+		var kept []Node
+		for i, n := range nodes {
+			if msg, ok := bad[i]; ok {
+				res.Skipped = append(res.Skipped, Skip{n.Where, n.ID, "설계에 더하면 진단이 난다: " + msg})
+				continue
+			}
+			kept = append(kept, n)
+		}
+		nodes = kept
+	}
+	return nodes, nil
+}
+
+func counts(ds model.Diagnostics) map[string]int {
+	out := map[string]int{}
+	for _, d := range ds {
+		if d.Level != model.Info {
+			out[d.String()]++
+		}
+	}
+	return out
+}
+
+func added(base map[string]int, now []string) []string {
+	seen := map[string]int{}
+	var out []string
+	for _, s := range now {
+		seen[s]++
+		if seen[s] > base[s] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// header는 초안 파일 머리 주석의 줄 수와 내용이다. lineNodes가 줄 번호를 맞추는 데 쓴다.
+const header = "# daemok init --l3가 만든 L3 초안이다. 설계에 없는 손으로 쓴 선언을 gen: false 노드로 옮겼다.\n" +
+	"# 새 설계 파일로 저장하거나 기존 설계 파일에 옮겨 붙인다.\n"
+
+func render(nodes []Node) []byte {
+	var b bytes.Buffer
+	b.WriteString(header)
+	kind := ""
+	for _, n := range nodes {
+		if n.Kind != kind {
+			kind = n.Kind
+			b.WriteString("\n" + kind + ":\n")
+		}
+		b.WriteString("  " + n.Line + "\n")
+	}
+	return b.Bytes()
+}
+
+// lineNodes는 render가 쓴 줄 번호(1부터)에서 노드 번호로 가는 표다.
+func lineNodes(nodes []Node) map[int]int {
+	out := map[int]int{}
+	line := strings.Count(header, "\n")
+	kind := ""
+	for i, n := range nodes {
+		if n.Kind != kind {
+			kind = n.Kind
+			line += 2
+		}
+		line++
+		out[line] = i
+	}
+	return out
+}

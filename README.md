@@ -22,7 +22,7 @@ Go 1.27 이상. 외부 의존성은 없다.
 |---|---|---|
 | `daemok check` | 설계 검사, import 대조, 생성 파일 최신 여부를 출력한다 | `--design DIR`, `--root DIR`, `--strict`(경고도 실패), `--format json` |
 | `daemok gen` | 설계에서 Go 생성 파일과 `ts_out` TS 파일을 쓰고, 설계에 없는 Go 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
-| `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다 | `--root DIR`, `--design DIR`, `--dry-run` |
+| `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다. `--l3`는 설계가 있을 때 설계에 없는 손으로 쓴 선언을 `gen: false` L3 노드 초안으로 출력한다 | `--root DIR`, `--design DIR`, `--dry-run`, `--l3` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
 | `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 읽기 도구는 `design`, `check`, `draft`이고, `--allow-write`면 설계를 고치는 `edit`도 낸다 | `--design DIR`, `--root DIR`, `--allow-write` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |
@@ -60,6 +60,7 @@ MCP를 지원하는 클라이언트의 서버 설정에 `daemok mcp`를 등록�
 
 1. `daemok init`으로 초안을 만든다. tier 이름과 그룹은 사람이 정한다.
 2. `daemok check`로 설계와 코드가 맞는지 본다.
-3. 생성할 노드를 설계에 더하고 `daemok gen`으로 생성 파일을 쓴다. 이미 손으로 쓴 선언이 있는 노드는 `gen: false`로 둔다.
+3. `daemok init --l3 > design/l3.yaml`로 손으로 쓴 에러·상수를 설계에 올린다. 초안은 설계에 더해도 검사를 통과하는 노드만 담는다.
+4. 생성할 노드를 설계에 더하고 `daemok gen`으로 생성 파일을 쓴다. 이미 손으로 쓴 선언이 있는 노드는 `gen: false`로 둔다.
 
 tolchain에 도입한 기록은 [tolchain 슬라이스](docs/design/02-slice-tolchain.md)에 있다.

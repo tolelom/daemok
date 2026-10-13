@@ -29,7 +29,7 @@ type Row struct {
 // 설계가 만드는 이름은 모든 L3·L4 노드를 gen: true로 보고 생성한 코드에서 얻는다. 모델은 바꾸지 않는다.
 // 파싱하지 못한 Go 파일은 세지 않고 함께 돌려준다.
 func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
-	expected, err := designNames(m)
+	expected, err := DesignNames(m)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -73,7 +73,7 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 }
 
 // designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수도 넣는다.
-func designNames(m *model.Model) (map[string]map[string]bool, error) {
+func DesignNames(m *model.Model) (map[string]map[string]bool, error) {
 	var gens []*bool
 	for _, x := range m.Enums {
 		gens = append(gens, &x.Gen)
