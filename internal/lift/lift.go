@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +34,10 @@ type Node struct {
 	Name   string `json:"name"` // Go 이름
 	Line   string `json:"line"`
 	Where  string `json:"where"` // 코드 루트 기준 "경로:줄"
+	fields []string
 }
+
+func (n *Node) render() { n.Line = n.ID + ": { " + strings.Join(n.fields, ", ") + " }" }
 
 // Skip은 옮기지 않은 선언과 그 이유다.
 type Skip struct {
@@ -56,7 +60,7 @@ var ErrDesign = errors.New("설계에 오류가 있어 초안을 만들 수 없�
 // draftName은 검증할 때 초안에 붙이는 설계 파일 이름이다.
 const draftName = "daemok-l3-draft.yaml"
 
-var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3}
+var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3, "contracts": 4}
 
 // Draft는 designDir의 설계와 root의 코드로 초안을 만든다.
 func Draft(designDir, root string) (*Result, error) {
@@ -79,7 +83,7 @@ func Draft(designDir, root string) (*Result, error) {
 	for _, u := range c.units {
 		c.unit(u.id, u.path, expected[u.path])
 	}
-	nodes, err := validate(sources, designDir, root, c.nodes, c.res)
+	nodes, err := validate(sources, designDir, root, dedupe(c.nodes), c.res)
 	if err != nil {
 		return nil, err
 	}
@@ -150,8 +154,30 @@ func (c *collector) add(kind, module, id string, name *ast.Ident, fields ...stri
 	if q, ok := quote(summary(c.docs[name])); ok && q != `""` {
 		head = append(head, "summary: "+q)
 	}
-	line := id + ": { " + strings.Join(append(head, fields...), ", ") + " }"
-	c.nodes = append(c.nodes, Node{Kind: kind, Module: module, ID: id, Name: name.Name, Line: line, Where: c.where(name.Pos())})
+	n := Node{Kind: kind, Module: module, ID: id, Name: name.Name, Where: c.where(name.Pos()), fields: append(head, fields...)}
+	n.render()
+	c.nodes = append(c.nodes, n)
+}
+
+// dedupe는 초안 안에서 같은 종류의 ID가 겹치면(모듈마다 있는 Config, Service) 모듈 ID를 앞에 붙이고
+// go.name으로 Go 이름을 지킨다. 에러는 ID가 Go 이름이고 enum은 go 블록이 달라 그대로 두고 검증에 맡긴다.
+func dedupe(nodes []Node) []Node {
+	seen := map[string]int{}
+	for _, n := range nodes {
+		seen[n.Kind+" "+n.ID]++
+	}
+	for i := range nodes {
+		n := &nodes[i]
+		if seen[n.Kind+" "+n.ID] < 2 || n.Kind == "errors" || n.Kind == "enums" {
+			continue
+		}
+		n.ID = n.Module + "_" + n.ID
+		if !slices.ContainsFunc(n.fields, func(f string) bool { return strings.HasPrefix(f, "go: ") }) {
+			n.fields = append(n.fields, "go: { name: "+n.Name+" }")
+		}
+		n.render()
+	}
+	return nodes
 }
 
 // unit은 모듈 하나의 패키지에서 설계에 없는 exported 선언을 옮긴다. known은 설계가 만드는 이름이다.
@@ -353,9 +379,13 @@ func (c *collector) unitOf(importPath string) (string, bool) {
 // structType은 struct를 타입 노드로 옮긴다. 필드를 모두 설계 타입 문자열로 바꿀 수 있어야 한다.
 func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, local map[string]string) {
 	name := ts.Name.Name
+	if iface, ok := ts.Type.(*ast.InterfaceType); ok && ts.TypeParams == nil {
+		c.contract(module, ts, iface, f, local)
+		return
+	}
 	st, ok := ts.Type.(*ast.StructType)
 	if !ok || ts.TypeParams != nil {
-		c.skip(ts.Name.Pos(), name, "struct나 string enum이 아니다")
+		c.skip(ts.Name.Pos(), name, "struct, interface, string enum이 아니다")
 		return
 	}
 	var fields []string
@@ -395,6 +425,101 @@ func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, loc
 		out = append(out, "go: { name: "+goName+" }")
 	}
 	c.add("types", module, id, ts.Name, out...)
+}
+
+// contract는 interface를 call 계약으로 옮긴다. 메서드는 반환 끝이 error여야 한다(생성 계약이 error를 붙인다).
+func (c *collector) contract(module string, ts *ast.TypeSpec, iface *ast.InterfaceType, f *ast.File, local map[string]string) {
+	name := ts.Name.Name
+	var methods []string
+	for _, fd := range iface.Methods.List {
+		ft, ok := fd.Type.(*ast.FuncType)
+		if len(fd.Names) == 0 || !ok {
+			c.skip(ts.Name.Pos(), name, "끼워 넣은 interface가 있다")
+			return
+		}
+		for _, n := range fd.Names {
+			m, reason := c.method(n.Name, ft, f, local)
+			if reason != "" {
+				c.skip(ts.Name.Pos(), name, "메서드 "+n.Name+": "+reason)
+				return
+			}
+			methods = append(methods, m)
+		}
+	}
+	if len(methods) == 0 {
+		c.skip(ts.Name.Pos(), name, "메서드가 없다")
+		return
+	}
+	id, goName, ok := snakeID(name)
+	if !ok {
+		c.skip(ts.Name.Pos(), name, "snake_case ID로 바꿀 수 없다")
+		return
+	}
+	fields := []string{"kind: call", "methods: { " + strings.Join(methods, ", ") + " }"}
+	if goName != "" {
+		fields = append(fields, "go: { name: "+goName+" }")
+	}
+	c.add("contracts", module, id, ts.Name, fields...)
+}
+
+// method는 메서드 하나를 "이름: { params, returns, errors: [] }"로 쓴다. 이름 없는 파라미터는 arg1부터 붙인다.
+func (c *collector) method(name string, ft *ast.FuncType, f *ast.File, local map[string]string) (string, string) {
+	id, _, ok := snakeID(name)
+	if !ok {
+		return "", "snake_case 이름으로 바꿀 수 없다"
+	}
+	var results []ast.Expr
+	if ft.Results != nil {
+		for _, r := range ft.Results.List {
+			for range max(1, len(r.Names)) {
+				results = append(results, r.Type)
+			}
+		}
+	}
+	if len(results) == 0 || typeName(results[len(results)-1]) != "error" {
+		return "", "반환 끝이 error가 아니다"
+	}
+	var params []string
+	arg := 0
+	for _, p := range ft.Params.List {
+		if _, ok := p.Type.(*ast.Ellipsis); ok {
+			return "", "가변 인자는 설계 문법이 없다"
+		}
+		typ, reason := c.fieldType(p.Type, f, local)
+		if reason != "" {
+			return "", reason
+		}
+		names := p.Names
+		if len(names) == 0 {
+			arg++
+			names = []*ast.Ident{{Name: fmt.Sprintf("arg%d", arg)}}
+		}
+		for _, n := range names {
+			pid, _, ok := snakeID(n.Name)
+			if !ok || n.Name == "_" {
+				arg++
+				pid = fmt.Sprintf("arg%d", arg)
+			}
+			params = append(params, pid+": "+typ)
+		}
+	}
+	var returns []string
+	for _, r := range results[:len(results)-1] {
+		typ, reason := c.fieldType(r, f, local)
+		if reason != "" {
+			return "", reason
+		}
+		returns = append(returns, typ)
+	}
+	var parts []string
+	if len(params) > 0 {
+		parts = append(parts, "params: { "+strings.Join(params, ", ")+" }")
+	}
+	if len(returns) > 0 {
+		parts = append(parts, "returns: ["+strings.Join(returns, ", ")+"]")
+	}
+	parts = append(parts, "errors: []")
+	return id + ": { " + strings.Join(parts, ", ") + " }", ""
 }
 
 var builtinGo = map[string]string{

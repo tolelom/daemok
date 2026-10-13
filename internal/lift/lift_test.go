@@ -369,3 +369,57 @@ type Point struct{ X int }
 		t.Fatalf("got\n%s\nwant\n%s", got, want)
 	}
 }
+
+// 모듈마다 같은 이름의 선언은 초안 안에서 ID가 겹치므로 모듈 ID를 앞에 붙이고 go.name으로 Go 이름을 지킨다.
+func TestDuplicateIDsAcrossModules(t *testing.T) {
+	r := draft(t, "  web: { tier: a }\n", map[string]string{
+		"core/c.go": "package core\n\ntype Config struct{ N int }\n",
+		"web/w.go":  "package web\n\ntype Config struct{ N int }\n",
+	})
+	want := strings.Join([]string{
+		"types core_config: { in: core, gen: false, fields: { n: int }, go: { name: Config } }",
+		"types web_config: { in: web, gen: false, fields: { n: int }, go: { name: Config } }",
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s\n%+v", got, want, r.Skipped)
+	}
+}
+
+func TestContracts(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/c.go": `package core
+
+import "context"
+
+type Post struct{ ID uint }
+
+// Store keeps posts.
+type Store interface {
+	// Get finds a post.
+	Get(ctx context.Context, id uint) (*Post, error)
+	List(limit, offset int) ([]Post, int64, error)
+	Delete(uint) error
+}
+
+type NoError interface {
+	Size() int
+}
+
+type Variadic interface {
+	Many(xs ...int) error
+}
+`})
+	want := strings.Join([]string{
+		`types post: { in: core, gen: false, fields: { id: uint } }`,
+		`contracts store: { in: core, gen: false, summary: "Store keeps posts.", kind: call, methods: { get: { params: { ctx: context.Context, id: uint }, returns: ["*post"], errors: [] }, list: { params: { limit: int, offset: int }, returns: ["[]post", int64], errors: [] }, delete: { params: { arg1: uint }, errors: [] } } }`,
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s\n%+v", got, want, r.Skipped)
+	}
+	reasons := map[string]string{}
+	for _, s := range r.Skipped {
+		reasons[s.Name] = s.Reason
+	}
+	if !strings.Contains(reasons["NoError"], "error") || !strings.Contains(reasons["Variadic"], "가변") {
+		t.Fatalf("%+v", r.Skipped)
+	}
+}
