@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tolelom/daemok/internal/edit"
 	"github.com/tolelom/daemok/internal/infer"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/workspace"
@@ -29,6 +30,8 @@ var maxLine = 16 << 20
 type Server struct {
 	design, root string
 	Version      string
+	// AllowWrite면 설계 파일을 고치는 edit 도구를 낸다. 사용자가 서버를 등록할 때 --allow-write로 켠다.
+	AllowWrite bool
 }
 
 func New(design, root string) *Server { return &Server{design: design, root: root, Version: "dev"} }
@@ -132,7 +135,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 	case "ping":
 		return struct{}{}, nil
 	case "tools/list":
-		return map[string]any{"tools": toolList()}, nil
+		return map[string]any{"tools": toolList(s.AllowWrite)}, nil
 	case "tools/call":
 		var p struct {
 			Name      string          `json:"name"`
@@ -145,9 +148,26 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			Module string `json:"module"`
 			Design string `json:"design"`
 			Root   string `json:"root"`
+			Op     string `json:"op"`
+			ID     string `json:"id"`
+			Value  string `json:"value"`
 		}
 		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
 			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
+		}
+		if p.Name == "edit" {
+			if !s.AllowWrite {
+				return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
+			}
+			// 쓰기는 사용자가 등록한 서버의 설계 디렉토리에만 한다. 도구 인자로 경로를 바꾸지 못한다.
+			if args.Design != "" || args.Root != "" {
+				return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
+			}
+			file, err := edit.Apply(s.design, args.Op, args.ID, args.Value)
+			if err != nil {
+				return toolResult(err.Error(), true), nil
+			}
+			return toolResult("고쳤다: "+file+". 승인은 사용자의 커밋이다. check 도구로 진단을 확인한다", false), nil
 		}
 		design, root := s.design, s.root
 		if args.Root != "" {
@@ -183,7 +203,7 @@ func toolResult(text string, isErr bool) map[string]any {
 	return map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": isErr}
 }
 
-func toolList() []map[string]any {
+func toolList(allowWrite bool) []map[string]any {
 	str := func(desc string) map[string]any { return map[string]any{"type": "string", "description": desc} }
 	paths := map[string]any{"design": str("설계 디렉토리. 기본은 서버의 --design"), "root": str("코드 루트. 기본은 서버의 --root")}
 	with := func(extra map[string]any) map[string]any {
@@ -196,7 +216,8 @@ func toolList() []map[string]any {
 		}
 		return map[string]any{"type": "object", "properties": props}
 	}
-	return []map[string]any{
+	read := map[string]any{"readOnlyHint": true}
+	tools := []map[string]any{
 		{"name": "design", "description": "설계를 읽는다. module이 없으면 설계 파일 원문, 있으면 그 모듈·그룹·멤버의 tier, 의존, 쓰는 쪽, 소속 노드를 JSON으로 준다",
 			"inputSchema": with(map[string]any{"module": str("모듈, 그룹, 그룹 멤버 ID")})},
 		{"name": "check", "description": "설계 검사, import 대조, 생성 파일 최신 여부를 돌려 진단을 JSON으로 준다(daemok check --format json과 같다)",
@@ -204,6 +225,17 @@ func toolList() []map[string]any {
 		{"name": "draft", "description": "Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 설계 파일이 있어도 코드만 본다. 파일은 쓰지 않는다(daemok init --dry-run과 같다)",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"root": paths["root"]}}},
 	}
+	for _, t := range tools {
+		t["annotations"] = read
+	}
+	if allowWrite {
+		tools = append(tools, map[string]any{"name": "edit",
+			"description": "설계 파일의 L2를 한 곳 고친다. op는 tier(id의 tier를 value로), add_dep·remove_dep(id의 depends_on에 value를 더하거나 뺀다), add_module(id 모듈을 tier value로 더한다), remove_module(id 모듈을 지운다). id는 모듈이나 그룹. 서버의 설계 디렉토리만 고치고, 승인은 사용자의 커밋이다",
+			"inputSchema": map[string]any{"type": "object", "required": []string{"op", "id"}, "properties": map[string]any{
+				"op": map[string]any{"type": "string", "enum": edit.Ops}, "id": str("모듈이나 그룹 ID"), "value": str("tier 이름이나 의존 대상")}},
+			"annotations": map[string]any{"readOnlyHint": false, "destructiveHint": true, "idempotentHint": false}})
+	}
+	return tools
 }
 
 func designTool(design, module string) (string, error) {
