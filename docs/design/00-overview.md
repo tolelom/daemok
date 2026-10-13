@@ -34,8 +34,8 @@
 | 층 | 내용 | Go 생성물 |
 |---|---|---|
 | R | 요구사항. 본문은 자연어, ID로 참조 | 없음. 설계 요소가 `satisfies`로 연결 |
-| L0 | 시스템, 액터, 외부 인터페이스 | 외부 경계 인터페이스 |
-| L1 | 실행 단위 | `cmd/<name>/main.go`와 조립 코드 |
+| L0 | 시스템, 액터, 외부 인터페이스 | 없음. 인터페이스의 구현 모듈과 조립 여부를 검사 |
+| L1 | 실행 단위 | 조립 코드(`modules.gen.go`의 멤버 import, `contracts.gen.go`의 interface 만족 확인) |
 | L2 | 모듈, tier, 의존 규칙 | 패키지 디렉토리, 허용되지 않은 import 검사 |
 | L3 | 타입, enum, 상수, 에러, 계약(interface, 핸들러 함수 타입) | struct, interface, const, sentinel error, 등록 코드 |
 | L4 | 함수 계약(시그니처, 에러, 케이스 표) | 시그니처 확인 코드, 테이블 테스트 |
