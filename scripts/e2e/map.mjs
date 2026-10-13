@@ -1,5 +1,5 @@
 // 지도 e2e: 관계선이 처음부터 흐리게 보이는지, 감춘 종류는 안 보이는지, tier 안 배치가 선 교차를 줄이는지,
-// 모듈 탭의 같은 진단이 묶이는지 본다.
+// 모듈 탭의 같은 진단이 묶이는지, 시스템 설정이 라이트면 밝은 바탕인지 본다.
 // 사용: node scripts/e2e/map.mjs <serve URL>. 설계는 TestUIMapE2E의 것을 전제로 한다.
 import { openBrowser, runSteps, sleep } from './browser.mjs';
 
@@ -12,8 +12,18 @@ const b = await openBrowser();
 await b.send('Page.navigate', { url });
 await sleep(1500);
 
+// 바탕 밝기(0~1)를 시스템 색 설정마다 잰다.
+const brightness = `(() => { const c = getComputedStyle(document.body).backgroundColor.match(/\\d+/g).map(Number); return (c[0] * .299 + c[1] * .587 + c[2] * .114) / 255; })()`;
+const scheme = (value) => b.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] });
+await scheme('light');
+const light = await b.run(brightness);
+await scheme('dark');
+const dark = await b.run(brightness);
+const theme = dark < .3 && light > .8 ? 'ok' : `바탕 밝기 다크 ${dark}, 라이트 ${light}`;
+
 const opacity = (sel) => `getComputedStyle(document.querySelector('${sel}')).opacity`;
 const steps = [
+  ['theme', `'${theme}'`],
   ['updated_label', `(() => { const t = document.querySelector('#status').textContent; return t.includes('갱신 ') ? 'ok' : '머리 상태: ' + t; })()`],
   ['faint_edges', `(() => { const o = +${opacity('path.edge')}; return o > 0 && o < .5 ? 'ok' : '처음 관계선 opacity ' + o; })()`],
   ['no_labels', `(() => { const l = [...document.querySelectorAll('text.edge-label')].filter(e => +getComputedStyle(e).opacity > 0); return l.length === 0 ? 'ok' : '처음 보이는 라벨 ' + l.length; })()`],
