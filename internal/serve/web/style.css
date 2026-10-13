@@ -118,6 +118,7 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .unit rect.stack { fill: var(--bg-2); stroke: var(--rule-2); }
 .unit .nm { fill: var(--ink); font: 600 14.5px var(--mono); }
 .unit .sb { fill: var(--ink-3); font-size: 12.5px; }
+.unit .sb.rel { fill: var(--ink); font-weight: 600; }
 .unit:hover rect.box, .unit:focus rect.box, .unit.on rect.box { stroke: var(--accent); stroke-width: 2; }
 .unit.st-add rect.box { stroke: var(--add); stroke-width: 2; } .unit.st-chg rect.box { stroke: var(--chg); stroke-width: 2; }
 .unit.st-rem rect.box { stroke: var(--rem); stroke-dasharray: 5 4; } .unit.st-rem .nm { text-decoration: line-through; }

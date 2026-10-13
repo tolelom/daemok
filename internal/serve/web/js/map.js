@@ -49,6 +49,24 @@ function mapPanel(id) {
   const sub = u.type === 'grp' ? `그룹, 멤버 ${u.members.length}` : (u.summary || '');
   return `<div><h2>${esc(id)}</h2>${sub ? `<p class="muted">${esc(sub)}</p>` : ''}</div>${part('쓰는 것', es.filter(e => e.from === id), 'to')}${part('쓰는 쪽', es.filter(e => e.to === id), 'from')}${tail}`;
 }
+// relSub는 올린 모듈과 이어진 상자의 부제다. 그 상자 입장의 말로 적는다. uses는 그 상자 → 올린 모듈, provides는 올린 모듈 → 그 상자
+// 관계선이다. 의존·계약·예외는 쓰는 쪽 → 쓰이는 쪽이라 "사용"·"제공", 이벤트는 발행자 → 구독자라 "발행"·"구독", 핸들러 등록은
+// 멤버 → 핸들러 종류의 주인이라 "등록"·"등록받음"이다. 의존이 아닌 관계는 라벨을, 계약은 종류 이름도 붙인다.
+const REL_WORDS = { event: ['발행', '구독'], register: ['등록', '등록받음'] };
+const REL_ORDER = ['사용', '제공', '발행', '구독', '등록', '등록받음'];
+function relSub(uses, provides) {
+  const parts = {};
+  const add = (e, dir) => {
+    const word = (REL_WORDS[e.kind] || ['사용', '제공'])[dir], l = [...e.labels];
+    const names = l.slice(0, 2).join(', ') + (l.length > 2 ? ` 외 ${l.length - 2}` : '');
+    (parts[word] ||= []);
+    if (e.kind === 'depends') return;
+    parts[word].push(REL_WORDS[e.kind] ? names : (KINDS[e.kind].name + (names ? ' ' + names : '')));
+  };
+  uses.forEach(e => add(e, 0));
+  provides.forEach(e => add(e, 1));
+  return REL_ORDER.filter(w => parts[w]).map(w => w + (parts[w].length ? ' · ' + parts[w].join(', ') : '')).join(' / ');
+}
 // tierOrder는 tier마다 모듈 순서를 정한다. 다른 tier 이웃의 평균 칸 위치로 위아래를 번갈아 정렬해
 // 관계선 교차를 줄인다. 이웃이 없거나 값이 같으면 설계 순서를 유지한다.
 function tierOrder(units, edges) {
@@ -192,7 +210,16 @@ function renderMap() {
       el.classList.toggle('off', hiddenKinds.has(el.dataset.kind));
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
     });
-    svg.querySelectorAll('.unit').forEach(g => { g.classList.toggle('near', near.has(g.dataset.id)); g.classList.toggle('on', g.dataset.id === id); });
+    const shown = id ? edges.filter(e => !hiddenKinds.has(e.kind) && (e.from === id || e.to === id) && !(shared.has(e.to) && e.to !== id)) : [];
+    svg.querySelectorAll('.unit').forEach(g => {
+      const u = g.dataset.id, sb = g.querySelector('text.sb');
+      g.classList.toggle('near', near.has(u));
+      g.classList.toggle('on', u === id);
+      if (sb.dataset.orig === undefined) sb.dataset.orig = sb.textContent;
+      const rel = near.has(u) && u !== id ? relSub(shown.filter(e => e.from === u && e.to === id), shown.filter(e => e.from === id && e.to === u)) : '';
+      sb.textContent = rel ? fit(rel, 24) : sb.dataset.orig;
+      sb.classList.toggle('rel', !!rel);
+    });
   };
   const panel = id => {
     mapFocus = id || mapFocus;
