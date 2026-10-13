@@ -31,6 +31,16 @@ type scanner struct {
 	decls map[string]map[string]bool
 	// 모듈·멤버 ID → 타입 이름 → 선언과 그 파일
 	typeSpecs map[string]map[string]typeSpec
+	// 즉석 errors.New 호출. 모두 모은 뒤 같은 메시지 수를 붙여 알린다.
+	adHoc []adHocCall
+}
+
+// adHocCall은 즉석 errors.New 호출 하나다. msg는 인자가 문자열 리터럴일 때만 있다.
+type adHocCall struct {
+	pos    yaml.Pos
+	module string
+	msg    string
+	lit    bool
 }
 
 // unit은 코드 디렉토리를 가진 모듈이나 그룹 멤버다.
@@ -52,6 +62,7 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	for _, u := range us {
 		s.scanUnit(u)
 	}
+	s.reportAdHoc()
 	s.queryPackages()
 	s.unusedDeps(us)
 	s.eventRefs(us)
@@ -389,11 +400,46 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 			}
 			if sel, ok := call.Fun.(*ast.SelectorExpr); ok && sel.Sel.Name == "New" {
 				if pkg, ok := sel.X.(*ast.Ident); ok && pkg.Name == name {
-					s.diags.Infof(s.pos(call.Pos()), "설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 %s", id)
+					c := adHocCall{pos: s.pos(call.Pos()), module: id}
+					if len(call.Args) == 1 {
+						if b, ok := call.Args[0].(*ast.BasicLit); ok && b.Kind == token.STRING {
+							c.msg, _ = strconv.Unquote(b.Value)
+							c.lit = true
+						}
+					}
+					s.adHoc = append(s.adHoc, c)
 				}
 			}
 			return true
 		})
+	}
+}
+
+// reportAdHoc은 즉석 errors.New를 메시지와 함께 알린다. 쓸 수 있는 설계 에러와 메시지가 같으면 그 에러를,
+// 같은 메시지가 여러 곳이면 그 수를 붙인다. 앞은 바로 바꿔 쓸 후보이고 뒤는 sentinel로 둘 후보다.
+func (s *scanner) reportAdHoc() {
+	same := map[string]int{}
+	for _, c := range s.adHoc {
+		if c.lit {
+			same[c.msg]++
+		}
+	}
+	for _, c := range s.adHoc {
+		if !c.lit {
+			s.diags.Infof(c.pos, "설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 %s", c.module)
+			continue
+		}
+		note := ""
+		for _, e := range s.m.Errors {
+			if e.Message == c.msg && (e.In.Name == c.module || s.m.CanDepend(c.module, e.In.Name)) {
+				note = " (설계 에러 " + e.GoName() + "와 메시지가 같다)"
+				break
+			}
+		}
+		if note == "" && same[c.msg] > 1 {
+			note = " (같은 메시지 " + strconv.Itoa(same[c.msg]) + "곳)"
+		}
+		s.diags.Infof(c.pos, "설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 %s, %s%s", c.module, strconv.Quote(c.msg), note)
 	}
 }
 

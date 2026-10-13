@@ -185,6 +185,7 @@ errors:
 `,
 		"core/errors.go": "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"not found\")\n",
 		"api/api.go":     "package api\n\nimport (\n\tstderr \"errors\"\n\t\"fmt\"\n\n\t_ \"example.com/e/core\"\n)\n\nfunc Get() error {\n\tif true {\n\t\treturn stderr.New(\"missing\")\n\t}\n\treturn fmt.Errorf(\"wrap: %w\", nil)\n}\n",
+		"api/more.go":    "package api\n\nimport \"errors\"\n\nvar msg = \"m\"\n\nfunc A() error { return errors.New(\"missing\") }\n\nfunc B() error { return errors.New(\"not found\") }\n\nfunc C() error { return errors.New(msg) }\n",
 		"free/free.go":   "package free\n\nimport \"errors\"\n\nfunc F() error { return errors.New(\"x\") }\n",
 	}
 	for p, c := range files {
@@ -200,7 +201,14 @@ errors:
 			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
 		}
 	}
-	want := []string{"정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api @api.go:12"}
+	sort.Strings(got)
+	want := []string{
+		"정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api @more.go:11",
+		`정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api, "missing" (같은 메시지 2곳) @api.go:12`,
+		`정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api, "missing" (같은 메시지 2곳) @more.go:7`,
+		`정보: 설계 에러가 있는데 즉석 errors.New를 쓴다: 모듈 api, "not found" (설계 에러 ErrNotFound와 메시지가 같다) @more.go:9`,
+	}
+	sort.Strings(want)
 	if strings.Join(got, "|") != strings.Join(want, "|") {
 		t.Fatalf("%q", got)
 	}
