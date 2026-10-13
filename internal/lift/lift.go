@@ -123,6 +123,7 @@ func units(m *model.Model) []unit {
 }
 
 type collector struct {
+	docs  map[*ast.Ident]*ast.CommentGroup // 선언 이름에서 그 선언의 문서 주석으로
 	m     *model.Model
 	units []unit
 	root  string
@@ -145,7 +146,11 @@ func (c *collector) skip(p token.Pos, name, reason string) {
 }
 
 func (c *collector) add(kind, module, id string, name *ast.Ident, fields ...string) {
-	line := id + ": { " + strings.Join(append([]string{"in: " + module, "gen: false"}, fields...), ", ") + " }"
+	head := []string{"in: " + module, "gen: false"}
+	if q, ok := quote(summary(c.docs[name])); ok && q != `""` {
+		head = append(head, "summary: "+q)
+	}
+	line := id + ": { " + strings.Join(append(head, fields...), ", ") + " }"
 	c.nodes = append(c.nodes, Node{Kind: kind, Module: module, ID: id, Name: name.Name, Line: line, Where: c.where(name.Pos())})
 }
 
@@ -159,6 +164,7 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 			hand = append(hand, f)
 		}
 	}
+	c.docs = docs(hand)
 	enumTypes, enumValues := c.enums(module, hand, fresh)
 	// local은 이 패키지에서 설계 ID로 가리킬 수 있는 타입 이름이다. 설계에 있는 타입·enum과 이번에 함께 옮기는 것.
 	local := c.designTypes(module)
@@ -485,6 +491,53 @@ func importPath(f *ast.File, name string) string {
 		}
 	}
 	return ""
+}
+
+// docs는 선언 이름마다 문서 주석이다. 블록 안 선언은 자기 주석, 괄호 없는 단독 선언은 선언 주석이다.
+func docs(files []*ast.File) map[*ast.Ident]*ast.CommentGroup {
+	out := map[*ast.Ident]*ast.CommentGroup{}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			g, ok := d.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, sp := range g.Specs {
+				switch sp := sp.(type) {
+				case *ast.TypeSpec:
+					out[sp.Name] = specDoc(g, sp.Doc)
+				case *ast.ValueSpec:
+					for _, n := range sp.Names {
+						out[n] = specDoc(g, sp.Doc)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+func specDoc(g *ast.GenDecl, doc *ast.CommentGroup) *ast.CommentGroup {
+	if doc == nil && !g.Lparen.IsValid() {
+		return g.Doc
+	}
+	return doc
+}
+
+// summary는 문서 주석 첫 단락의 첫 문장이다. 160자가 넘으면 요약으로 보지 않는다.
+func summary(doc *ast.CommentGroup) string {
+	if doc == nil {
+		return ""
+	}
+	para, _, _ := strings.Cut(doc.Text(), "\n\n")
+	text := strings.Join(strings.Fields(para), " ")
+	if i := strings.Index(text, ". "); i >= 0 {
+		text = text[:i+1]
+	}
+	if len([]rune(text)) > 160 {
+		return ""
+	}
+	return text
 }
 
 func generated(f *ast.File) bool {

@@ -339,3 +339,33 @@ func TestBuiltinNamedStruct(t *testing.T) {
 		t.Fatalf("%+v", r.Skipped)
 	}
 }
+
+// Go 문서 주석의 첫 문장이 summary가 된다. 블록 안 선언은 자기 주석, 단독 선언은 선언 주석을 쓴다.
+func TestSummaryFromDoc(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/core.go": `package core
+
+import "errors"
+
+// ErrGone means the item was removed. It is permanent.
+var ErrGone = errors.New("gone")
+
+const (
+	// PageSize is the default page size.
+	PageSize = 10
+	Bare = 1
+)
+
+// Point is a 2D point
+// spanning two lines.
+type Point struct{ X int }
+`})
+	want := strings.Join([]string{
+		`errors ErrGone: { in: core, gen: false, summary: "ErrGone means the item was removed.", message: "gone" }`,
+		`consts bare: { in: core, gen: false, type: int, value: 1 }`,
+		`consts page_size: { in: core, gen: false, summary: "PageSize is the default page size.", type: int, value: 10 }`,
+		`types point: { in: core, gen: false, summary: "Point is a 2D point spanning two lines.", fields: { x: int } }`,
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+}
