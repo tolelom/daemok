@@ -16,7 +16,7 @@
 |---|---|---|
 | `errors` | `var ErrX = errors.New("문자열")` | ID는 Go 이름, `message`는 문자열 |
 | `consts` | 정수 리터럴, 문자열 리터럴, `N * time.Unit`(Millisecond, Second, Minute, Hour) | `type`과 `value` |
-| `enums` | `type T string`과 `T` 타입 문자열 리터럴 상수 2개 이상 | `values`는 리터럴, 상수 이름이 `접두사 + GoName(값)`이 아니면 옮기지 않습니다 |
+| `enums` | `type T string`과 `T` 타입 문자열 리터럴 상수 2개 이상 | `values`는 리터럴. 값은 소문자 snake_case만 받고, 상수 이름이 같은 `접두사 + GoName(값)`이 아니면 옮기지 않습니다. 값 순서는 파일 이름, 선언 순입니다 |
 | `types` | struct | 필드를 모두 설계 문법으로 옮길 수 있을 때만 |
 
 - 모든 노드는 `gen: false`와 `in: <모듈 또는 멤버>`를 가집니다.

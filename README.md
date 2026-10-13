@@ -60,7 +60,7 @@ MCP를 지원하는 클라이언트의 서버 설정에 `daemok mcp`를 등록�
 
 1. `daemok init`으로 초안을 만든다. tier 이름과 그룹은 사람이 정한다.
 2. `daemok check`로 설계와 코드가 맞는지 본다.
-3. `daemok init --l3 > design/l3.yaml`로 손으로 쓴 에러·상수를 설계에 올린다. 초안은 설계에 더해도 검사를 통과하는 노드만 담는다.
+3. `daemok init --l3 > design/l3.yaml`로 손으로 쓴 에러·상수·enum을 설계에 올린다. 초안은 설계에 더해도 검사를 통과하는 노드만 담는다.
 4. 생성할 노드를 설계에 더하고 `daemok gen`으로 생성 파일을 쓴다. 이미 손으로 쓴 선언이 있는 노드는 `gen: false`로 둔다.
 
 tolchain에 도입한 기록은 [tolchain 슬라이스](docs/design/02-slice-tolchain.md)에 있다.

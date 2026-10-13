@@ -150,10 +150,14 @@ func (c *collector) add(kind, module, id string, p token.Pos, fields ...string) 
 func (c *collector) unit(module, dir string, known map[string]bool) {
 	files, _ := gosrc.Files(c.fset, filepath.Join(c.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
 	fresh := func(n *ast.Ident) bool { return n.IsExported() && !known[n.Name] }
+	var hand []*ast.File
 	for _, f := range files {
-		if generated(f) {
-			continue
+		if !generated(f) {
+			hand = append(hand, f)
 		}
+	}
+	enumTypes, enumValues := c.enums(module, hand, fresh)
+	for _, f := range hand {
 		for _, d := range f.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
@@ -164,12 +168,12 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 				for _, s := range d.Specs {
 					switch sp := s.(type) {
 					case *ast.TypeSpec:
-						if fresh(sp.Name) {
+						if fresh(sp.Name) && !enumTypes[sp.Name.Name] {
 							c.skip(sp.Name.Pos(), sp.Name.Name, "타입은 아직 옮기지 않는다")
 						}
 					case *ast.ValueSpec:
 						for i, n := range sp.Names {
-							if !fresh(n) {
+							if !fresh(n) || enumValues[n.Name] {
 								continue
 							}
 							if d.Tok == token.VAR {
@@ -184,6 +188,105 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 		}
 	}
 }
+
+// enums는 string 타입과 그 타입의 문자열 리터럴 상수를 enum 노드로 옮긴다.
+// 옮겼든 못 옮겼든 다룬 타입과 값 상수 이름을 돌려줘 다른 종류로 다시 알리지 않게 한다.
+func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Ident) bool) (types, values map[string]bool) {
+	types, values = map[string]bool{}, map[string]bool{}
+	var order []*ast.TypeSpec
+	for _, f := range files {
+		for _, d := range f.Decls {
+			g, ok := d.(*ast.GenDecl)
+			if !ok || g.Tok != token.TYPE {
+				continue
+			}
+			for _, s := range g.Specs {
+				ts := s.(*ast.TypeSpec)
+				if under, ok := ts.Type.(*ast.Ident); ok && under.Name == "string" && ts.Assign == 0 && ts.TypeParams == nil && fresh(ts.Name) {
+					types[ts.Name.Name] = true
+					order = append(order, ts)
+				}
+			}
+		}
+	}
+	type value struct {
+		name *ast.Ident
+		lit  string
+		ok   bool
+	}
+	consts := map[string][]value{}
+	for _, f := range files {
+		for _, d := range f.Decls {
+			g, ok := d.(*ast.GenDecl)
+			if !ok || g.Tok != token.CONST {
+				continue
+			}
+			for _, s := range g.Specs {
+				sp := s.(*ast.ValueSpec)
+				typ, _ := sp.Type.(*ast.Ident)
+				if typ == nil || !types[typ.Name] {
+					continue
+				}
+				for i, n := range sp.Names {
+					values[n.Name] = true
+					v := value{name: n}
+					if len(sp.Values) == len(sp.Names) {
+						v.lit, v.ok = stringLit(sp.Values[i])
+					}
+					consts[typ.Name] = append(consts[typ.Name], v)
+				}
+			}
+		}
+	}
+	for _, ts := range order {
+		name := ts.Name.Name
+		vs := consts[name]
+		if len(vs) < 2 {
+			c.skip(ts.Name.Pos(), name, "string 타입이지만 값 상수가 2개 미만이다")
+			continue
+		}
+		prefix, lits, reason := "", []string{}, ""
+		for i, v := range vs {
+			if !v.ok || !enumValue.MatchString(v.lit) {
+				reason = "값 상수가 단순한 문자열 리터럴이 아니다: " + v.name.Name
+				break
+			}
+			suffix := model.GoName(v.lit)
+			p, found := strings.CutSuffix(v.name.Name, suffix)
+			if !found || (i > 0 && p != prefix) {
+				reason = "상수 이름이 같은 접두사 + 값 이름이 아니다: " + v.name.Name
+				break
+			}
+			prefix = p
+			lits = append(lits, v.lit)
+		}
+		if reason != "" {
+			c.skip(ts.Name.Pos(), name, reason)
+			continue
+		}
+		id, goType, ok := snakeID(name)
+		if !ok {
+			c.skip(ts.Name.Pos(), name, "snake_case ID로 바꿀 수 없다")
+			continue
+		}
+		var goOpts []string
+		if goType != "" {
+			goOpts = append(goOpts, "type: "+goType)
+		}
+		if prefix != name {
+			goOpts = append(goOpts, "prefix: "+prefix)
+		}
+		fields := []string{"values: [" + strings.Join(lits, ", ") + "]"}
+		if len(goOpts) > 0 {
+			fields = append(fields, "go: { "+strings.Join(goOpts, ", ")+" }")
+		}
+		c.add("enums", module, id, ts.Name.Pos(), fields...)
+	}
+	return types, values
+}
+
+// enumValue는 YAML 평문으로 그대로 쓸 수 있는 enum 값이다. 설계 검사의 값 문자 규칙보다 좁다.
+var enumValue = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 func generated(f *ast.File) bool {
 	return len(f.Comments) > 0 && f.Comments[0].List[0].Text == golang.Header && f.Comments[0].Pos() < f.Package

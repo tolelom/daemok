@@ -196,3 +196,63 @@ func TestNegativeAndVarReason(t *testing.T) {
 		t.Fatalf("%+v", r.Skipped)
 	}
 }
+
+func TestEnums(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/msg.go": `package core
+
+type MsgType string
+
+const (
+	MsgHello     MsgType = "hello"
+	MsgGetBlocks MsgType = "get_blocks"
+)
+
+type PostStatus string
+
+const (
+	PostStatusPublished PostStatus = "published"
+	PostStatusDraft     PostStatus = "draft"
+)
+
+type HTTPMode string
+
+const (
+	HTTPModeFast HTTPMode = "fast"
+	HTTPModeSlow HTTPMode = "slow"
+)
+
+type Odd string
+
+const (
+	OddA Odd = "a"
+	Other Odd = "b"
+)
+
+type Single string
+
+const SingleOnly Single = "only"
+`,
+		"core/msg_more.go": "package core\n\nconst MsgPing MsgType = \"ping\"\n",
+	})
+	want := strings.Join([]string{
+		"enums http_mode: { in: core, gen: false, values: [fast, slow], go: { type: HTTPMode } }",
+		"enums msg_type: { in: core, gen: false, values: [hello, get_blocks, ping], go: { prefix: Msg } }",
+		"enums post_status: { in: core, gen: false, values: [published, draft] }",
+	}, "\n")
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\nwant\n%s", got, want)
+	}
+	reasons := map[string]string{}
+	for _, s := range r.Skipped {
+		reasons[s.Name] = s.Reason
+	}
+	if !strings.Contains(reasons["Odd"], "접두사") || !strings.Contains(reasons["Single"], "2개") {
+		t.Fatalf("%+v", r.Skipped)
+	}
+	for _, n := range []string{"OddA", "Other", "SingleOnly", "MsgHello"} {
+		if _, ok := reasons[n]; ok {
+			t.Errorf("enum 값 상수 %s는 따로 알리지 않는다", n)
+		}
+	}
+}
