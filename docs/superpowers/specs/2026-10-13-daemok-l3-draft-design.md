@@ -37,6 +37,7 @@
 |---|---|
 | `daemok init --l3` | stdout에 YAML, stderr에 옮기지 않은 선언. 설계 디렉토리에 쓰지 않습니다. `daemok init --l3 > design/l3.yaml`처럼 새 설계 파일로 저장할 수 있습니다 |
 | MCP `draft` 도구 | 인자 `l3: true`면 같은 YAML과 옮기지 않은 선언을 줍니다 |
+| 화면 L3 초안 탭 | 탭을 열 때 `GET /api/l3`로 받아 종류별 수, YAML, 옮기지 않은 선언을 보여 줍니다. 저장(`POST /api/l3`, 루프백만)은 서버가 초안을 다시 만들어 설계 디렉토리에 `l3.yaml`, 있으면 `l3-2.yaml`처럼 비어 있는 이름의 새 파일로 씁니다. 있는 파일은 덮어쓰지 않습니다 |
 
 YAML은 최상위 키(`errors`, `consts`, `enums`, `types`)마다 노드 하나를 한 줄 플로우 맵으로 쓰고, 노드는 모듈, ID 순입니다.
 

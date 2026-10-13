@@ -291,6 +291,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/open", s.open)
 	mux.HandleFunc("POST /api/init", s.initDraft)
 	mux.HandleFunc("POST /api/edit", s.editDesign)
+	mux.HandleFunc("GET /api/l3", s.l3Draft)
+	mux.HandleFunc("POST /api/l3", s.l3Save)
 	return s.guard(mux)
 }
 

@@ -83,3 +83,29 @@ errors:
 		t.Fatalf("%v\n%s", err, out)
 	}
 }
+
+// L3 초안 탭에서 초안을 보고 새 설계 파일로 저장한다. DAEMOK_E2E=1일 때만 돈다.
+func TestUIL3E2E(t *testing.T) {
+	if os.Getenv("DAEMOK_E2E") != "1" {
+		t.Skip("DAEMOK_E2E=1일 때만 돈다")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node가 없다")
+	}
+	s, dir := setup(t, l3Design)
+	root := filepath.Dir(dir)
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "c.go"), []byte("package core\n\n// Limit is the cap.\nconst Limit = 3\n\nconst Twice = Limit * 2\n"), 0o644)
+	s.Poll()
+	local(t, s)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	out, err := exec.Command(node, filepath.Join("..", "..", "scripts", "e2e", "l3.mjs"), srv.URL+"/").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+	if b, err := os.ReadFile(filepath.Join(dir, "l3.yaml")); err != nil || !strings.Contains(string(b), "limit: { in: core") {
+		t.Fatalf("저장한 파일: %v\n%s", err, b)
+	}
+}

@@ -279,6 +279,7 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
       <button type="button" data-view="flow">흐름</button>
       <button type="button" data-view="reqs">요구사항</button>
       <button type="button" data-view="draft" hidden>초안</button>
+      <button type="button" data-view="l3" hidden>L3 초안</button>
     </nav>
     <button type="button" class="diagbtn" id="issuesbtn" aria-label="진단 목록 열기"></button>
   </div>
@@ -848,6 +849,46 @@ ${(r.hints || []).length ? `<h3 style="margin-top:22px">L3 노드 후보</h3><p 
 <pre class="yaml">${esc(d.yaml)}</pre>`;
 }
 
+/* ---------- L3 초안 ---------- */
+// 서버가 설계 대조를 다시 돌려 만들므로 탭을 열 때만 받고, 상태 버전이 바뀌면 다시 받는다.
+let l3 = null, l3Version = -1, l3Loading = false;
+function renderL3() {
+  setSide('');
+  if (l3 && l3Version === meta.version) return paintL3();
+  $('#main').innerHTML = '<h1 class="plain">L3 초안</h1><p class="muted">코드를 읽는 중이다</p>';
+  if (l3Loading) return;
+  l3Loading = true;
+  const version = meta.version;
+  fetch('/api/l3', { cache: 'no-store' })
+    .then(r => r.json().then(j => (r.ok ? j : { error: j.error || `요청이 거부되었다 (${r.status})` })))
+    .catch(() => ({ error: '서버에 연결할 수 없다' }))
+    .then(j => { l3 = j; l3Version = version; l3Loading = false; if (view === 'l3') renderL3(); });
+}
+function paintL3() {
+  const d = l3;
+  if (d.error) { $('#main').innerHTML = `<h1 class="plain">L3 초안</h1><p class="sub">${esc(d.error)}</p>`; return; }
+  const kinds = {};
+  for (const n of d.nodes || []) kinds[n.kind] = (kinds[n.kind] || 0) + 1;
+  const count = k => kinds[k] || 0;
+  const skipped = (d.skipped || []).map(x => `<li><span class="id">${esc(x.name)}</span> <span class="muted">${esc(x.where)}</span> ${esc(x.reason)}</li>`).join('');
+  const has = (d.nodes || []).length > 0;
+  $('#main').innerHTML = `<h1 class="plain">L3 초안</h1>
+<p class="sub">설계 모듈 패키지에 손으로 쓴 선언 중 설계에 없는 것을 gen: false 노드로 옮겼다. 설계에 더해도 검사를 통과하는 노드만 담는다.</p>
+<dl class="facts"><dt>에러</dt><dd>${count('errors')}</dd><dt>상수</dt><dd>${count('consts')}</dd><dt>enum</dt><dd>${count('enums')}</dd><dt>타입</dt><dd>${count('types')}</dd><dt>옮기지 않은 선언</dt><dd>${(d.skipped || []).length}</dd><dt>설계에 없는 함수</dt><dd>${d.funcs}</dd></dl>
+${has ? `<div class="draftbar">${d.canSave ? '<button type="button" class="primary" id="savel3">design/에 새 파일로 저장</button>' : '<span class="muted">루프백 주소로 띄웠을 때만 저장할 수 있다</span>'}<button type="button" id="copyl3">YAML 복사</button></div>
+<p id="savemsg" class="muted"></p>
+<pre class="yaml">${esc(d.yaml)}</pre>` : '<p class="muted">설계에 올릴 선언이 없다.</p>'}
+${skipped ? `<details><summary>옮기지 않은 선언 ${(d.skipped || []).length}개</summary><ul>${skipped}</ul></details>` : ''}`;
+}
+async function saveL3() {
+  const btn = $('#savel3'); if (btn) btn.disabled = true;
+  const res = await post('/api/l3', {});
+  if (!res.ok) { $('#savemsg').textContent = res.error; if (btn) btn.disabled = false; return; }
+  toast(`${res.path}에 노드 ${res.nodes}개를 썼다`);
+  l3 = null;
+  await load();
+}
+
 /* ---------- 프로젝트 ---------- */
 let autoOpened = false;
 async function post(url, body) {
@@ -908,12 +949,12 @@ async function editOp(op, id, value) {
 }
 
 /* ---------- 이동 ---------- */
-const VIEWS = { check: ['map', 'module', 'flow', 'reqs'], analyze: ['map', 'module', 'draft'], none: [] };
+const VIEWS = { check: ['map', 'module', 'flow', 'reqs', 'l3'], analyze: ['map', 'module', 'draft'], none: [] };
 function render() {
   if (!(VIEWS[S.mode] || VIEWS.check).includes(view)) view = 'map';
   renderHeader();
   if (S.mode === 'none') { setSide(''); $('#main').innerHTML = `<p class="muted">열 프로젝트를 고른다. 설계 파일(design/*.yaml)이나 go.mod가 있는 폴더를 연다.</p>`; return; }
-  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs, draft: renderDraft })[view]();
+  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs, draft: renderDraft, l3: renderL3 })[view]();
 }
 function go(v, arg) {
   view = v;
@@ -941,6 +982,8 @@ document.addEventListener('click', e => {
   const rf = t.closest('[data-reqf]'); if (rf) { reqFilter = rf.dataset.reqf; return render(); }
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
   if (t.closest('#savedraft')) return saveDraft();
+  if (t.closest('#savel3')) return saveL3();
+  if (t.closest('#copyl3')) { navigator.clipboard.writeText(l3.yaml).then(() => toast('YAML을 복사했다'), () => toast('복사할 수 없다')); return; }
   if (t.closest('#copycmd')) { navigator.clipboard.writeText(S.draft.command).then(() => toast('명령을 복사했다'), () => toast('복사할 수 없다')); return; }
   const tab = t.closest('[data-view]'); if (tab) return go(tab.dataset.view);
   if (t.closest('#issuesbtn')) return openIssues();
@@ -994,7 +1037,7 @@ async function load() {
 }
 {
   const [v, arg] = location.hash.slice(1).split('/');
-  if (['map', 'module', 'flow', 'reqs', 'draft'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
+  if (['map', 'module', 'flow', 'reqs', 'draft', 'l3'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
 }
 const es = new EventSource('/api/events');
 es.onmessage = e => { if (+e.data !== meta.version) load(); };
