@@ -293,6 +293,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/edit", s.editDesign)
 	mux.HandleFunc("GET /api/l3", s.l3Draft)
 	mux.HandleFunc("POST /api/l3", s.l3Save)
+	mux.HandleFunc("GET /api/gen", s.genPreview)
+	mux.HandleFunc("GET /api/gen/file", s.genContent)
 	return s.guard(mux)
 }
 

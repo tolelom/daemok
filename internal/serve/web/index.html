@@ -56,6 +56,11 @@ nav.tabs button[aria-current="true"] { color: var(--ink); border-bottom-color: v
 .projbtn:hover { color: var(--accent); }
 .brand span.modebadge { color: var(--warn); }
 .toast { position: fixed; right: 24px; bottom: 24px; z-index: 30; background: var(--bg-3); border: 1px solid var(--rule-2); padding: 10px 14px; border-radius: 6px; font-size: 14px; }
+.genlist { margin: 10px 0; padding-left: 18px; }
+.genlist li { margin: 3px 0; overflow-wrap: anywhere; }
+.genlist code, .genlist .linklike { font: 13px var(--mono); }
+.linklike { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; text-align: left; }
+.linklike.on { text-decoration: underline; }
 pre.yaml { background: var(--bg-2); border: 1px solid var(--rule); padding: 14px 16px; overflow-x: auto; font: 13px/1.6 var(--mono); }
 .draftbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 18px 0 8px; }
 .draftbar code { font: 13px var(--mono); color: var(--ink-2); overflow-wrap: anywhere; }
@@ -280,6 +285,7 @@ pre { margin: 0 0 8px; padding: 12px; background: var(--bg); border: 1px solid v
       <button type="button" data-view="reqs">요구사항</button>
       <button type="button" data-view="draft" hidden>초안</button>
       <button type="button" data-view="l3" hidden>L3 초안</button>
+      <button type="button" data-view="gen" hidden>생성</button>
     </nav>
     <button type="button" class="diagbtn" id="issuesbtn" aria-label="진단 목록 열기"></button>
   </div>
@@ -890,6 +896,48 @@ async function saveL3() {
   await load();
 }
 
+/* ---------- 생성 미리보기 ---------- */
+// daemok gen이 할 일을 보인다. 쓰지 않는다. 서버가 설계 대조를 다시 돌리므로 탭을 열 때만 받는다.
+let gen = null, genVersion = -1, genLoading = false, genSel = '', genText = null;
+const GEN_LABEL = { new: '새 파일', changed: '바뀜', delete: '지울 파일', refuse: '쓰지 않음', same: '그대로' };
+function renderGen() {
+  setSide('');
+  if (gen && genVersion === meta.version) return paintGen();
+  $('#main').innerHTML = '<h1 class="plain">생성</h1><p class="muted">생성하는 중이다</p>';
+  if (genLoading) return;
+  genLoading = true;
+  const version = meta.version;
+  fetch('/api/gen', { cache: 'no-store' })
+    .then(r => r.json().then(j => (r.ok ? j : { error: j.error || `요청이 거부되었다 (${r.status})` })))
+    .catch(() => ({ error: '서버에 연결할 수 없다' }))
+    .then(j => { gen = j; genVersion = version; genLoading = false; genText = null; if (view === 'gen') renderGen(); });
+}
+function paintGen() {
+  const d = gen;
+  if (d.error) { $('#main').innerHTML = `<h1 class="plain">생성</h1><p class="sub">${esc(d.error)}</p>`; return; }
+  const files = d.files || [];
+  const n = st => files.filter(f => f.status === st).length;
+  const row = f => {
+    const name = f.status === 'delete' || f.status === 'refuse'
+      ? `<code>${esc(f.path)}</code>`
+      : `<button type="button" class="linklike${f.path === genSel ? ' on' : ''}" data-genfile="${esc(f.path)}">${esc(f.path)}</button>`;
+    return `<li>${name} <span class="muted">${GEN_LABEL[f.status]}${f.reason ? ': ' + esc(f.reason) : ''}</span></li>`;
+  };
+  const todo = files.filter(f => f.status !== 'same'), same = files.filter(f => f.status === 'same');
+  $('#main').innerHTML = `<h1 class="plain">생성</h1>
+<p class="sub">daemok gen이 쓰고 지울 파일이다. 이 화면은 쓰지 않는다.</p>
+<p>${['new', 'changed', 'delete', 'refuse', 'same'].filter(st => n(st)).map(st => `${GEN_LABEL[st]} ${n(st)}`).join(' · ') || '생성 파일이 없다'}</p>
+${todo.length ? `<ul class="genlist">${todo.map(row).join('')}</ul>` : '<p class="muted">생성 파일이 설계와 같다.</p>'}
+${same.length ? `<details${todo.length ? '' : ' open'}><summary>그대로인 파일 ${same.length}개</summary><ul class="genlist">${same.map(row).join('')}</ul></details>` : ''}
+${genSel ? `<h3 style="margin-top:22px"><code>${esc(genSel)}</code></h3>${genText === null ? '<p class="muted">읽는 중이다</p>' : `<pre class="yaml">${esc(genText)}</pre>`}` : ''}`;
+}
+async function showGenFile(path) {
+  genSel = path; genText = null; paintGen();
+  const r = await fetch('/api/gen/file?path=' + encodeURIComponent(path), { cache: 'no-store' }).catch(() => null);
+  genText = r && r.ok ? await r.text() : '내용을 받을 수 없다';
+  if (view === 'gen' && genSel === path) paintGen();
+}
+
 /* ---------- 프로젝트 ---------- */
 let autoOpened = false;
 async function post(url, body) {
@@ -950,12 +998,12 @@ async function editOp(op, id, value) {
 }
 
 /* ---------- 이동 ---------- */
-const VIEWS = { check: ['map', 'module', 'flow', 'reqs', 'l3'], analyze: ['map', 'module', 'draft'], none: [] };
+const VIEWS = { check: ['map', 'module', 'flow', 'reqs', 'l3', 'gen'], analyze: ['map', 'module', 'draft'], none: [] };
 function render() {
   if (!(VIEWS[S.mode] || VIEWS.check).includes(view)) view = 'map';
   renderHeader();
   if (S.mode === 'none') { setSide(''); $('#main').innerHTML = `<p class="muted">열 프로젝트를 고른다. 설계 파일(design/*.yaml)이나 go.mod가 있는 폴더를 연다.</p>`; return; }
-  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs, draft: renderDraft, l3: renderL3 })[view]();
+  ({ map: renderMap, module: renderModule, flow: renderFlow, reqs: renderReqs, draft: renderDraft, l3: renderL3, gen: renderGen })[view]();
 }
 function go(v, arg) {
   view = v;
@@ -984,6 +1032,7 @@ document.addEventListener('click', e => {
   const op = t.closest('[data-openpath]'); if (op) return openProject(op.dataset.openpath);
   if (t.closest('#savedraft')) return saveDraft();
   if (t.closest('#savel3')) return saveL3();
+  const gf = t.closest('[data-genfile]'); if (gf) return showGenFile(gf.dataset.genfile);
   if (t.closest('#copyl3')) { navigator.clipboard.writeText(l3.yaml).then(() => toast('YAML을 복사했다'), () => toast('복사할 수 없다')); return; }
   if (t.closest('#copycmd')) { navigator.clipboard.writeText(S.draft.command).then(() => toast('명령을 복사했다'), () => toast('복사할 수 없다')); return; }
   const tab = t.closest('[data-view]'); if (tab) return go(tab.dataset.view);
@@ -1038,7 +1087,7 @@ async function load() {
 }
 {
   const [v, arg] = location.hash.slice(1).split('/');
-  if (['map', 'module', 'flow', 'reqs', 'draft', 'l3'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
+  if (['map', 'module', 'flow', 'reqs', 'draft', 'l3', 'gen'].includes(v)) { view = v; if (v === 'module') current = decodeURIComponent(arg || ''); if (v === 'flow') flowSel = decodeURIComponent(arg || ''); }
 }
 const es = new EventSource('/api/events');
 es.onmessage = e => { if (+e.data !== meta.version) load(); };
