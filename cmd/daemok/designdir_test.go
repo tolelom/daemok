@@ -48,3 +48,23 @@ func TestDesignDirDefault(t *testing.T) {
 		t.Errorf("준 --design: %q", got)
 	}
 }
+
+func TestExtraArgsRejected(t *testing.T) {
+	root := writeRoot(t)
+	for _, cmd := range []string{"check", "gen", "coverage", "init", "serve", "mcp"} {
+		code, _, errOut := runCLI(t, cmd, "--root", root, "extra", "--strict")
+		if code != 2 || !strings.Contains(errOut, "extra") {
+			t.Errorf("%s: exit %d, err %q", cmd, code, errOut)
+		}
+	}
+}
+
+// gen은 아직 없는 루트에 처음 생성할 수 있어야 하므로 check만 막는다.
+func TestMissingRootIsFatal(t *testing.T) {
+	root := writeRoot(t)
+	missing := filepath.Join(root, "nope")
+	code, out, _ := runCLI(t, "check", "--design", filepath.Join(root, "design"), "--root", missing)
+	if code != 2 || !strings.Contains(out, "코드 루트가 없다") {
+		t.Errorf("exit %d\n%s", code, out)
+	}
+}

@@ -17,7 +17,7 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	design, root := pathFlags(fs)
 	dryRun := fs.Bool("dry-run", false, "쓰지 않고 초안과 분석 메모만 출력한다")
-	if err := fs.Parse(args); err != nil {
+	if !parse(fs, args) {
 		return 2
 	}
 	dir := designDir(*design, *root)

@@ -17,14 +17,14 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	design, root := pathFlags(fs)
 	strict := fs.Bool("strict", false, "경고도 실패로 본다")
 	format := fs.String("format", "text", "출력 형식: text, json")
-	if err := fs.Parse(args); err != nil {
+	if !parse(fs, args) {
 		return 2
 	}
 	if *format != "text" && *format != "json" {
 		fmt.Fprintf(stderr, "알 수 없는 --format %q (text, json)\n", *format)
 		return 2
 	}
-	r := workspace.Run(designDir(*design, *root), *root)
+	r := workspace.Check(designDir(*design, *root), *root)
 	if *format == "json" {
 		stdout.Write(workspace.ReportJSON(r.Diags))
 	} else {

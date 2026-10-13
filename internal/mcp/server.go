@@ -165,7 +165,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 		case "design":
 			text, err = designTool(design, args.Module)
 		case "check":
-			text = string(workspace.ReportJSON(workspace.Run(design, root).Diags))
+			text = string(workspace.ReportJSON(workspace.Check(design, root).Diags))
 		case "draft":
 			text, err = draftTool(root)
 		default:

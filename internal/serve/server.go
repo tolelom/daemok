@@ -96,7 +96,9 @@ func (s *Server) Refresh() {
 func (s *Server) refresh() {
 	design, root := s.paths()
 	st := state{Design: design, Root: root, Updated: time.Now(), designSum: designSum(design)}
-	if infer.HasDesignFiles(design) {
+	if fi, err := os.Stat(root); err != nil || !fi.IsDir() {
+		st.Mode, st.Fatal, st.Problem = "none", true, "코드 루트가 없다: "+root
+	} else if infer.HasDesignFiles(design) {
 		st.Mode = "check"
 		fill(&st, workspace.Run(design, root), root)
 		if files, ok, err := gitbase.Files(design); err == nil && ok {

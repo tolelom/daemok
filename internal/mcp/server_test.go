@@ -152,3 +152,12 @@ func TestCheckAndDraftTools(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+func TestCheckToolMissingRoot(t *testing.T) {
+	root := project(t)
+	missing := filepath.ToSlash(filepath.Join(root, "nope"))
+	text, _ := call(t, root, "check", `{"design":"`+filepath.ToSlash(filepath.Join(root, "design"))+`","root":"`+missing+`"}`)
+	if !strings.Contains(text, "코드 루트가 없다") {
+		t.Fatal(text)
+	}
+}

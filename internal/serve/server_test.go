@@ -409,3 +409,13 @@ func TestIssueHasAbsolutePath(t *testing.T) {
 		}
 	}
 }
+
+func TestMissingRootProblem(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "nope")
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	st := getState(t, s)
+	if p, _ := st["problem"].(string); !strings.Contains(p, "코드 루트가 없다") {
+		t.Fatalf("%v", st["problem"])
+	}
+}

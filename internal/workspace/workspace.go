@@ -52,6 +52,17 @@ func Run(designDir, root string) Result {
 	return run(m, diags, designDir, root)
 }
 
+// Check는 코드 대조까지 하는 Run이다. 코드 루트가 없으면 대조할 코드가 없어 통과로 보이므로 진행하지 않는다.
+// gen은 없는 루트에 처음 생성할 수 있어야 하므로 Run을 그대로 쓴다.
+func Check(designDir, root string) Result {
+	if st, err := os.Stat(root); err != nil || !st.IsDir() {
+		var diags model.Diagnostics
+		diags.Errorf(yaml.Pos{File: root}, "코드 루트가 없다")
+		return Result{Diags: diags, Fatal: true}
+	}
+	return Run(designDir, root)
+}
+
 // RunSources는 디스크가 아닌 설계 파일 내용으로 Run과 같은 일을 한다. 키는 진단 위치에 쓰는 파일 이름이다.
 func RunSources(files map[string][]byte, designDir, root string) Result {
 	m, diags := model.LoadSources(files)

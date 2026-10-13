@@ -24,7 +24,7 @@ func runServe(args []string, stdout, stderr io.Writer) int {
 	design, root := pathFlags(fs)
 	addr := fs.String("addr", "127.0.0.1:7412", "들을 주소")
 	workspaceDir := fs.String("workspace", "", "프로젝트를 찾을 작업 폴더")
-	if err := fs.Parse(args); err != nil {
+	if !parse(fs, args) {
 		return 2
 	}
 	s := serve.New(designDir(*design, *root), *root)

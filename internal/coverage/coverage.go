@@ -27,12 +27,14 @@ type Row struct {
 
 // Count는 root 아래 패키지마다 최상위 선언 수와 그중 설계가 만드는 이름의 수를 준다.
 // 설계가 만드는 이름은 모든 L3·L4 노드를 gen: true로 보고 생성한 코드에서 얻는다. 모델은 바꾸지 않는다.
-func Count(m *model.Model, root string) ([]Row, error) {
+// 파싱하지 못한 Go 파일은 세지 않고 함께 돌려준다.
+func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 	expected, err := designNames(m)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var rows []Row
+	var bad []gosrc.ParseError
 	fset := token.NewFileSet()
 	err = filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -44,7 +46,8 @@ func Count(m *model.Model, root string) ([]Row, error) {
 		if p != root && (gosrc.SkipDir(d.Name()) || strings.HasPrefix(d.Name(), "_")) {
 			return filepath.SkipDir
 		}
-		files, _ := gosrc.Files(fset, p, parser.SkipObjectResolution)
+		files, errs := gosrc.Files(fset, p, parser.SkipObjectResolution)
+		bad = append(bad, errs...)
 		if len(files) == 0 {
 			return nil
 		}
@@ -63,10 +66,10 @@ func Count(m *model.Model, root string) ([]Row, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].Pkg < rows[j].Pkg })
-	return rows, nil
+	return rows, bad, nil
 }
 
 // designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수도 넣는다.

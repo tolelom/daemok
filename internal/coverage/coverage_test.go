@@ -57,7 +57,7 @@ func init() {}
 	if diags.HasErrors() {
 		t.Fatal(diags)
 	}
-	rows, err := Count(m, root)
+	rows, _, err := Count(m, root)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ func runMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	design, root := pathFlags(fs)
-	if err := fs.Parse(args); err != nil {
+	if !parse(fs, args) {
 		return 2
 	}
 	s := mcp.New(designDir(*design, *root), *root)

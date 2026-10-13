@@ -11,12 +11,12 @@ import (
 )
 
 // runCoverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 출력한다.
-// 설계를 읽지 못하거나 설계 검사 오류가 있으면 2다.
+// 설계를 읽지 못하거나 설계 검사 오류가 있으면 2, 파싱하지 못한 Go 파일이 있으면 표를 내고 1이다.
 func runCoverage(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("coverage", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	design, root := pathFlags(fs)
-	if err := fs.Parse(args); err != nil {
+	if !parse(fs, args) {
 		return 2
 	}
 	m, diags := model.Load(designDir(*design, *root))
@@ -28,7 +28,7 @@ func runCoverage(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "설계 오류가 있어 셀 수 없다")
 		return 2
 	}
-	rows, err := coverage.Count(m, *root)
+	rows, bad, err := coverage.Count(m, *root)
 	if err != nil {
 		fmt.Fprintf(stderr, "셀 수 없다: %v\n", err)
 		return 2
@@ -41,6 +41,12 @@ func runCoverage(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stdout, "| `%s` | %d | %d | %s |\n", r.Pkg, r.Decls, r.Matched, percent(r.Matched, r.Decls))
 	}
 	fmt.Fprintf(stdout, "| 합계 | %d | %d | %s |\n", decls, matched, percent(matched, decls))
+	for _, b := range bad {
+		fmt.Fprintf(stderr, "세지 못한 Go 파일: %v\n", b.Err)
+	}
+	if len(bad) > 0 {
+		return 1
+	}
 	return 0
 }
 
