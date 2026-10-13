@@ -21,14 +21,13 @@ import (
 func runServe(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "design", "설계 디렉토리")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	addr := fs.String("addr", "127.0.0.1:7412", "들을 주소")
 	workspaceDir := fs.String("workspace", "", "프로젝트를 찾을 작업 폴더")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	s := serve.New(*design, *root)
+	s := serve.New(designDir(*design, *root), *root)
 	s.Poll()
 	ln, err := net.Listen("tcp", *addr)
 	if err != nil {

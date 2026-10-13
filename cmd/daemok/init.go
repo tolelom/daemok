@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/infer"
@@ -16,16 +15,12 @@ import (
 func runInit(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "", "설계 디렉토리 (기본 <root>/design)")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	dryRun := fs.Bool("dry-run", false, "쓰지 않고 초안과 분석 메모만 출력한다")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	dir := *design
-	if dir == "" {
-		dir = filepath.Join(*root, "design")
-	}
+	dir := designDir(*design, *root)
 	a, err := infer.Analyze(*root)
 	if err != nil {
 		fmt.Fprintf(stderr, "분석할 수 없다: %v\n", err)

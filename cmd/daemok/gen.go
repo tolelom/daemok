@@ -13,13 +13,12 @@ import (
 func runGen(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("gen", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "design", "설계 디렉토리")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	dryRun := fs.Bool("dry-run", false, "쓸 파일, 지울 파일, 거부할 파일 목록만 출력한다")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	r := workspace.Run(*design, *root)
+	r := workspace.Run(designDir(*design, *root), *root)
 	if r.Fatal || r.Plan == nil {
 		printDiags(stdout, r.Diags)
 		return 2

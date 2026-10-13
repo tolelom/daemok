@@ -1,0 +1,50 @@
+package main
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+// writeRoot는 design/ 아래 cleanDesign을 둔 코드 루트를 만든다.
+// 테스트의 현재 디렉토리(cmd/daemok)에는 design/이 없으므로, 기본값이 현재 디렉토리 기준이면 설계를 찾지 못한다.
+func writeRoot(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	os.MkdirAll(filepath.Join(root, "design"), 0o755)
+	os.WriteFile(filepath.Join(root, "design", "d.yaml"), []byte(cleanDesign), 0o644)
+	return root
+}
+
+func TestRootOnlyUsesRootDesign(t *testing.T) {
+	for _, args := range [][]string{{"check"}, {"gen", "--dry-run"}, {"coverage"}} {
+		root := writeRoot(t)
+		code, out, errOut := runCLI(t, append(args, "--root", root)...)
+		if code != 0 || strings.Contains(out, "설계 파일(*.yaml)이 없다") {
+			t.Errorf("%v: exit %d\n%s%s", args, code, out, errOut)
+		}
+	}
+}
+
+func TestMCPRootOnlyUsesRootDesign(t *testing.T) {
+	root := writeRoot(t)
+	var out, errb bytes.Buffer
+	in := strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"design","arguments":{}}}` + "\n")
+	if code := runMCP([]string{"--root", root}, in, &out, &errb); code != 0 {
+		t.Fatalf("%d %s", code, errb.String())
+	}
+	if !strings.Contains(out.String(), "core: { tier: a }") {
+		t.Fatal(out.String())
+	}
+}
+
+func TestDesignDirDefault(t *testing.T) {
+	if got := designDir("", "/p"); got != filepath.Join("/p", "design") {
+		t.Errorf("빈 --design: %q", got)
+	}
+	if got := designDir("x/d", "/p"); got != "x/d" {
+		t.Errorf("준 --design: %q", got)
+	}
+}

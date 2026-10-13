@@ -16,13 +16,13 @@ Go 1.27 이상. 외부 의존성은 없다.
 
 ## 명령
 
-설계 디렉토리는 `design/`(`*.yaml`), 코드 루트는 현재 디렉토리가 기본이다.
+코드 루트(`--root`)는 현재 디렉토리, 설계 디렉토리(`--design`)는 `<root>/design`(`*.yaml`)이 기본이다.
 
 | 명령 | 하는 일 | 주요 옵션 |
 |---|---|---|
 | `daemok check` | 설계 검사, import 대조, 생성 파일 최신 여부를 출력한다 | `--design DIR`, `--root DIR`, `--strict`(경고도 실패), `--format json` |
 | `daemok gen` | 설계에서 Go 생성 파일을 쓰고, 설계에 없는 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
-| `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다 | `--root DIR`, `--design DIR`(기본 `<root>/design`), `--dry-run` |
+| `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다 | `--root DIR`, `--design DIR`, `--dry-run` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
 | `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 도구는 `design`, `check`, `draft`이고 모두 읽기 전용이다 | `--design DIR`, `--root DIR` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |

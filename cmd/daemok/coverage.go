@@ -15,12 +15,11 @@ import (
 func runCoverage(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("coverage", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "design", "설계 디렉토리")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	m, diags := model.Load(*design)
+	m, diags := model.Load(designDir(*design, *root))
 	if !diags.HasErrors() {
 		diags = append(diags, check.Run(m)...)
 	}

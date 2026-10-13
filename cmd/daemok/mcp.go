@@ -13,12 +13,11 @@ import (
 func runMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "design", "설계 디렉토리")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	s := mcp.New(*design, *root)
+	s := mcp.New(designDir(*design, *root), *root)
 	s.Version = versionString(debug.ReadBuildInfo())
 	if err := s.Serve(stdin, stdout); err != nil {
 		fmt.Fprintf(stderr, "MCP 서버 오류: %v\n", err)

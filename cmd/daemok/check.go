@@ -14,8 +14,7 @@ import (
 func runCheck(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
 	fs.SetOutput(stderr)
-	design := fs.String("design", "design", "설계 디렉토리")
-	root := fs.String("root", ".", "코드 루트")
+	design, root := pathFlags(fs)
 	strict := fs.Bool("strict", false, "경고도 실패로 본다")
 	format := fs.String("format", "text", "출력 형식: text, json")
 	if err := fs.Parse(args); err != nil {
@@ -25,7 +24,7 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "알 수 없는 --format %q (text, json)\n", *format)
 		return 2
 	}
-	r := workspace.Run(*design, *root)
+	r := workspace.Run(designDir(*design, *root), *root)
 	if *format == "json" {
 		stdout.Write(workspace.ReportJSON(r.Diags))
 	} else {
