@@ -136,7 +136,7 @@ func TestUIGenE2E(t *testing.T) {
 	}
 }
 
-// 분석 모드 지도에서 많은 관계선, 긴 이름, 디렉토리 영역 띠를, 모듈 탭에서 영역 목록과 하위 패키지·외부 의존·L3 후보를 본다. DAEMOK_E2E=1일 때만 돈다.
+// 분석 모드 지도에서 많은 관계선, 긴 이름, 디렉토리 영역 띠, 공용 띠를, 모듈 탭에서 영역 목록과 하위 패키지·외부 의존·L3 후보를 본다. DAEMOK_E2E=1일 때만 돈다.
 func TestUIMapDenseE2E(t *testing.T) {
 	if os.Getenv("DAEMOK_E2E") != "1" {
 		t.Skip("DAEMOK_E2E=1일 때만 돈다")
@@ -150,18 +150,20 @@ func TestUIMapDenseE2E(t *testing.T) {
 		os.MkdirAll(filepath.Join(root, filepath.Dir(rel)), 0o755)
 		os.WriteFile(filepath.Join(root, rel), []byte(src), 0o644)
 	}
+	write("library/base/x.go", "package base\n")
 	write("go.mod", "module example.com/d\n\nrequire example.org/ext v1.0.0\n")
 	write("box/core/reg/errs.go", "package reg\n\nimport (\n\t\"errors\"\n\t_ \"example.org/ext/sub\"\n)\n\nvar (\n\tErrGone = errors.New(\"gone\")\n\tErrBusy = errors.New(\"busy\")\n)\n")
 	var leaves []string
 	for i := 0; i < 13; i++ {
 		p := "leaf" + string(rune('a'+i))
-		write("library/thirdparty/"+p+"/x.go", "package "+p+"\n")
+		write("library/thirdparty/"+p+"/x.go", "package "+p+"\nimport _ \"example.com/d/library/base\"\n")
 		leaves = append(leaves, `_ "example.com/d/library/thirdparty/`+p+`"`)
 	}
 	imp := "import (\n" + strings.Join(leaves, "\n") + "\n)\n"
 	for _, p := range []string{"reg", "reg/query", "reg/service", "shop", "shop/query", "shop/rulecheckevaluation/service"} {
 		write("box/core/"+p+"/x.go", "package "+filepath.Base(p)+"\n"+imp)
 	}
+	write("box/core/inventory_reconciliation_worker/x.go", "package worker\n"+imp)
 	write("box/main.go", "package box\nimport _ \"example.com/d/box/core/reg\"\n")
 	s := New(filepath.Join(root, "design"), root)
 	s.Poll()

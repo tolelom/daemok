@@ -4,11 +4,21 @@ const NW = 176, NH = 58, GAP = 22, LEFT = 120, TOP = 12, BAND_PAD = 18, PER = 5;
 const EDGE_FAINT_MAX = 60;  // 관계선이 이보다 많으면 흐린 선이 지도를 덮어서 처음에는 숨긴다
 // edgesHidden은 관계선을 올렸을 때만 보일지다. 분석 모드의 영역 띠는 의존 순서가 아니라서 흐린 선이 흐름을 보여 주지 못한다.
 const edgesHidden = n => S.mode === 'analyze' || n > EDGE_FAINT_MAX;
+// 공용 띠: 뿌리 모듈의 30% 이상, 그리고 최소 3개가 쓰는 모듈. 25%면 도메인 모듈까지 빠져서 30%로 잡았다.
+const SHARED_SHARE = .3, SHARED_MIN = 3;
 const NAME_PX = 14.5, NAME_MIN_PX = 12, NAME_W = NW - 34, MONO_EM = .6;
+// mapUnit은 지도에 그리는 단위다. 그룹 멤버는 그룹, 분석 모드의 하위 패키지는 접은 뿌리 모듈이다.
+let foldCache = null;
+function mapUnit(id) {
+  const u = unitOf(id);
+  if (S.mode !== 'analyze') return u;
+  if (!foldCache || foldCache.s !== S) foldCache = { s: S, root: (areaRows(topUnits())[0] || {}).rootOf || {} };
+  return foldCache.root[u] || u;
+}
 function mapEdges() {
   const out = new Map();
   for (const r of S.relations) {
-    const a = unitOf(r.from), b = unitOf(r.to);
+    const a = mapUnit(r.from), b = mapUnit(r.to);
     if (!a || !b || a === b) continue;
     const key = `${a}>${b}>${r.kind}`;
     if (!out.has(key)) out.set(key, { from: a, to: b, kind: r.kind, labels: new Set() });
@@ -27,7 +37,8 @@ function kindFilter() {
 function mapPanel(id) {
   const n = mapEdges().length;
   const tail = `<hr>${kindFilter()}${edgesHidden(n) ? `<p class="muted">관계선은 모듈에 올렸을 때만 보인다</p>` : ''}<div class="legend"><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot err" cx="12" cy="5"/></svg>오류가 있는 모듈</span><span><svg width="24" height="10" aria-hidden="true"><circle class="issue-dot warn" cx="12" cy="5"/></svg>경고만 있는 모듈</span></div><label><input type="checkbox" id="showall" ${showAll ? 'checked' : ''}> 고른 종류의 관계선 모두 보기</label>${S.canEdit ? `<hr><form id="addmod" class="addmod"><h3>모듈 추가</h3><input id="addmodid" placeholder="모듈 ID (snake_case)" autocomplete="off" spellcheck="false" aria-label="모듈 ID"><select id="addmodtier" aria-label="tier">${[...M.tiers].reverse().map(t => `<option>${esc(t)}</option>`).join('')}</select><button type="submit">추가</button></form>` : ''}`;
-  const u = unitNode(id);
+  const u = unitNode(id && mapUnit(id));
+  if (u) id = u.id;
   if (!u) return `<p class="muted">모듈에 마우스를 올리면 연결이 여기 적힌다. 누르면 모듈 보기로 간다.</p>${tail}`;
   const es = mapEdges();
   const part = (title, list, side) => {
@@ -64,6 +75,7 @@ const unitPath = u => u.path || u.id;
 // 조상은 담는 그릇이라 접지 않는다. 사이 디렉토리가 internal이면 그 조상 전용이라 갈래를 세지 않는다.
 // 하위 패키지는 부모와 같은 띠에서 경로 순으로 부모 뒤에 온다. 띠는 tier 평균이 높은 영역부터다.
 // rootOf는 모듈 ID → 접은 뿌리 모듈 ID다. 모듈 탭이 하위 패키지를 뿌리 아래에 넣는 데 쓴다.
+// 뿌리 중 많은 뿌리가 쓰는 것은 영역에서 빼 마지막 "공용" 띠에 둔다. 기준은 SHARED_SHARE와 SHARED_MIN이다.
 function areaRows(units) {
   const paths = units.map(unitPath), has = new Set(paths);
   const branches = d => new Set(paths.filter(q => q.startsWith(d + '/')).map(q => q.slice(d.length + 1).split('/')[0])).size;
@@ -84,9 +96,23 @@ function areaRows(units) {
     if (!areas.has(a)) areas.set(a, []);
     areas.get(a).push(u);
   }
+  const roots = units.filter(u => root[u.id] === u.id), users = {};
+  for (const r of S.relations) {
+    const a = root[unitOf(r.from)], b = root[unitOf(r.to)];
+    if (a && b && a !== b) (users[b] ||= new Set()).add(a);
+  }
+  const shared = new Set(roots.filter(u => (users[u.id] || new Set()).size >= Math.max(SHARED_MIN, Math.ceil(roots.length * SHARED_SHARE))).map(u => u.id));
+  const sharedUnits = units.filter(u => shared.has(root[u.id]));
+  for (const [a, us] of areas) {
+    const rest = us.filter(u => !shared.has(root[u.id]));
+    if (rest.length) areas.set(a, rest); else areas.delete(a);
+  }
   const avg = us => us.reduce((n, u) => n + M.tiers.indexOf(u.tier), 0) / us.length;
-  return [...areas].map(([a, us]) => ({ area: a, label: a === '.' ? '루트' : a, avg: avg(us), ids: us.map(u => u.id).sort((x, y) => (unitPath(M.mods[x] || M.groups[x]) < unitPath(M.mods[y] || M.groups[y]) ? -1 : 1)) }))
+  const byPath = (x, y) => (unitPath(M.mods[x] || M.groups[x]) < unitPath(M.mods[y] || M.groups[y]) ? -1 : 1);
+  const tail = sharedUnits.length ? [{ area: '', label: '공용', shared: true, ids: sharedUnits.map(u => u.id).sort(byPath) }] : [];
+  return [...areas].map(([a, us]) => ({ area: a, label: a === '.' ? '루트' : a, avg: avg(us), ids: us.map(u => u.id).sort(byPath) }))
     .sort((x, y) => y.avg - x.avg || (x.area < y.area ? -1 : 1))
+    .concat(tail)
     .map(r => Object.assign(r, { rootOf: root }));
 }
 // fitName은 이름이 상자에 들어가도록 글자를 줄이고, 그래도 넘치면 가운데를 줄인다. 끝(_service, _query)이 구분에 쓰여서다.
@@ -110,8 +136,12 @@ function bandLines(t) {
 }
 function renderMap() {
   setSide('');
-  const units = topUnits(), pos = {}, bands = [], areaOf = {};
-  const rows = S.mode === 'analyze' ? areaRows(units) : (order => tiersTopDown().map(t => ({ label: t || 'tier 없음', ids: order[t] })))(tierOrder(units, mapEdges()));
+  const all = topUnits(), pos = {}, bands = [], areaOf = {}, kids = {}, shared = new Set();
+  // 분석 모드는 하위 패키지를 뿌리 상자로 접어 뿌리만 그린다.
+  const rows = S.mode === 'analyze' ? areaRows(all).map(r => {
+    r.ids.forEach(id => { if (r.rootOf[id] !== id) kids[r.rootOf[id]] = (kids[r.rootOf[id]] || 0) + 1; if (r.shared) shared.add(id); });
+    return { ...r, ids: r.ids.filter(id => r.rootOf[id] === id) };
+  }) : (order => tiersTopDown().map(t => ({ label: t || 'tier 없음', ids: order[t] })))(tierOrder(all, mapEdges()));
   let y = TOP;
   for (const r of rows) {
     const us = r.ids.map(id => M.mods[id] || M.groups[id]);
@@ -122,6 +152,7 @@ function renderMap() {
     bands.push({ t: r.label, y0: top, y1: y });
     y += 12;
   }
+  const units = all.filter(u => pos[u.id]);
   const W = LEFT + PER * (NW + GAP) + 6, H = Math.max(y, 80);
   const edges = mapEdges().filter(e => pos[e.from] && pos[e.to]);
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" id="mapsvg" class="${edgesHidden(edges.length) ? 'many' : ''}" role="img" aria-label="모듈 지도">`;
@@ -133,16 +164,16 @@ function renderMap() {
     const my = (y1 + y2) / 2;
     const d = Math.abs(y2 - y1) < 4 ? `M${x1},${y1} C${(x1 + x2) / 2},${y1 - 40} ${(x1 + x2) / 2},${y2 - 40} ${x2},${y2}` : `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
     const lbl = [...e.labels].slice(0, 2).join(', ') + (e.labels.size > 2 ? ` 외 ${e.labels.size - 2}` : '');
-    s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}" marker-end="url(#ar-${e.kind})"/>`;
-    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}">${esc(lbl)}</text>`;
+    s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''} marker-end="url(#ar-${e.kind})"/>`;
+    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''}>${esc(lbl)}</text>`;
   }
   for (const u of units) {
     const p = pos[u.id], st = unitSt(u.id), iss = worst(issuesFor(ownedKeys(u.id)));
     const a = areaOf[u.id], rel = a && a !== '.' ? unitPath(u).slice(a.length + 1) : u.path;
-    const sub = u.type === 'grp' ? `그룹, 멤버 ${u.members.length}` : (u.summary || (rel && rel !== u.id ? rel : '') || u.role || '');
+    const sub = u.type === 'grp' ? `그룹, 멤버 ${u.members.length}` : (u.summary || (kids[u.id] ? `하위 패키지 ${kids[u.id]}` : '') || (rel && rel !== u.id ? rel : '') || u.role || '');
     const nm = fitName(u.id);
-    s += `<g class="unit ${st ? 'st-' + st : ''}" tabindex="0" role="button" data-id="${esc(u.id)}" aria-label="${esc(u.id)} 모듈 보기"><title>${esc(u.id)}</title>`;
-    if (u.type === 'grp') s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${NW}" height="${NH}" rx="6"/>`;
+    s += `<g class="unit ${st ? 'st-' + st : ''}${shared.has(u.id) ? ' shared' : ''}" tabindex="0" role="button" data-id="${esc(u.id)}" aria-label="${esc(u.id)} 모듈 보기"><title>${esc(u.id)}</title>`;
+    if (u.type === 'grp' || kids[u.id]) s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${NW}" height="${NH}" rx="6"/>`;
     s += `<rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="6"/>`;
     s += `<text class="nm" x="${p.x + 12}" y="${p.y + 25}"${nm.px !== NAME_PX ? ` style="font-size: ${nm.px.toFixed(1)}px"` : ''}>${esc(nm.text)}</text><text class="sb" x="${p.x + 12}" y="${p.y + 44}">${esc(fit(sub, 22))}</text>`;
     if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + NW - 12}" cy="${p.y + 12}"><title>${iss === 'err' ? '오류가 있다' : '경고가 있다'}</title></circle>`;
@@ -155,7 +186,8 @@ function renderMap() {
     svg.classList.toggle('dim', !!id || !!($('#mapq') && $('#mapq').value.trim()));
     const near = new Set();
     svg.querySelectorAll('.edge, .edge-label').forEach(el => {
-      const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id)));
+      // 공용 모듈로 가는 선은 그 공용 모듈에 올렸을 때만 보인다. 쓰는 쪽에 올렸을 때 선 대부분이 공용으로 가서다.
+      const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id) && !(el.dataset.shared && el.dataset.to !== id)));
       el.classList.toggle('show', !!on);
       el.classList.toggle('off', hiddenKinds.has(el.dataset.kind));
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
@@ -185,8 +217,8 @@ function renderMap() {
     const t = q.value.trim().toLowerCase();
     if (!t) { svg.classList.remove('dim'); svg.querySelectorAll('.unit').forEach(g => g.classList.remove('hit')); $('#mapqn').textContent = ''; return []; }
     const match = n => [n.id, n.path, n.summary].some(x => String(x || '').toLowerCase().includes(t));
-    // 그룹 멤버는 지도에 따로 그리지 않으므로 맞으면 그 그룹을 강조한다.
-    const hits = [...new Set([...units.filter(match).map(u => u.id), ...Object.values(M.members).filter(match).map(m => m.group)])];
+    // 그룹 멤버와 접은 하위 패키지는 지도에 따로 그리지 않으므로 맞으면 그 그룹·뿌리를 강조한다.
+    const hits = [...new Set([...all.filter(match).map(u => mapUnit(u.id)), ...Object.values(M.members).filter(match).map(m => m.group)])];
     svg.classList.add('dim');
     svg.querySelectorAll('.unit').forEach(g => g.classList.toggle('hit', hits.includes(g.dataset.id)));
     $('#mapqn').textContent = `${hits.length}개`;

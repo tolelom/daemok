@@ -123,6 +123,8 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .unit.st-rem rect.box { stroke: var(--rem); stroke-dasharray: 5 4; } .unit.st-rem .nm { text-decoration: line-through; }
 .unit:focus { outline: none; }
 .dim .unit:not(.near):not(.on) > * { opacity: .3; }
+.unit.shared rect.box { stroke-dasharray: 5 4; }
+.unit.shared:not(.on):not(.near) > * { opacity: .6; }
 .edge { fill: none; stroke: var(--c); stroke-width: 1.8; opacity: .16; transition: opacity .12s; }
 .edge.show { opacity: .95; }
 .dim .edge:not(.show), .many .edge:not(.show), .edge.off { opacity: 0; }
