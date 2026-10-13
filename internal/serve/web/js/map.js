@@ -67,6 +67,20 @@ function relSub(uses, provides) {
   provides.forEach(e => add(e, 1));
   return REL_ORDER.filter(w => parts[w]).map(w => w + (parts[w].length ? ' · ' + parts[w].join(', ') : '')).join(' / ');
 }
+// roundPath는 꺾은선의 꼭짓점을 반지름 r로 둥글린 SVG 경로다. 같은 점이 이어지면 건너뛴다.
+function roundPath(pts, r) {
+  const ps = pts.filter((p, i) => !i || p[0] !== pts[i - 1][0] || p[1] !== pts[i - 1][1]);
+  let d = `M${ps[0][0]},${ps[0][1]}`;
+  for (let i = 1; i < ps.length - 1; i++) {
+    const [ax, ay] = ps[i - 1], [bx, by] = ps[i], [cx, cy] = ps[i + 1];
+    const k1 = Math.min(r, Math.hypot(bx - ax, by - ay) / 2), k2 = Math.min(r, Math.hypot(cx - bx, cy - by) / 2);
+    const u = (x, y, k) => { const n = Math.hypot(x, y) || 1; return [x / n * k, y / n * k]; };
+    const [ux, uy] = u(ax - bx, ay - by, k1), [vx, vy] = u(cx - bx, cy - by, k2);
+    d += ` L${bx + ux},${by + uy} Q${bx},${by} ${bx + vx},${by + vy}`;
+  }
+  const last = ps[ps.length - 1];
+  return d + ` L${last[0]},${last[1]}`;
+}
 // edgeLanes는 관계선마다 차선 오프셋(px)이다. 방향과 종류에 관계없이 같은 두 상자 사이의 선을 8px 간격으로 벌린다.
 function edgeLanes(edges) {
   const group = {};
@@ -184,8 +198,25 @@ function renderMap() {
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" id="mapsvg" class="${edgesHidden(edges.length) ? 'many' : ''}" role="img" aria-label="모듈 지도">`;
   s += `<defs>${Object.keys(KINDS).map(k => `<marker id="ar-${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" style="fill: var(--k-${k})"/></marker>`).join('')}</defs>`;
   for (const b of bands) s += `<g class="band"><rect x="0" y="${b.y0}" width="${W}" height="${b.y1 - b.y0}" rx="6"/><text x="14" y="${b.y0 + 24}">${bandLines(b.t).map((l, i) => `<tspan x="14" dy="${i ? 17 : 0}">${esc(l)}</tspan>`).join('')}</text></g>`;
-  const anchor = (p, q) => { const cx = p.x + NW / 2, ty = q.y + NH / 2; return [cx, ty > p.y + NH / 2 ? p.y + NH : p.y]; };
   const lanes = edgeLanes(edges);
+  // 다른 줄 선: 같은 열에 사이 상자가 없으면 곧게 잇는다. 있으면 출발 줄 옆 여백 → 도착 상자 옆 열 사이 통로 → 도착 줄 옆
+  // 여백으로 돌아 상자를 지나지 않는다. 통로를 여러 선이 쓰므로 선마다 ±6px 안에서 조금씩 비킨다.
+  const rowYs = [...new Set(Object.values(pos).map(p => p.y))].sort((a, b) => a - b);
+  const spread = i => ((i % 5) - 2) * 3;
+  const gapBelow = y => { const k = rowYs.indexOf(y); return k < rowYs.length - 1 ? (y + NH + rowYs[k + 1]) / 2 : y + NH + 10; };
+  const gapAbove = y => { const k = rowYs.indexOf(y); return k > 0 ? (rowYs[k - 1] + NH + y) / 2 : y - 10; };
+  const crossPath = (P, Q, off) => {
+    const down = Q.y > P.y, px = P.x + NW / 2 + off, qx = Q.x + NW / 2 + off;
+    const py = down ? P.y + NH : P.y, qy = down ? Q.y : Q.y + NH;
+    const lo = Math.min(P.y, Q.y), hi = Math.max(P.y, Q.y);
+    const blocked = P.x === Q.x && Object.values(pos).some(o => o.x === P.x && o.y > lo && o.y < hi);
+    if (P.x === Q.x && !blocked) return { d: `M${px},${py} L${qx},${qy}`, lx: px, ly: (py + qy) / 2 };
+    const c1 = down ? gapBelow(P.y) : gapAbove(P.y), c2 = down ? gapAbove(Q.y) : gapBelow(Q.y);
+    const left = Q.x - GAP / 2, right = Q.x + NW + GAP / 2;
+    const gx = (Math.abs(left - px) <= Math.abs(right - px) ? left : right) + off;
+    const pts = [[px, py], [px, c1], [gx, c1], [gx, c2], [qx, c2], [qx, qy]];
+    return { d: roundPath(pts, 6), lx: gx, ly: (c1 + c2) / 2 };
+  };
   // 같은 줄 선: 이웃 칸이면 옆면끼리 직선, 건너면 윗면에서 줄 위 여백으로 넘어간다.
   const rowPath = (p, q, off) => {
     const right = q.x > p.x;
@@ -203,11 +234,7 @@ function renderMap() {
       ({ d, lx, ly: my } = rowPath(P, Q, off));
       my += 4;
     } else {
-      let [x1, y1] = anchor(P, Q), [x2, y2] = anchor(Q, P);
-      x1 += off; x2 += off;
-      my = (y1 + y2) / 2;
-      d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
-      lx = (x1 + x2) / 2;
+      ({ d, lx, ly: my } = crossPath(P, Q, off + spread(i)));
     }
     const lbl = [...e.labels].slice(0, 2).join(', ') + (e.labels.size > 2 ? ` 외 ${e.labels.size - 2}` : '');
     s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''} marker-end="url(#ar-${e.kind})"/>`;

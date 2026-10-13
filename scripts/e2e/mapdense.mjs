@@ -1,6 +1,6 @@
 // 분석 모드 지도 e2e: 관계선이 많으면 처음에는 숨는지, 올리면 보이는지, 긴 이름을 가운데 줄여 상자 안에 두는지,
 // 모듈 탭 왼쪽 목록이 같은 영역으로 묶이고 하위 패키지가 부모 아래 들어가며 이름이 잘리지 않는지, 머리글과 사실 칸을 본다.
-// 같은 줄 관계선이 이웃이면 직선, 건너면 줄 위로 가고, 같은 두 상자 사이 선은 차선을 나누는지,
+// 어떤 관계선도 끝점이 아닌 상자를 지나지 않는지, 같은 줄 관계선이 이웃이면 직선, 건너면 줄 위로 가고, 같은 두 상자 사이 선은 차선을 나누는지,
 // 띠가 디렉토리 영역이고 띠 이름이 상자에 닿지 않는지, 하위 패키지가 부모 상자로 접히고 관계선과 찾기도 부모로 모이는지 본다.
 // 사용: node scripts/e2e/mapdense.mjs <serve URL>. 코드는 TestUIMapDenseE2E의 것을 전제로 한다.
 import { openBrowser, runSteps, sleep } from './browser.mjs';
@@ -46,6 +46,20 @@ const steps = [
     const ys = edgeLanes([{ from: 'a', to: 'b', kind: 'depends' }, { from: 'a', to: 'b', kind: 'register' }, { from: 'b', to: 'a', kind: 'depends' }]);
     if (new Set(ys).size !== 3) out.push('같은 두 상자 사이 선 차선 ' + ys);
     return out.length ? out.join(', ') : 'ok';
+  })()`],
+  ['no_edge_through_box', `(() => {
+    const boxes = [...document.querySelectorAll('g.unit')].map(g => [g.dataset.id, g.querySelector('rect.box').getBBox()]);
+    const inside = (p, b) => p.x > b.x + 1 && p.x < b.x + b.width - 1 && p.y > b.y + 1 && p.y < b.y + b.height - 1;
+    const bad = [];
+    for (const el of document.querySelectorAll('path.edge')) {
+      const n = el.getTotalLength();
+      for (let i = 0; i <= 80; i++) {
+        const p = el.getPointAtLength(n * i / 80);
+        const hit = boxes.find(([id, b]) => id !== el.dataset.from && id !== el.dataset.to && inside(p, b));
+        if (hit) { bad.push(el.dataset.from + '>' + el.dataset.to + ' 지남 ' + hit[0]); break; }
+      }
+    }
+    return bad.length ? bad.length + '개: ' + bad.slice(0, 4).join(', ') : 'ok';
   })()`],
   ['side_areas', `(() => { go('module', 'reg'); const l = [...document.querySelectorAll('#side h2')].map(h => h.textContent); return JSON.stringify(l) === JSON.stringify(['루트', 'box/core', 'library/thirdparty', '공용']) ? 'ok' : JSON.stringify(l); })()`],
   ['side_nested', `(() => { const li = document.querySelector('#side button[data-go="reg"]').closest('li'); const kids = [...li.querySelectorAll(':scope > ul button')].map(x => [x.dataset.go, x.textContent, x.title]); return JSON.stringify(kids) === JSON.stringify([['reg_query', 'query', 'reg_query'], ['reg_service', 'service', 'reg_service']]) ? 'ok' : JSON.stringify(kids); })()`],
