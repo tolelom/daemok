@@ -1,5 +1,6 @@
 // 분석 모드 지도 e2e: 관계선이 많으면 처음에는 숨는지, 올리면 보이는지, 긴 이름을 가운데 줄여 상자 안에 두는지,
 // 모듈 탭 왼쪽 목록이 같은 영역으로 묶이고 하위 패키지가 부모 아래 들어가며 이름이 잘리지 않는지, 머리글과 사실 칸을 본다.
+// 같은 줄 관계선이 이웃이면 직선, 건너면 줄 위로 가고, 같은 두 상자 사이 선은 차선을 나누는지,
 // 띠가 디렉토리 영역이고 띠 이름이 상자에 닿지 않는지, 하위 패키지가 부모 상자로 접히고 관계선과 찾기도 부모로 모이는지 본다.
 // 사용: node scripts/e2e/mapdense.mjs <serve URL>. 코드는 TestUIMapDenseE2E의 것을 전제로 한다.
 import { openBrowser, runSteps, sleep } from './browser.mjs';
@@ -24,8 +25,28 @@ const steps = [
   ['shared_edges', `(async () => { const op = sel => [...document.querySelectorAll(sel)].map(e => +getComputedStyle(e).opacity); const wait = () => new Promise(r => setTimeout(r, 250)); ${unit('leafa')}.dispatchEvent(new MouseEvent('mouseenter')); await wait(); const fromLeaf = op('path.edge[data-from="leafa"][data-to="base"]'), leafIn = op('path.edge[data-to="leafa"]'); ${unit('leafa')}.dispatchEvent(new MouseEvent('mouseleave')); ${unit('base')}.dispatchEvent(new MouseEvent('mouseenter')); await wait(); const toBase = op('path.edge[data-to="base"]'); ${unit('base')}.dispatchEvent(new MouseEvent('mouseleave')); return fromLeaf.length === 1 && fromLeaf[0] === 0 && leafIn.every(x => x > .5) && toBase.length === 13 && toBase.every(x => x > .5) ? 'ok' : 'leafa→base ' + fromLeaf + ', leafa로 ' + leafIn + ', base로 ' + toBase.length + ' ' + toBase; })()`],
   ['band_label_fits', `(() => { const left = Math.min(...[...document.querySelectorAll('g.unit rect.box')].map(r => +r.getAttribute('x'))); const over = [...document.querySelectorAll('.band text')].filter(t => { const b = t.getBBox(); return b.x + b.width > left - 6; }).map(t => t.textContent); return over.length ? '상자에 닿는 띠 이름 ' + over : 'ok'; })()`],
   ['folded', `(() => { const kids = ['reg_query', 'reg_service', 'shop_query', 'rulecheckevaluation_service'].filter(id => document.querySelector('g.unit[data-id="' + id + '"]')); const sub = ${unit('reg')}.querySelector('text.sb').textContent, stack = !!${unit('reg')}.querySelector('rect.stack'); return !kids.length && sub === '하위 패키지 2' && stack ? 'ok' : '그려진 하위 ' + kids + ', 부제 ' + sub + ', 겹 ' + stack; })()`],
-  ['folded_edges', `(() => { const from = [...document.querySelectorAll('path.edge')].map(e => e.dataset.from + '>' + e.dataset.to); const reg = from.filter(x => x.startsWith('reg>')).length, stray = from.filter(x => /_query|_service/.test(x)); return reg === 13 && !stray.length ? 'ok' : 'reg 선 ' + reg + ', 하위 선 ' + stray; })()`],
+  ['folded_edges', `(() => { const from = [...document.querySelectorAll('path.edge')].map(e => e.dataset.from + '>' + e.dataset.to); const reg = from.filter(x => x.startsWith('reg>leaf')).length, stray = from.filter(x => /_query|_service/.test(x)); return reg === 13 && !stray.length ? 'ok' : 'reg 선 ' + reg + ', 하위 선 ' + stray; })()`],
   ['search_child', `(async () => { const q = document.querySelector('#mapq'); q.value = 'query'; q.dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 100)); const hits = [...document.querySelectorAll('g.unit.hit')].map(g => g.dataset.id).sort(); q.value = ''; q.dispatchEvent(new Event('input')); return JSON.stringify(hits) === JSON.stringify(['reg', 'shop']) ? 'ok' : JSON.stringify(hits); })()`],
+  ['row_edges', `(() => {
+    const path = (f, t) => [...document.querySelectorAll('path.edge')].filter(e => e.dataset.from === f && e.dataset.to === t);
+    const box = id => document.querySelector('g.unit[data-id="' + id + '"] rect.box').getBBox();
+    const inside = (p, b) => p.x > b.x + 1 && p.x < b.x + b.width - 1 && p.y > b.y + 1 && p.y < b.y + b.height - 1;
+    const pts = el => { const n = el.getTotalLength(); return Array.from({ length: 41 }, (_, i) => el.getPointAtLength(n * i / 40)); };
+    const out = [];
+    const [sr] = path('shop', 'reg'), [rs] = path('reg', 'shop');
+    if (!sr || !rs) return '같은 줄 선 없음 ' + !!sr + ' ' + !!rs;
+    const a = pts(sr), b = pts(rs);
+    if (a.some(p => Math.abs(p.y - a[0].y) > .5)) out.push('이웃 칸 선이 직선이 아님');
+    if (Math.abs(a[0].y - b[0].y) < 4) out.push('양방향 선이 겹침');
+    const [ws] = path('inventory_reconciliation_worker', 'shop');
+    const w = pts(ws), reg = box('reg'), top = Math.min(...w.map(p => p.y));
+    if (w.some(p => inside(p, reg))) out.push('건너는 선이 reg 상자를 지남');
+    if (top >= reg.y) out.push('건너는 선이 줄 위로 가지 않음');
+    if (top < reg.y - 22) out.push('건너는 선이 윗줄 여백을 넘음 ' + top + ' ' + reg.y);
+    const ys = edgeLanes([{ from: 'a', to: 'b', kind: 'depends' }, { from: 'a', to: 'b', kind: 'register' }, { from: 'b', to: 'a', kind: 'depends' }]);
+    if (new Set(ys).size !== 3) out.push('같은 두 상자 사이 선 차선 ' + ys);
+    return out.length ? out.join(', ') : 'ok';
+  })()`],
   ['side_areas', `(() => { go('module', 'reg'); const l = [...document.querySelectorAll('#side h2')].map(h => h.textContent); return JSON.stringify(l) === JSON.stringify(['루트', 'box/core', 'library/thirdparty', '공용']) ? 'ok' : JSON.stringify(l); })()`],
   ['side_nested', `(() => { const li = document.querySelector('#side button[data-go="reg"]').closest('li'); const kids = [...li.querySelectorAll(':scope > ul button')].map(x => [x.dataset.go, x.textContent, x.title]); return JSON.stringify(kids) === JSON.stringify([['reg_query', 'query', 'reg_query'], ['reg_service', 'service', 'reg_service']]) ? 'ok' : JSON.stringify(kids); })()`],
   ['side_no_hscroll', `(() => { const s = document.querySelector('#side'); const cut = [...s.querySelectorAll('button')].filter(x => x.scrollWidth > x.clientWidth + 1).map(x => x.dataset.go); return s.scrollWidth <= s.clientWidth && !cut.length ? 'ok' : 'side ' + s.scrollWidth + '/' + s.clientWidth + ' 잘린 이름 ' + cut; })()`],

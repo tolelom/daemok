@@ -163,7 +163,10 @@ func TestUIMapDenseE2E(t *testing.T) {
 	for _, p := range []string{"reg", "reg/query", "reg/service", "shop", "shop/query", "shop/rulecheckevaluation/service"} {
 		write("box/core/"+p+"/x.go", "package "+filepath.Base(p)+"\n"+imp)
 	}
-	write("box/core/inventory_reconciliation_worker/x.go", "package worker\n"+imp)
+	// 같은 줄 관계선: shop → reg는 이웃 칸, worker → shop은 reg를 건너는 칸이다. reg → shop은 반대 방향이다.
+	write("box/core/shop/up.go", "package shop\nimport _ \"example.com/d/box/core/reg\"\n")
+	write("box/core/reg/svc.go", "package reg\nimport _ \"example.com/d/box/core/shop/query\"\n")
+	write("box/core/inventory_reconciliation_worker/x.go", "package worker\n"+imp+"import _ \"example.com/d/box/core/shop\"\n")
 	write("box/main.go", "package box\nimport _ \"example.com/d/box/core/reg\"\n")
 	s := New(filepath.Join(root, "design"), root)
 	s.Poll()

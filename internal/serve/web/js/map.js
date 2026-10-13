@@ -67,6 +67,14 @@ function relSub(uses, provides) {
   provides.forEach(e => add(e, 1));
   return REL_ORDER.filter(w => parts[w]).map(w => w + (parts[w].length ? ' · ' + parts[w].join(', ') : '')).join(' / ');
 }
+// edgeLanes는 관계선마다 차선 오프셋(px)이다. 방향과 종류에 관계없이 같은 두 상자 사이의 선을 8px 간격으로 벌린다.
+function edgeLanes(edges) {
+  const group = {};
+  edges.forEach((e, i) => { (group[[e.from, e.to].sort().join('|')] ||= []).push(i); });
+  const out = [];
+  for (const is of Object.values(group)) is.forEach((i, k) => { out[i] = (k - (is.length - 1) / 2) * 8; });
+  return out;
+}
 // tierOrder는 tier마다 모듈 순서를 정한다. 다른 tier 이웃의 평균 칸 위치로 위아래를 번갈아 정렬해
 // 관계선 교차를 줄인다. 이웃이 없거나 값이 같으면 설계 순서를 유지한다.
 function tierOrder(units, edges) {
@@ -176,15 +184,35 @@ function renderMap() {
   let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" id="mapsvg" class="${edgesHidden(edges.length) ? 'many' : ''}" role="img" aria-label="모듈 지도">`;
   s += `<defs>${Object.keys(KINDS).map(k => `<marker id="ar-${k}" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" style="fill: var(--k-${k})"/></marker>`).join('')}</defs>`;
   for (const b of bands) s += `<g class="band"><rect x="0" y="${b.y0}" width="${W}" height="${b.y1 - b.y0}" rx="6"/><text x="14" y="${b.y0 + 24}">${bandLines(b.t).map((l, i) => `<tspan x="14" dy="${i ? 17 : 0}">${esc(l)}</tspan>`).join('')}</text></g>`;
-  const anchor = (p, q) => { const cx = p.x + NW / 2, cy = p.y + NH / 2, tx = q.x + NW / 2, ty = q.y + NH / 2; return Math.abs(ty - cy) < 4 ? [cx + (tx > cx ? NW / 2 : -NW / 2), cy] : [cx, ty > cy ? p.y + NH : p.y]; };
-  for (const e of edges) {
-    const [x1, y1] = anchor(pos[e.from], pos[e.to]), [x2, y2] = anchor(pos[e.to], pos[e.from]);
-    const my = (y1 + y2) / 2;
-    const d = Math.abs(y2 - y1) < 4 ? `M${x1},${y1} C${(x1 + x2) / 2},${y1 - 40} ${(x1 + x2) / 2},${y2 - 40} ${x2},${y2}` : `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+  const anchor = (p, q) => { const cx = p.x + NW / 2, ty = q.y + NH / 2; return [cx, ty > p.y + NH / 2 ? p.y + NH : p.y]; };
+  const lanes = edgeLanes(edges);
+  // 같은 줄 선: 이웃 칸이면 옆면끼리 직선, 건너면 윗면에서 줄 위 여백으로 넘어간다.
+  const rowPath = (p, q, off) => {
+    const right = q.x > p.x;
+    if (Math.abs(q.x - p.x) <= NW + GAP + 1) {
+      const y = p.y + NH / 2 + off, x1 = right ? p.x + NW : p.x, x2 = right ? q.x : q.x + NW;
+      return { d: `M${x1},${y} L${x2},${y}`, lx: (x1 + x2) / 2, ly: y - 4 };
+    }
+    const x1 = p.x + NW / 2 + off, x2 = q.x + NW / 2 + off, top = p.y - 26;
+    return { d: `M${x1},${p.y} C${x1},${top} ${x2},${top} ${x2},${q.y}`, lx: (x1 + x2) / 2, ly: p.y - 22 };
+  };
+  edges.forEach((e, i) => {
+    const P = pos[e.from], Q = pos[e.to], off = lanes[i];
+    let d, lx, my;
+    if (Math.abs(P.y - Q.y) < 4) {
+      ({ d, lx, ly: my } = rowPath(P, Q, off));
+      my += 4;
+    } else {
+      let [x1, y1] = anchor(P, Q), [x2, y2] = anchor(Q, P);
+      x1 += off; x2 += off;
+      my = (y1 + y2) / 2;
+      d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
+      lx = (x1 + x2) / 2;
+    }
     const lbl = [...e.labels].slice(0, 2).join(', ') + (e.labels.size > 2 ? ` 외 ${e.labels.size - 2}` : '');
     s += `<path class="edge k-${e.kind} ${KINDS[e.kind].style}" d="${d}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''} marker-end="url(#ar-${e.kind})"/>`;
-    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${(x1 + x2) / 2 + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''}>${esc(lbl)}</text>`;
-  }
+    if (lbl) s += `<text class="edge-label k-${e.kind}" x="${lx + 6}" y="${my - 4}" data-from="${esc(e.from)}" data-to="${esc(e.to)}" data-kind="${e.kind}"${shared.has(e.to) ? ' data-shared="1"' : ''}>${esc(lbl)}</text>`;
+  });
   for (const u of units) {
     const p = pos[u.id], st = unitSt(u.id), iss = worst(issuesFor(ownedKeys(u.id)));
     const a = areaOf[u.id], rel = a && a !== '.' ? unitPath(u).slice(a.length + 1) : u.path;
