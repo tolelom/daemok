@@ -294,7 +294,7 @@ func TestErrorHTTP(t *testing.T) {
 
 func TestContractWithoutErrors(t *testing.T) {
 	ds := run(t, replace(t, "returns: [payload], errors: [ErrNotFound] }", "returns: [payload] }"))
-	want(t, ds, model.Warning, "계약 store의 메서드 get에 errors가 없다")
+	want(t, ds, model.Warning, "계약 메서드에 errors가 없다: store.get")
 	ds = run(t, replace(t, "returns: [payload], errors: [ErrNotFound] }", "returns: [payload], errors: [] }"))
 	wantNone(t, ds, model.Warning)
 }

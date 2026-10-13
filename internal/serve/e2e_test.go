@@ -68,6 +68,7 @@ modules:
   q: { tier: a }
   x: { tier: b, depends_on: [q] }
   y: { tier: b, depends_on: [p, q] }
+  inventory_reconciliation_query: { tier: a }
 errors:
   ErrBad: { in: p, message: bad }
 enums:
@@ -170,6 +171,8 @@ func TestUIMapDenseE2E(t *testing.T) {
 		write("box/core/"+p+"/x.go", "package "+filepath.Base(p)+"\n"+imp)
 	}
 	// 같은 줄 관계선: shop → reg는 이웃 칸, worker → shop은 reg를 건너는 칸이다. reg → shop은 반대 방향이다.
+	// 지도 부제: 한글 긴 패키지 설명이 상자를 넘지 않는지 본다.
+	write("box/core/shop/doc.go", "// Package shop은 매장 상품과 가격과 진열과 재고를 함께 다루는 아주 긴 설명이다.\npackage shop\n")
 	write("box/core/shop/up.go", "package shop\nimport \"example.com/d/box/core/reg\"\nvar _ = reg.ErrGone\n")
 	// 모듈 탭 연결 표: shop/query가 reg/service의 이름을 별칭 import로 쓴다.
 	write("box/core/reg/service/api.go", "package service\n\ntype Service struct{}\n\nfunc Find() {}\n")

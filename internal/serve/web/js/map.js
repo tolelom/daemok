@@ -248,13 +248,14 @@ function renderMap() {
     s += `<g class="unit ${st ? 'st-' + st : ''}${shared.has(u.id) ? ' shared' : ''}" tabindex="0" role="button" data-id="${esc(u.id)}" aria-label="${esc(u.id)} 모듈 보기"><title>${esc(u.id)}</title>`;
     if (u.type === 'grp' || kids[u.id]) s += `<rect class="stack" x="${p.x + 5}" y="${p.y - 5}" width="${NW}" height="${NH}" rx="6"/>`;
     s += `<rect class="box" x="${p.x}" y="${p.y}" width="${NW}" height="${NH}" rx="6"/>`;
-    s += `<text class="nm" x="${p.x + 12}" y="${p.y + 25}"${nm.px !== NAME_PX ? ` style="font-size: ${nm.px.toFixed(1)}px"` : ''}>${esc(nm.text)}</text><text class="sb" x="${p.x + 12}" y="${p.y + 44}">${esc(fit(sub, 22))}</text>`;
+    s += `<text class="nm" x="${p.x + 12}" y="${p.y + 25}"${nm.px !== NAME_PX ? ` style="font-size: ${nm.px.toFixed(1)}px"` : ''}>${esc(nm.text)}</text><text class="sb" x="${p.x + 12}" y="${p.y + 44}">${esc(sub)}</text>`;
     if (iss) s += `<circle class="issue-dot ${iss}" cx="${p.x + NW - 12}" cy="${p.y + 12}"><title>${iss === 'err' ? '오류가 있다' : '경고가 있다'}</title></circle>`;
     s += `</g>`;
   }
   s += '</svg>';
   $('#main').innerHTML = `<div class="mapsearch"><input id="mapq" type="search" placeholder="모듈 찾기 (/)" autocomplete="off" spellcheck="false" aria-label="모듈 찾기"><span id="mapqn" class="muted"></span></div><div class="mapwrap"><div class="map">${s}</div><aside class="panel" id="mappanel"></aside></div>`;
   const svg = $('#mapsvg');
+  svg.querySelectorAll('.unit text.sb').forEach(t => fitWidth(t, SUB_W));
   const hi = id => {
     svg.classList.toggle('dim', !!id || !!($('#mapq') && $('#mapq').value.trim()));
     const near = new Set();
@@ -273,7 +274,8 @@ function renderMap() {
       g.classList.toggle('on', u === id);
       if (sb.dataset.orig === undefined) sb.dataset.orig = sb.textContent;
       const rel = near.has(u) && u !== id ? relSub(shown.filter(e => e.from === u && e.to === id), shown.filter(e => e.from === id && e.to === u)) : '';
-      sb.textContent = rel ? fit(rel, 24) : sb.dataset.orig;
+      sb.textContent = rel || sb.dataset.orig;
+      if (rel) fitWidth(sb, SUB_W);
       sb.classList.toggle('rel', !!rel);
     });
   };
@@ -315,4 +317,17 @@ function renderMap() {
   panel(null);
   hi(null);
 }
+// fitWidth는 SVG 글자를 실제 폭으로 재서 maxW를 넘으면 끝을 줄인다. 한글은 영문보다 넓어 글자 수로는 맞지 않는다.
+function fitWidth(el, maxW) {
+  const full = el.textContent;
+  if (el.getComputedTextLength() <= maxW) return;
+  let lo = 0, hi = full.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    el.textContent = full.slice(0, mid) + '…';
+    if (el.getComputedTextLength() <= maxW) lo = mid; else hi = mid - 1;
+  }
+  el.textContent = full.slice(0, lo) + '…';
+}
+const SUB_W = NW - 20;
 function fit(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }

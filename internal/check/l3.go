@@ -136,7 +136,7 @@ func (c *checker) contractErrors() {
 	for _, ct := range c.m.Contracts {
 		for _, me := range ct.Methods {
 			if !me.HasErrors {
-				c.warnf(me.Pos, "계약 %s의 메서드 %s에 errors가 없다", ct.ID, me.Name)
+				c.warnf(me.Pos, "계약 메서드에 errors가 없다: %s.%s", ct.ID, me.Name)
 			}
 		}
 	}

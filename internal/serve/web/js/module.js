@@ -1,7 +1,7 @@
 // 모듈. 여러 classic script가 전역을 함께 쓰며 index.html의 순서대로 읽힌다.
 /* ---------- 모듈 ---------- */
 function moduleSide() {
-  const item = (id, extra = '', label = '') => `<button type="button" data-go="${esc(id)}" aria-current="${id === current}"${label ? ` title="${esc(id)}"` : ''}>${esc(label || id)}${unitSt(id) ? `<small class="st ${unitSt(id)}">${ST[unitSt(id)]}</small>` : ''}</button>${extra}`;
+  const item = (id, extra = '', label = '') => `<button type="button" data-go="${esc(id)}" aria-current="${id === current}"${label ? ` title="${esc(id)}"` : ''}>${esc(label || id).replace(/_/g, '_<wbr>')}${unitSt(id) ? `<small class="st ${unitSt(id)}">${ST[unitSt(id)]}</small>` : ''}</button>${extra}`;
   let h = '';
   // 분석 모드는 지도와 같은 영역으로 묶고, 하위 패키지는 뿌리 모듈 아래에 뿌리 기준 상대 경로로 넣는다. ID는 툴팁이다.
   if (S.mode === 'analyze') {

@@ -46,6 +46,16 @@ const steps = [
     return edge > .5 && onHover === 0 && onAll === 1 ? 'ok' : '이벤트 선 ' + edge + ', 올렸을 때 라벨 ' + onHover + ', 모두 보기 라벨 ' + onAll;
   })()`],
   ['module_diag_group', `(() => { go('module', 'p'); const g = document.querySelectorAll('#main details.igroup'); return g.length === 1 && g[0].textContent.includes('3개') ? 'ok' : '묶음 ' + g.length + ': ' + document.querySelector('#main').textContent.slice(0, 200); })()`],
+  ['side_breaks_at_underscore', `(() => {
+    go('module', 'x');
+    const btn = document.querySelector('#side button[data-go="inventory_reconciliation_query"]');
+    if (!btn) return '목록에 없음';
+    const r = document.createRange(), chars = [];
+    const walk = n => { if (n.nodeType === 3) { for (let i = 0; i < n.length; i++) { r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); if (b.width) chars.push([n.data[i], b.top]); } } else n.childNodes.forEach(walk); };
+    walk(btn.firstChild.nodeType === 3 ? btn : btn);
+    const bad = chars.filter((c, i) => i && c[1] > chars[i - 1][1] + 2 && chars[i - 1][0] !== '_').map((c, i) => c[0]);
+    return bad.length ? '밑줄이 아닌 곳에서 줄바꿈 ' + JSON.stringify(chars.map(c => c[0]).join('')) : 'ok';
+  })()`],
   ['conn_design', `(() => { go('module', 'x'); const sec = [...document.querySelectorAll('#main table.conn tr.sec')].map(r => r.textContent.trim()); const bare = document.querySelector('#main table.conn tr.bare')?.textContent.trim(); return JSON.stringify(sec) === '["쓰는 것","구독"]' && bare === 'q' ? 'ok' : JSON.stringify([sec, bare]); })()`],
   ['conn_words', `(() => { const t = connSections('m', [{ from: 'm', to: 'a', kind: 'event', label: 'E' }, { from: 'b', to: 'm', kind: 'event', label: 'F' }, { from: 'm', to: 'c', kind: 'depends' }, { from: 'd', to: 'm', kind: 'register', label: 'hk' }]).map(s => s.title + ':' + s.rows.map(r => r.other + '=' + r.what.join('|')).join(',')); const want = ['쓰는 것:c=', '발행:a=E', '구독:b=F', '등록받음:d=hk']; return JSON.stringify(t) === JSON.stringify(want) ? 'ok' : JSON.stringify(t); })()`],
 ];
