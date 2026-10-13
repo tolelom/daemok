@@ -153,6 +153,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			ID     string `json:"id"`
 			Value  string `json:"value"`
 			L3     bool   `json:"l3"`
+			Path   string `json:"path"`
 		}
 		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
 			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
@@ -194,6 +195,8 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			} else {
 				text, err = draftTool(root)
 			}
+		case "gen":
+			text, err = genTool(design, root, args.Path)
 		default:
 			return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
 		}
@@ -230,6 +233,8 @@ func toolList(allowWrite bool) []map[string]any {
 			"inputSchema": with(nil)},
 		{"name": "draft", "description": "Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 설계 파일이 있어도 코드만 본다(daemok init --dry-run과 같다). l3가 참이면 설계에 없는 손으로 쓴 에러·상수·enum·struct·interface와 설계 에러를 반환하는 함수를 gen: false 노드 초안으로 만든다. 설계에 합쳐도 검사를 통과하는 노드만 담는다(daemok init --l3와 같다). 파일은 쓰지 않는다",
 			"inputSchema": with(map[string]any{"l3": map[string]any{"type": "boolean", "description": "L3 초안을 만든다. design은 이때만 쓴다"}})},
+		{"name": "gen", "description": "daemok gen이 쓰고 지울 생성 파일을 상태(same, new, changed, delete, refuse)와 함께 JSON으로 준다. path가 있으면 그 생성 파일의 생성할 내용을 준다. 설계를 고친 뒤 생성 코드를 확인하는 데 쓴다. 파일은 쓰지 않는다",
+			"inputSchema": with(map[string]any{"path": str("생성 파일 경로(코드 루트 기준 슬래시 경로)")})},
 	}
 	for _, t := range tools {
 		t["annotations"] = read
@@ -242,6 +247,22 @@ func toolList(allowWrite bool) []map[string]any {
 			"annotations": map[string]any{"readOnlyHint": false, "destructiveHint": true, "idempotentHint": false}})
 	}
 	return tools
+}
+
+func genTool(design, root, path string) (string, error) {
+	r := workspace.Run(design, root)
+	if r.Plan == nil {
+		return "", fmt.Errorf("설계 검사 오류가 있어 생성할 수 없다:\n%s", strings.Join(diagLines(r.Diags), "\n"))
+	}
+	if path != "" {
+		content, ok := workspace.Content(r, path)
+		if !ok {
+			return "", fmt.Errorf("생성 파일이 아니다: %s", path)
+		}
+		return string(content), nil
+	}
+	b, _ := json.MarshalIndent(map[string]any{"files": workspace.Preview(r, root)}, "", "  ")
+	return string(b), nil
 }
 
 func designTool(design, module string) (string, error) {

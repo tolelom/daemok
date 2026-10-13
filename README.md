@@ -24,7 +24,7 @@ Go 1.27 이상. 외부 의존성은 없다.
 | `daemok gen` | 설계에서 Go 생성 파일과 `ts_out` TS 파일을 쓰고, 설계에 없는 Go 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
 | `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다. `--l3`는 설계가 있을 때 설계에 없는 손으로 쓴 선언을 `gen: false` L3 노드 초안으로 출력한다 | `--root DIR`, `--design DIR`, `--dry-run`, `--l3` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율과 함수를 뺀 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
-| `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 읽기 도구는 `design`, `check`, `draft`이고, `--allow-write`면 설계를 고치는 `edit`도 낸다 | `--design DIR`, `--root DIR`, `--allow-write` |
+| `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 읽기 도구는 `design`, `check`, `draft`, `gen`이고, `--allow-write`면 설계를 고치는 `edit`도 낸다 | `--design DIR`, `--root DIR`, `--allow-write` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |
 
 `daemok version`은 버전과 빌드한 커밋을 출력한다. 종료 코드는 0 통과, 1 문제 있음, 2 진행할 수 없음이다.
@@ -54,7 +54,7 @@ MCP를 지원하는 클라이언트의 서버 설정에 `daemok mcp`를 등록�
 }
 ```
 
-`design`은 설계 파일이나 모듈 하나의 의존·소속 노드를, `check`는 진단 JSON을, `draft`는 코드에서 만든 초안을 준다(`l3: true`면 설계에 없는 손으로 쓴 선언의 L3 초안). AI가 코드를 고친 뒤 `check`로 설계와 어긋나지 않았는지 확인하는 데 쓴다. 도구는 인자로 받은 경로를 제한하지 않으므로, 클라이언트가 넘긴 디렉토리의 `*.yaml`을 읽어 돌려줄 수 있다.
+`design`은 설계 파일이나 모듈 하나의 의존·소속 노드를, `check`는 진단 JSON을, `draft`는 코드에서 만든 초안을 준다(`l3: true`면 설계에 없는 손으로 쓴 선언의 L3 초안). `gen`은 `daemok gen`이 쓰고 지울 생성 파일과 상태를, `path`를 주면 그 파일의 생성할 내용을 준다. AI가 코드를 고친 뒤 `check`로 설계와 어긋나지 않았는지 확인하는 데 쓴다. 도구는 인자로 받은 경로를 제한하지 않으므로, 클라이언트가 넘긴 디렉토리의 `*.yaml`을 읽어 돌려줄 수 있다.
 
 `args`에 `--allow-write`를 더하면 `edit` 도구로 AI가 설계의 L2를 고칠 수 있다. 서버의 `--design`만 고치고, 클라이언트는 호출마다 사용자에게 묻고, 승인은 커밋이다.
 
