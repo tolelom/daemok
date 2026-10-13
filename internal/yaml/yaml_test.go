@@ -345,3 +345,27 @@ func TestErrFlowMissingComma(t *testing.T) {
 		t.Fatalf("%+v", n.Get("p"))
 	}
 }
+
+// 평문 스칼라는 더 깊게 들여 쓴 다음 줄로 이어지고, 줄바꿈은 공백 하나가 된다.
+func TestPlainScalarContinues(t *testing.T) {
+	n := parse(t, "a: one two\n  three\n      four\nb: x\n")
+	if a, b := n.Get("a"), n.Get("b"); a.Value != "one two three four" || a.Pos.Line != 1 || b.Value != "x" {
+		t.Fatalf("a %+v b %+v", a, b)
+	}
+	s := parse(t, "- one\n  two\n- three\n")
+	if len(s.Items) != 2 || s.Items[0].Value != "one two" || s.Items[1].Value != "three" {
+		t.Fatalf("seq %+v", s.Items)
+	}
+	m := parse(t, "- id: x\n  summary: long\n    tail\n  next: y\n")
+	if it := m.Items[0]; it.Get("summary").Value != "long tail" || it.Get("next").Value != "y" {
+		t.Fatalf("item %+v", it.Entries)
+	}
+}
+
+// 이어지는 줄이 키나 목록 항목처럼 보이거나, 따옴표·플로우 값 뒤에 오면 이어 읽지 않는다.
+func TestPlainScalarContinuationLimits(t *testing.T) {
+	wantErr(t, parseErr(t, "a: b\n  c: d\n"), 2, 3, "들여쓰기")
+	wantErr(t, parseErr(t, "a: b\n  - c\n"), 2, 3, "들여쓰기")
+	wantErr(t, parseErr(t, "a: \"x\"\n  y\n"), 2, 3, "들여쓰기")
+	wantErr(t, parseErr(t, "a: [x]\n  y\n"), 2, 3, "들여쓰기")
+}

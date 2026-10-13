@@ -70,6 +70,9 @@ func (p *parser) parseMap(indent int) (*Node, error) {
 			}
 		} else {
 			val, err = p.parseInline(ln, rest, restCol)
+			if err == nil {
+				p.continuePlain(val, indent)
+			}
 		}
 		if err != nil {
 			return nil, err
@@ -174,6 +177,7 @@ func (p *parser) parseSeq(indent int) (*Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		p.continuePlain(item, indent)
 		n.Items = append(n.Items, item)
 	}
 	return n, nil
@@ -206,4 +210,20 @@ func (p *parser) parseInline(ln line, rest string, col int) (*Node, error) {
 		return nil, p.errAt(ln.num, col, msg)
 	}
 	return &Node{Kind: Scalar, Pos: Pos{p.file, ln.num, col}, Value: rest}, nil
+}
+
+// continuePlain은 평문 스칼라 n 뒤에서 indent보다 깊게 들여 쓴 줄을 이어 붙인다. 줄바꿈은 공백 하나가 된다.
+// 키나 목록 항목처럼 보이는 줄은 이어 붙이지 않아 들여쓰기 오류로 남는다.
+func (p *parser) continuePlain(n *Node, indent int) {
+	if n.Kind != Scalar || n.Quoted || n.Value == "" {
+		return
+	}
+	for p.i < len(p.lines) {
+		ln := p.lines[p.i]
+		if ln.indent <= indent || isSeqItem(ln.text) || colonAfterKey(ln.text) >= 0 {
+			return
+		}
+		n.Value += " " + ln.text
+		p.i++
+	}
 }
