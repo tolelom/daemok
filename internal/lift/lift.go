@@ -9,6 +9,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -86,7 +87,7 @@ func Draft(designDir, root string) (*Result, error) {
 		c.unit(u.id, u.path, expected[u.path])
 	}
 	c.funcs()
-	nodes, err := validate(sources, designDir, root, dedupe(c.nodes, c.res), c.res)
+	nodes, err := validate(sources, designDir, root, relink(dedupe(c.nodes, c.res)), c.res)
 	if err != nil {
 		return nil, err
 	}
@@ -227,6 +228,44 @@ func platformVariants(nodes []Node, res *Result) []Node {
 		out = append(out, n)
 	}
 	return out
+}
+
+// qualified는 필드 타입 문자열 안의 "모듈.Go이름"이다. 앞 글자가 이름의 일부면 맞추지 않는다.
+var qualified = regexp.MustCompile(`(^|[^A-Za-z0-9_.])([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)`)
+
+// relink는 다른 모듈 패키지의 타입을 코드 이름(core.Block)으로 가리킨 곳을, 그 타입·enum이 같은 초안에
+// 남아 있으면 ID로 바꾼다. 수집할 때는 다른 모듈의 어떤 선언이 초안에 남을지 몰라 코드 이름으로 둔다.
+// 요약 문장은 바꾸지 않는다.
+func relink(nodes []Node) []Node {
+	ids := map[string]string{}
+	for _, n := range nodes {
+		if n.Kind == "types" || n.Kind == "enums" {
+			ids[n.Module+"."+n.Name] = n.ID
+		}
+	}
+	for i := range nodes {
+		n := &nodes[i]
+		changed := false
+		for j, f := range n.fields {
+			if strings.HasPrefix(f, "summary: ") {
+				continue
+			}
+			g := qualified.ReplaceAllStringFunc(f, func(m string) string {
+				sub := qualified.FindStringSubmatch(m)
+				if id, ok := ids[sub[2]+"."+sub[3]]; ok {
+					return sub[1] + id
+				}
+				return m
+			})
+			if g != f {
+				n.fields[j], changed = g, true
+			}
+		}
+		if changed {
+			n.render()
+		}
+	}
+	return nodes
 }
 
 // dedupe는 초안 안에서 같은 종류의 ID가 겹치면(모듈마다 있는 Config, Service) 모듈 ID를 앞에 붙이고

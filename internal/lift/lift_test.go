@@ -330,7 +330,7 @@ type Page struct {
 		"enums status: { in: core, gen: false, values: [on, off] }",
 		`types post: { in: core, gen: false, fields: { id: uint, title: string, avatar_url: string, owner: "*account", tags: "[]string", raw: json.RawMessage, data: bytes, created: time, ttl: duration, status: status, extra: any } }`,
 		`types with_map: { in: core, gen: false, fields: { m: "map[string]int" } }`,
-		`types page: { in: web, gen: false, fields: { items: "[]*account", post: core.Post } }`,
+		`types page: { in: web, gen: false, fields: { items: "[]*account", post: post } }`,
 	}, "\n")
 	if got := lines(r); got != want {
 		t.Fatalf("got\n%s\nwant\n%s\nskipped %+v", got, want, r.Skipped)
@@ -572,5 +572,21 @@ funcs guard: { in: web, gen: false, errors: [ErrHigh] }`
 	}
 	if r.Funcs != 2 {
 		t.Fatalf("funcs %d", r.Funcs)
+	}
+}
+
+// 다른 모듈 패키지의 타입이 같은 초안에 올라오면 코드 이름(core.Block) 대신 그 ID로 가리킨다.
+// 요약 문장 안의 같은 글자는 바꾸지 않는다.
+func TestCrossModuleDraftRefs(t *testing.T) {
+	r := draft(t, "  web: { tier: a, depends_on: [core] }\n", map[string]string{
+		"core/core.go": "package core\n\ntype Block struct{ Height int }\n\ntype Kind string\n\nconst (\n\tKindA Kind = \"a\"\n\tKindB Kind = \"b\"\n)\n",
+		"web/web.go":   "package web\n\nimport \"example.com/x/core\"\n\n// Resp wraps core.Block.\ntype Resp struct {\n\tB    *core.Block\n\tBs   []core.Block\n\tK    core.Kind\n}\n\ntype Store interface {\n\tGet(id int) (*core.Block, error)\n}\n",
+	})
+	want := `enums kind: { in: core, gen: false, values: [a, b] }
+types block: { in: core, gen: false, fields: { height: int } }
+types resp: { in: web, gen: false, summary: "Resp wraps core.Block.", fields: { b: "*block", bs: "[]block", k: kind } }
+contracts store: { in: web, gen: false, kind: call, methods: { get: { params: { id: int }, returns: ["*block"], errors: [] } } }`
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
 	}
 }
