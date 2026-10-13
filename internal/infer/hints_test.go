@@ -44,6 +44,23 @@ const (
 	A = 1
 	B = 2
 )
+
+// unexported 타입은 설계 노드의 Go 이름(exported)과 대응하지 않아 후보가 아니다.
+type state string
+
+const (
+	stateUp   state = "up"
+	stateDown state = "down"
+)
+
+// exported 타입의 unexported 값은 뺀다.
+type Mode string
+
+const (
+	ModeOn   Mode = "on"
+	modeTest Mode = "test"
+	ModeOff  Mode = "off"
+)
 `), 0o644)
 	a, err := Analyze(root)
 	if err != nil {
@@ -53,6 +70,7 @@ const (
 		{Kind: "에러", Module: "core", Names: []string{"ErrNotFound", "ErrBad"}, Where: "core/core.go:9"},
 		{Kind: "enum", Module: "core", Names: []string{"TxTransfer", "TxMint"}, Type: "TxType", Where: "core/core.go:17"},
 		{Kind: "enum", Module: "core", Names: []string{"LevelLow", "LevelHigh"}, Type: "Level", Where: "core/core.go:24"},
+		{Kind: "enum", Module: "core", Names: []string{"ModeOn", "ModeOff"}, Type: "Mode", Where: "core/core.go:47"},
 	}
 	if !reflect.DeepEqual(a.Report.Hints, want) {
 		t.Fatalf("%+v", a.Report.Hints)

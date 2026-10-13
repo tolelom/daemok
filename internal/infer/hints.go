@@ -56,7 +56,8 @@ func fileHints(fset *token.FileSet, root string, f *ast.File, types map[string]b
 			}
 			first := g.Specs[0].(*ast.ValueSpec)
 			typ, ok := first.Type.(*ast.Ident)
-			if !ok || !types[typ.Name] {
+			// 설계 노드는 exported Go 이름을 만들어서 unexported 타입·값은 gen: false로 올려도 대응하지 않는다. init --l3와 같은 기준이다.
+			if !ok || !types[typ.Name] || !ast.IsExported(typ.Name) {
 				continue
 			}
 			h := Hint{Kind: "enum", Type: typ.Name, Where: where(first.Names[0].Pos())}
@@ -69,7 +70,9 @@ func fileHints(fset *token.FileSet, root string, f *ast.File, types map[string]b
 					break
 				}
 				for _, n := range sp.Names {
-					h.Names = append(h.Names, n.Name)
+					if n.IsExported() {
+						h.Names = append(h.Names, n.Name)
+					}
 				}
 			}
 			if len(h.Names) >= 2 {
