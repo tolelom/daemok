@@ -5,17 +5,17 @@ import "github.com/tolelom/daemok/internal/yaml"
 func (mg *merger) funcs(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "funcs", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "in", "gen", "summary", "satisfies", "kind", "handles", "of", "errors", "cases")
+		d.allow(v, "in", "gen", "summary", "satisfies", "kind", "handles", "of", "errors", "cases", "go")
 		if !mg.unique("함수", id, pos) {
 			return
 		}
-		f := &Func{Owned: d.owned(id, pos, v), Kind: d.ref(v, "kind"), Handles: d.ref(v, "handles"), Of: d.ref(v, "of"), Errors: d.refs(v, "errors")}
+		f := &Func{Owned: d.owned(id, pos, v), Kind: d.ref(v, "kind"), Handles: d.ref(v, "handles"), Of: d.ref(v, "of"), Errors: d.refs(v, "errors"), Go: d.goOpts(v, "name")}
 		hasKind, hasOf := f.Kind.Name != "" || f.Handles.Name != "", f.Of.Name != ""
 		switch {
 		case hasKind && hasOf:
 			d.diags.Errorf(pos, "함수 %q에는 kind+handles와 of 중 하나만 쓴다", id)
-		case !hasKind && !hasOf:
-			d.diags.Errorf(pos, "함수 %q에 kind+handles 또는 of가 필요하다", id)
+		case (hasKind || hasOf) && f.Go.Name != "":
+			d.diags.Errorf(pos, "go.name은 일반 함수에만 쓴다: 함수 %q", id)
 		case hasKind:
 			d.need(pos, v, "kind")
 			d.need(pos, v, "handles")

@@ -509,3 +509,24 @@ types:
 		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
 	}
 }
+
+// 일반 함수는 본문을 늘 손으로 쓰므로 gen과 관계없이 선언이 있어야 한다.
+func TestFreeFuncDecl(t *testing.T) {
+	got := scanShapes(t, map[string]string{
+		"design/d.yaml": `version: 0.5
+go_module: example.com/f
+tiers: [a]
+modules:
+  core: { tier: a }
+funcs:
+  safe_add: { in: core, gen: false }
+  gone: { in: core }
+  check_it: { in: core, go: { name: CheckIT } }
+`,
+		"core/c.go": "package core\n\nfunc SafeAdd(a, b int) int { return a + b }\n\nfunc CheckIT() {}\n",
+	})
+	want := []string{"오류: 손으로 쓴다고 한 선언이 코드에 없다: 모듈 core, 함수 gone (Gone)"}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}

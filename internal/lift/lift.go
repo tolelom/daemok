@@ -21,7 +21,7 @@ import (
 
 // Node는 초안 노드 하나다. Line은 "ID: { ... }" 한 줄이다.
 type Node struct {
-	Kind   string `json:"kind"` // errors, consts, enums, types
+	Kind   string `json:"kind"` // errors, consts, enums, types, contracts, funcs
 	Module string `json:"module"`
 	ID     string `json:"id"`
 	Name   string `json:"name"` // Go 이름
@@ -39,7 +39,7 @@ type Skip struct {
 	Reason string `json:"reason"`
 }
 
-// Result는 초안 YAML과 노드, 옮기지 않은 선언이다. Funcs는 설계에 없는 exported 함수의 수다.
+// Result는 초안 YAML과 노드, 옮기지 않은 선언이다. Funcs는 설계에 없고 설계 에러를 반환하지 않아 옮기지 않은 exported 함수의 수다.
 type Result struct {
 	YAML    []byte `json:"-"`
 	Nodes   []Node `json:"nodes"`
@@ -62,7 +62,7 @@ var ErrDesign = errors.New("설계에 오류가 있어 초안을 만들 수 없�
 // draftName은 검증할 때 초안에 붙이는 설계 파일 이름이다.
 const draftName = "daemok-l3-draft.yaml"
 
-var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3, "contracts": 4}
+var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3, "contracts": 4, "funcs": 5}
 
 // Draft는 designDir의 설계와 root의 코드로 초안을 만든다.
 func Draft(designDir, root string) (*Result, error) {
@@ -81,10 +81,11 @@ func Draft(designDir, root string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := &collector{m: m, root: root, fset: token.NewFileSet(), res: &Result{}, units: units(m)}
+	c := &collector{m: m, root: root, fset: token.NewFileSet(), res: &Result{}, units: units(m), docs: map[*ast.Ident]*ast.CommentGroup{}}
 	for _, u := range c.units {
 		c.unit(u.id, u.path, expected[u.path])
 	}
+	c.funcs()
 	nodes, err := validate(sources, designDir, root, dedupe(c.nodes, c.res), c.res)
 	if err != nil {
 		return nil, err
@@ -156,13 +157,14 @@ func units(m *model.Model) []unit {
 }
 
 type collector struct {
-	docs  map[*ast.Ident]*ast.CommentGroup // 선언 이름에서 그 선언의 문서 주석으로
-	m     *model.Model
-	units []unit
-	root  string
-	fset  *token.FileSet
-	nodes []Node
-	res   *Result
+	docs    map[*ast.Ident]*ast.CommentGroup // 선언 이름에서 그 선언의 문서 주석으로
+	m       *model.Model
+	units   []unit
+	root    string
+	fset    *token.FileSet
+	nodes   []Node
+	pending []pendingFunc
+	res     *Result
 }
 
 func (c *collector) where(p token.Pos) string {

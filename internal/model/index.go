@@ -399,6 +399,17 @@ func (hk *HandlerKind) GoName() string {
 	return GoName(hk.ID)
 }
 
+// Free는 핸들러도 계약 메서드도 아닌 일반 함수인지 본다. 본문은 손으로 쓰고 설계는 에러 계약과 케이스만 둔다.
+func (f *Func) Free() bool { return f.Kind.Name == "" && f.Handles.Name == "" && f.Of.Name == "" }
+
+// GoName은 일반 함수의 Go 이름이다.
+func (f *Func) GoName() string {
+	if f.Go.Name != "" {
+		return f.Go.Name
+	}
+	return GoName(f.ID)
+}
+
 // GoName은 에러 sentinel의 Go 이름이다. go.name이 없으면 ID가 Go 이름이다.
 func (e *ErrorDef) GoName() string {
 	if e.Go.Name != "" {

@@ -620,3 +620,15 @@ types:
 	want(t, ds, model.Error, "의존하지 않는 모듈의 타입을 쓴다: web → core.post")
 	want(t, ds, model.Error, `알 수 없는 타입 "map[post]int"`)
 }
+
+func TestL4FreeFunc(t *testing.T) {
+	base := tsBase + "errors:\n  ErrLow: { in: core, message: low }\nfuncs:\n"
+	ds := run(t, base+"  safe_add: { in: core, errors: [ErrLow] }\n")
+	want(t, ds, model.Warning, "확인하는 케이스가 없는 에러: 함수 safe_add, 에러 ErrLow")
+	// gen: false는 케이스 테스트를 만들지 않으므로 케이스 없는 에러를 경고하지 않는다
+	ds = run(t, base+"  safe_add: { in: core, gen: false, errors: [ErrLow] }\n")
+	wantNone(t, ds, model.Warning)
+	wantNone(t, ds, model.Error)
+	ds = run(t, base+"  safe_add: { in: core, go: { name: safeAdd }, errors: [] }\n")
+	want(t, ds, model.Error, "Go 이름으로 쓸 수 없는 함수 이름: safe_add safeAdd")
+}

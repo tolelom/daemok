@@ -69,3 +69,21 @@ func init() {}
 		t.Fatal("Count가 모델을 바꿨다")
 	}
 }
+
+// 일반 함수는 Go 이름으로 센다.
+func TestCountFreeFunc(t *testing.T) {
+	root := t.TempDir()
+	write(t, root, "core/c.go", "package core\n\nfunc SafeAdd() {}\n\nfunc CheckIT() {}\n\nfunc Other() {}\n")
+	src := "version: 0.5\ngo_module: example.com/cov\ntiers: [a]\nmodules:\n  core: { tier: a }\nfuncs:\n  safe_add: { in: core, gen: false }\n  check_it: { in: core, go: { name: CheckIT } }\n"
+	m, diags := model.LoadSources(map[string][]byte{"d.yaml": []byte(src)})
+	if diags.HasErrors() {
+		t.Fatal(diags)
+	}
+	rows, _, err := Count(m, root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []Row{{"core", 3, 2}}; !reflect.DeepEqual(rows, want) {
+		t.Fatalf("%+v", rows)
+	}
+}

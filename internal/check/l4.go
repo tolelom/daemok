@@ -35,7 +35,7 @@ func (c *checker) l4() {
 			}
 		}
 		for _, r := range f.Errors {
-			if !covered[r.Name] {
+			if f.Gen && !covered[r.Name] { // gen: false면 케이스 테스트를 만들지 않는다
 				c.warnf(r.Pos, "확인하는 케이스가 없는 에러: 함수 %s, 에러 %s", f.ID, r.Name)
 			}
 		}

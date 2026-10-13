@@ -875,7 +875,7 @@ function paintL3() {
   const has = (d.nodes || []).length > 0;
   $('#main').innerHTML = `<h1 class="plain">L3 초안</h1>
 <p class="sub">설계 모듈 패키지에 손으로 쓴 선언 중 설계에 없는 것을 gen: false 노드로 옮겼다. 설계에 더해도 검사를 통과하는 노드만 담는다.</p>
-<dl class="facts"><dt>에러</dt><dd>${count('errors')}</dd><dt>상수</dt><dd>${count('consts')}</dd><dt>enum</dt><dd>${count('enums')}</dd><dt>타입</dt><dd>${count('types')}</dd><dt>옮기지 않은 선언</dt><dd>${(d.skipped || []).length}</dd><dt>설계에 없는 함수</dt><dd>${d.funcs}</dd><dt>coverage</dt><dd>${pct(d.coverage.before, d.coverage.decls)} → ${pct(d.coverage.after, d.coverage.decls)} <span class="muted">선언 ${d.coverage.decls}개 중 ${d.coverage.before} → ${d.coverage.after}</span></dd></dl>
+<dl class="facts"><dt>에러</dt><dd>${count('errors')}</dd><dt>상수</dt><dd>${count('consts')}</dd><dt>enum</dt><dd>${count('enums')}</dd><dt>타입</dt><dd>${count('types')}</dd><dt>계약</dt><dd>${count('contracts')}</dd><dt>함수</dt><dd>${count('funcs')}</dd><dt>옮기지 않은 선언</dt><dd>${(d.skipped || []).length}</dd><dt>설계 에러를 반환하지 않는 함수</dt><dd>${d.funcs}</dd><dt>coverage</dt><dd>${pct(d.coverage.before, d.coverage.decls)} → ${pct(d.coverage.after, d.coverage.decls)} <span class="muted">선언 ${d.coverage.decls}개 중 ${d.coverage.before} → ${d.coverage.after}</span></dd></dl>
 ${has ? `<div class="draftbar">${d.canSave ? '<button type="button" class="primary" id="savel3">design/에 새 파일로 저장</button>' : '<span class="muted">루프백 주소로 띄웠을 때만 저장할 수 있다</span>'}<button type="button" id="copyl3">YAML 복사</button></div>
 <p id="savemsg" class="muted"></p>
 <pre class="yaml">${esc(d.yaml)}</pre>` : '<p class="muted">설계에 올릴 선언이 없다.</p>'}

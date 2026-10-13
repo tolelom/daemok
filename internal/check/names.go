@@ -22,6 +22,7 @@ func (c *checker) names() {
 	c.nodeIDs()
 	c.enumValues()
 	c.errorIDs()
+	c.funcNames()
 	c.fieldNames()
 	c.durations()
 	c.packageNames()
@@ -171,6 +172,15 @@ func (c *checker) errorIDs() {
 			c.errorf(e.Pos, "Go 이름으로 쓸 수 없는 에러 이름: %s %s", e.ID, e.Go.Name)
 		case e.Go.Name == "" && !exportedIdent.MatchString(e.ID):
 			c.errorf(e.Pos, "Go 이름으로 쓸 수 없는 에러 ID: %s", e.ID)
+		}
+	}
+}
+
+// funcNames는 일반 함수의 go.name이 export되는 이름인지 본다.
+func (c *checker) funcNames() {
+	for _, f := range c.m.Funcs {
+		if f.Go.Name != "" && !exportedIdent.MatchString(f.Go.Name) {
+			c.errorf(f.Pos, "Go 이름으로 쓸 수 없는 함수 이름: %s %s", f.ID, f.Go.Name)
 		}
 	}
 }

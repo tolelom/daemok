@@ -186,6 +186,7 @@ type Func struct {
 	Of      Ref // "계약.메서드"
 	Errors  []Ref
 	Cases   []*Case
+	Go      GoOpts // 일반 함수의 go.name
 }
 
 type EventKind struct {

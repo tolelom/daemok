@@ -15,6 +15,7 @@ const main = `document.querySelector('#main').textContent`;
 const steps = [
   ['tab_visible', `(() => { const t = document.querySelector('nav.tabs button[data-view="l3"]'); return t && !t.hidden ? 'ok' : '탭이 안 보인다'; })()`],
   ['draft_shown', `(() => { const y = document.querySelector('#main pre.yaml'); return y && y.textContent.includes('limit: { in: core, gen: false, summary: "Limit is the cap."') ? 'ok' : ${main}.slice(0, 300); })()`],
+  ['counts', `(() => ${main}.includes('타입0계약0함수0') && ${main}.includes('설계 에러를 반환하지 않는 함수0') ? 'ok' : ${main}.slice(0, 400))()`],
   ['coverage', `(() => ${main}.includes('coverage0% → 50%') ? 'ok' : ${main}.slice(0, 400))()`],
   ['skipped_listed', `(() => ${main}.includes('옮기지 않은 선언 1개') && ${main}.includes('Twice') ? 'ok' : ${main}.slice(0, 300))()`],
   ['save', `(async () => { document.querySelector('#savel3').click(); for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 100)); if (${main}.includes('설계에 올릴 선언이 없다')) return 'ok'; } return '저장 뒤: ' + ${main}.slice(0, 300); })()`],

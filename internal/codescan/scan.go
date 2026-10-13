@@ -337,6 +337,13 @@ func (s *scanner) handWritten() {
 	for _, hk := range m.HandlerKinds {
 		need(hk.Owned, "핸들러 종류", hk.GoName())
 	}
+	for _, f := range m.Funcs {
+		if f.Free() {
+			o := f.Owned
+			o.Gen = false // 일반 함수의 본문은 gen과 관계없이 손으로 쓴다
+			need(o, "함수", f.GoName())
+		}
+	}
 }
 
 func (s *scanner) ownerDir(id string) string {

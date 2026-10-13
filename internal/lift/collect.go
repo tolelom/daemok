@@ -22,7 +22,9 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 			hand = append(hand, f)
 		}
 	}
-	c.docs = docs(hand)
+	for k, v := range docs(hand) {
+		c.docs[k] = v
+	}
 	enumTypes, enumValues := c.enums(module, hand, fresh)
 	// local은 이 패키지에서 설계 ID로 가리킬 수 있는 타입 이름이다. 설계에 있는 타입·enum과 이번에 함께 옮기는 것.
 	local := c.designTypes(module)
@@ -51,8 +53,8 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 		for _, d := range f.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
-				if d.Recv == nil && fresh(d.Name) {
-					c.res.Funcs++
+				if d.Recv == nil && fresh(d.Name) && d.Body != nil {
+					c.pending = append(c.pending, pendingFunc{module, d, f})
 				}
 			case *ast.GenDecl:
 				for _, s := range d.Specs {
@@ -84,6 +86,10 @@ func docs(files []*ast.File) map[*ast.Ident]*ast.CommentGroup {
 	out := map[*ast.Ident]*ast.CommentGroup{}
 	for _, f := range files {
 		for _, d := range f.Decls {
+			if fd, ok := d.(*ast.FuncDecl); ok {
+				out[fd.Name] = fd.Doc
+				continue
+			}
 			g, ok := d.(*ast.GenDecl)
 			if !ok {
 				continue

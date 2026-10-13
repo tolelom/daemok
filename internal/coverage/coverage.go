@@ -72,7 +72,7 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 	return rows, bad, nil
 }
 
-// designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수도 넣는다.
+// designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수와 일반 함수도 넣는다.
 func DesignNames(m *model.Model) (map[string]map[string]bool, error) {
 	var gens []*bool
 	for _, x := range m.Enums {
@@ -129,6 +129,14 @@ func DesignNames(m *model.Model) (map[string]map[string]bool, error) {
 		}
 		for _, name := range handlerRefs(f) {
 			out[dir][name] = true
+		}
+	}
+	for _, fn := range m.Funcs {
+		if o, ok := m.Owner(fn.In.Name); ok && fn.Free() {
+			if out[o.Path] == nil {
+				out[o.Path] = map[string]bool{}
+			}
+			out[o.Path][fn.GoName()] = true // 일반 함수는 생성물이 없고 손으로 쓴 선언을 가리킨다
 		}
 	}
 	return out, nil

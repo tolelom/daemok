@@ -524,3 +524,53 @@ types series_info: { in: core, gen: false, fields: { id: int } }`
 		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
 	}
 }
+
+// 반환문에서 설계 에러(기존 설계, 같은 초안, 다른 모듈, %w 감싸기)를 가리키는 함수만 일반 함수로 옮긴다.
+// 클로저 안의 return은 그 함수의 반환이 아니다.
+func TestFreeFuncs(t *testing.T) {
+	r := draft(t, "  web: { tier: a, depends_on: [core] }\nerrors:\n  ErrHigh: { in: core, gen: false, message: high }\n", map[string]string{
+		"core/core.go": `package core
+
+import (
+	"errors"
+	"fmt"
+)
+
+var ErrHigh = errors.New("high")
+
+var ErrLow = errors.New("low")
+
+// SafeAdd adds. It checks bounds.
+func SafeAdd(a, b int) (int, error) {
+	if a < 0 {
+		return 0, ErrLow
+	}
+	if b < 0 {
+		return 0, fmt.Errorf("b: %w", ErrHigh)
+	}
+	return a + b, nil
+}
+
+func Plain() error { return errors.New("x") }
+
+func Closure() func() error { return func() error { return ErrLow } }
+
+func CheckIT() error { return ErrLow }
+
+type T struct{}
+
+func (T) Method() error { return ErrLow }
+`,
+		"web/web.go": "package web\n\nimport \"example.com/x/core\"\n\nfunc Guard() error { return core.ErrHigh }\n",
+	})
+	want := `errors ErrLow: { in: core, gen: false, message: "low" }
+funcs check_it: { in: core, gen: false, errors: [ErrLow], go: { name: CheckIT } }
+funcs safe_add: { in: core, gen: false, summary: "SafeAdd adds.", errors: [ErrHigh, ErrLow] }
+funcs guard: { in: web, gen: false, errors: [ErrHigh] }`
+	if got := lines(r); got != want {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
+	}
+	if r.Funcs != 2 {
+		t.Fatalf("funcs %d", r.Funcs)
+	}
+}

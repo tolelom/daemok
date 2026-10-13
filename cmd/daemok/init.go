@@ -103,7 +103,7 @@ func initL3(dir, root string, stdout, stderr io.Writer) int {
 	for _, s := range r.Skipped {
 		fmt.Fprintf(stderr, "옮기지 않음: %s %s (%s)\n", s.Where, s.Name, s.Reason)
 	}
-	fmt.Fprintf(stderr, "노드 %d개. 설계에 없는 함수 %d개는 옮기지 않는다\n", len(r.Nodes), r.Funcs)
+	fmt.Fprintf(stderr, "노드 %d개. 설계 에러를 반환하지 않는 함수 %d개는 옮기지 않는다\n", len(r.Nodes), r.Funcs)
 	c := r.Coverage
 	fmt.Fprintf(stderr, "coverage %s → %s (선언 %d개 중 %d → %d)\n", percent(c.Before, c.Decls), percent(c.After, c.Decls), c.Decls, c.Before, c.After)
 	return 0

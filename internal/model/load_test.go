@@ -384,11 +384,27 @@ funcs:
 	}
 }
 
+// kind+handles도 of도 없으면 일반 함수다. Go 이름은 go.name, 없으면 ID의 CamelCase다.
+func TestDecodeFreeFunc(t *testing.T) {
+	m, ds := loadOne(t, `
+funcs:
+  safe_add: { in: m, errors: [ErrX] }
+  check_it: { in: m, go: { name: CheckIT } }
+`)
+	if len(ds) != 0 {
+		t.Fatal(ds)
+	}
+	a, b := m.Funcs[0], m.Funcs[1]
+	if !a.Free() || !b.Free() || a.GoName() != "SafeAdd" || b.GoName() != "CheckIT" {
+		t.Fatalf("%v %q %v %q", a.Free(), a.GoName(), b.Free(), b.GoName())
+	}
+}
+
 func TestDecodeL4Errors(t *testing.T) {
 	_, ds := loadOne(t, `
 funcs:
   a: { in: m, kind: k, handles: h, of: c.m }
-  b: { in: m }
+  b: { in: m, of: c.m, go: { name: B } }
   c: { in: m, kind: k }
   d:
     in: m
@@ -401,7 +417,7 @@ funcs:
       - { name: w, given: { a: [1] }, error: E }
 `)
 	wantDiag(t, ds, Error, "kind+handles와 of 중 하나만")
-	wantDiag(t, ds, Error, "kind+handles 또는 of가 필요하다")
+	wantDiag(t, ds, Error, "go.name은 일반 함수에만 쓴다")
 	wantDiag(t, ds, Error, `필요한 키가 없다: "handles"`)
 	wantDiag(t, ds, Error, `필요한 키가 없다: "name"`)
 	wantDiag(t, ds, Error, "expect와 error 중 하나만")

@@ -228,7 +228,7 @@ func toolList(allowWrite bool) []map[string]any {
 			"inputSchema": with(map[string]any{"module": str("모듈, 그룹, 그룹 멤버 ID")})},
 		{"name": "check", "description": "설계 검사, import 대조, 생성 파일 최신 여부를 돌려 진단을 JSON으로 준다(daemok check --format json과 같다)",
 			"inputSchema": with(nil)},
-		{"name": "draft", "description": "Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 설계 파일이 있어도 코드만 본다(daemok init --dry-run과 같다). l3가 참이면 설계에 없는 손으로 쓴 에러·상수·enum·struct·interface를 gen: false L3 노드 초안으로 만든다. 설계에 합쳐도 검사를 통과하는 노드만 담는다(daemok init --l3와 같다). 파일은 쓰지 않는다",
+		{"name": "draft", "description": "Go 모듈의 코드에서 L2 설계 초안과 분석 메모를 만든다. 설계 파일이 있어도 코드만 본다(daemok init --dry-run과 같다). l3가 참이면 설계에 없는 손으로 쓴 에러·상수·enum·struct·interface와 설계 에러를 반환하는 함수를 gen: false 노드 초안으로 만든다. 설계에 합쳐도 검사를 통과하는 노드만 담는다(daemok init --l3와 같다). 파일은 쓰지 않는다",
 			"inputSchema": with(map[string]any{"l3": map[string]any{"type": "boolean", "description": "L3 초안을 만든다. design은 이때만 쓴다"}})},
 	}
 	for _, t := range tools {
@@ -366,7 +366,7 @@ func unitInfo(m *model.Model, id string) (unit, bool) {
 	return u, true
 }
 
-// draftL3Tool은 L3 초안 YAML과, 옮기지 않은 선언·설계에 없는 함수 수의 JSON을 ---로 나눠 준다.
+// draftL3Tool은 L3 초안 YAML과, 옮기지 않은 선언·설계 에러를 반환하지 않는 함수 수의 JSON을 ---로 나눠 준다.
 func draftL3Tool(design, root string) (string, error) {
 	r, err := lift.Draft(design, root)
 	if err != nil {
