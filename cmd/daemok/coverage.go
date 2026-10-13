@@ -10,7 +10,7 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// runCoverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율을 출력한다.
+// runCoverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율과, 함수를 뺀 비율을 출력한다.
 // 설계를 읽지 못하거나 설계 검사 오류가 있으면 2, 파싱하지 못한 Go 파일이 있으면 표를 내고 1이다.
 func runCoverage(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("coverage", flag.ContinueOnError)
@@ -33,14 +33,17 @@ func runCoverage(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "셀 수 없다: %v\n", err)
 		return 2
 	}
-	var decls, matched int
-	fmt.Fprintln(stdout, "| 패키지 | 최상위 선언 | 설계 대응 | 비율 |\n|---|---|---|---|")
+	var sum coverage.Row
+	fmt.Fprintln(stdout, "| 패키지 | 최상위 선언 | 설계 대응 | 비율 | 함수 제외 비율 |\n|---|---|---|---|---|")
 	for _, r := range rows {
-		decls += r.Decls
-		matched += r.Matched
-		fmt.Fprintf(stdout, "| `%s` | %d | %d | %s |\n", r.Pkg, r.Decls, r.Matched, percent(r.Matched, r.Decls))
+		sum.Decls += r.Decls
+		sum.Matched += r.Matched
+		sum.Funcs += r.Funcs
+		sum.FuncsMatched += r.FuncsMatched
+		fmt.Fprintf(stdout, "| `%s` | %d | %d | %s | %s |\n", r.Pkg, r.Decls, r.Matched, percent(r.Matched, r.Decls), percent(r.Matched-r.FuncsMatched, r.Decls-r.Funcs))
 	}
-	fmt.Fprintf(stdout, "| 합계 | %d | %d | %s |\n", decls, matched, percent(matched, decls))
+	fmt.Fprintf(stdout, "| 합계 | %d | %d | %s | %s |\n", sum.Decls, sum.Matched, percent(sum.Matched, sum.Decls), percent(sum.Matched-sum.FuncsMatched, sum.Decls-sum.Funcs))
+	fmt.Fprintf(stdout, "\n함수 제외: 선언 %d개 중 %d개. 함수 %d개 중 설계 대응 %d개\n", sum.Decls-sum.Funcs, sum.Matched-sum.FuncsMatched, sum.Funcs, sum.FuncsMatched)
 	for _, b := range bad {
 		fmt.Fprintf(stderr, "세지 못한 Go 파일: %v\n", b.Err)
 	}

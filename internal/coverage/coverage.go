@@ -19,10 +19,14 @@ import (
 )
 
 // Row는 패키지 하나의 결과다. Pkg는 코드 루트 기준 슬래시 경로이고 루트는 "."다.
+// Funcs와 FuncsMatched는 Decls·Matched 중 메서드가 아닌 함수다. 설계는 에러 계약이 있는 함수만 두므로
+// 함수를 뺀 비율을 따로 볼 수 있게 한다.
 type Row struct {
-	Pkg     string
-	Decls   int
-	Matched int
+	Pkg          string
+	Decls        int
+	Matched      int
+	Funcs        int
+	FuncsMatched int
 }
 
 // Count는 root 아래 패키지마다 최상위 선언 수와 그중 설계가 만드는 이름의 수를 준다.
@@ -55,10 +59,22 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 		rel = filepath.ToSlash(rel)
 		row := Row{Pkg: rel}
 		for _, f := range files {
+			funcs := map[string]bool{}
+			for _, d := range f.Decls {
+				if fd, ok := d.(*ast.FuncDecl); ok && fd.Recv == nil {
+					funcs[fd.Name.Name] = true
+				}
+			}
 			for _, name := range gosrc.TopNames(f) {
 				row.Decls++
+				if funcs[name] {
+					row.Funcs++
+				}
 				if expected[rel][name] {
 					row.Matched++
+					if funcs[name] {
+						row.FuncsMatched++
+					}
 				}
 			}
 		}

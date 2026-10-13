@@ -61,7 +61,7 @@ func init() {}
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Row{{"core", 5, 3}, {"vm", 2, 1}, {"vm/mods/pay", 2, 1}}
+	want := []Row{{"core", 5, 3, 2, 1}, {"vm", 2, 1, 1, 0}, {"vm/mods/pay", 2, 1, 2, 1}}
 	if !reflect.DeepEqual(rows, want) {
 		t.Fatalf("%+v", rows)
 	}
@@ -83,7 +83,7 @@ func TestCountFreeFunc(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []Row{{"core", 3, 2}}; !reflect.DeepEqual(rows, want) {
+	if want := []Row{{"core", 3, 2, 3, 2}}; !reflect.DeepEqual(rows, want) {
 		t.Fatalf("%+v", rows)
 	}
 }
