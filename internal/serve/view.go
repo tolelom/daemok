@@ -125,6 +125,7 @@ type vField struct {
 	Many     bool   `json:"many"`
 	Optional bool   `json:"optional"`
 	Max      string `json:"max"`
+	Summary  string `json:"summary"`
 }
 
 type vType struct {
@@ -299,7 +300,7 @@ func vGoOf(g model.GoOpts) vGo {
 func vFields(fs []*model.Field) []vField {
 	out := []vField{}
 	for _, f := range fs {
-		out = append(out, vField{Name: f.Name, Type: f.Type.Name, Ref: f.RefType.Name, Many: f.Many, Optional: f.Optional, Max: f.Max.Name})
+		out = append(out, vField{Name: f.Name, Type: f.Type.Name, Ref: f.RefType.Name, Many: f.Many, Optional: f.Optional, Max: f.Max.Name, Summary: f.Summary})
 	}
 	return out
 }

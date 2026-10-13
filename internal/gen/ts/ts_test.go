@@ -94,7 +94,7 @@ types:
       tags: "[]string"
       author: { ref: user }
       reviewers: { ref: user, many: true }
-      nick: { type: string, optional: true }
+      nick: { type: string, optional: true, summary: 별명 }
       raw: bytes
       meta: "map[string]any"
       by_id: "map[uint][]*user"
@@ -119,6 +119,7 @@ export interface Post {
   tags: string[] | null;
   author: User | null;
   reviewers: User[] | null;
+  /** 별명 */
   nick?: string;
   raw: string | null;
   meta: Record<string, unknown> | null;

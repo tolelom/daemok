@@ -132,6 +132,7 @@ type Field struct {
 	Many     bool
 	Optional bool
 	Max      Ref // 상수 ID 또는 숫자
+	Summary  string
 }
 
 type Type struct {

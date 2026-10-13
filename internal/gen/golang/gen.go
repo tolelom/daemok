@@ -181,6 +181,9 @@ func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax
 	for _, fl := range fields {
 		gt := g.fieldType(fl, dir, f)
 		line := fmt.Sprintf("\t%s %s `%s`", model.GoName(fl.Name), gt, JSONTag(fl))
+		if fl.Summary != "" {
+			line = "\t// " + fl.Summary + "\n" + line
+		}
 		if withMax && fl.Max.Name != "" {
 			line += " // 최대 " + fl.Max.Name
 		}

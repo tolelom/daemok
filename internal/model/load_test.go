@@ -276,7 +276,7 @@ types:
       title:  { type: string, max: post_title_max }
       tags:   { ref: tag, many: true }
       series: { ref: series, optional: true }
-      note:   { type: string, max: 80 }
+      note:   { type: string, max: 80, summary: 작성자 메모 }
 contracts:
   post_service:
     in: post
@@ -311,7 +311,7 @@ func TestDecodeL3(t *testing.T) {
 		t.Fatalf("type %+v", tp)
 	}
 	post := m.Types[1]
-	if post.Fields[0].Max.Name != "post_title_max" || !post.Fields[1].Many || post.Fields[1].RefType.Name != "tag" || !post.Fields[2].Optional || post.Fields[3].Max.Name != "80" {
+	if post.Fields[0].Max.Name != "post_title_max" || !post.Fields[1].Many || post.Fields[1].RefType.Name != "tag" || !post.Fields[2].Optional || post.Fields[3].Max.Name != "80" || post.Fields[3].Summary != "작성자 메모" || post.Fields[0].Summary != "" {
 		t.Fatalf("post fields %+v", post.Fields)
 	}
 	c := m.Contracts[0]

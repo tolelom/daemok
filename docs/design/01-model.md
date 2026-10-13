@@ -100,7 +100,7 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 Go 생성에서 빠진�
 | `enums` | `values`(문자열 목록), `go.type`, `go.prefix`, `export` | 문자열 타입, 상수 블록, `Valid()` |
 | `consts` | `type`(int, string, duration), `value`, `go.name`, `export` | const 블록 |
 | `errors` | `message`, `http`, `go.name` | sentinel `var` 블록, `http`가 있으면 `HTTPStatus(err)`. Go 이름은 `go.name`, 없으면 ID |
-| `types` | `fields`: 타입 문자열 또는 `{type, ref, many, optional, max}`, `export` | struct |
+| `types` | `fields`: 타입 문자열 또는 `{type, ref, many, optional, max, summary}`, `export` | struct. 필드 `summary`는 필드 위 주석, TS는 `/** */` |
 | `contracts` | `kind`(call, query, port, external), `methods`: `{params, returns, errors}`, `go.name` | interface. 반환 끝에 `error`가 붙는다 |
 | `handler_kinds` | `params`, `returns`, `key`, `go.name`, `go.register` | 함수 타입, 멤버별 `init()` 등록과 시그니처 확인 |
 | `event_kinds` | `key`(enum), `encoding`(map, json), `subscribers` | 이벤트마다 payload struct, map이면 변환 함수 |

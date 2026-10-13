@@ -41,7 +41,7 @@ errors:
 types:
   account:
     in: core
-    fields: { address: address, balance: uint64, status: status, nick: { type: string, optional: true, max: 20 } }
+    fields: { address: address, balance: uint64, status: status, nick: { type: string, optional: true, max: 20, summary: 화면에 보이는 이름 } }
   block:
     in: core
     fields: { height: int64, txs: { ref: account, many: true }, owner: { ref: account }, by_status: "map[status][]*account", meta: "map[string]json.RawMessage" }
@@ -78,7 +78,7 @@ events:
   asset_minted:
     kind: chain_event
     publishers: [asset]
-    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true }, kind: mint_kind, memo: { type: string, optional: true }, count: { type: int, optional: true }, tags: { type: string, many: true, optional: true } }
+    data: { asset_id: string, owner: string, amount: uint64, players: { type: string, many: true }, kind: mint_kind, memo: { type: string, optional: true, summary: 발행자가 남긴 메모 }, count: { type: int, optional: true }, tags: { type: string, many: true, optional: true } }
 
 funcs:
   handle_transfer:

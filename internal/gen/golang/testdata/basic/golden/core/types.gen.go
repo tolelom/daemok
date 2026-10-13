@@ -7,10 +7,11 @@ import (
 )
 
 type Account struct {
-	Address string  `json:"address"`
-	Balance uint64  `json:"balance"`
-	Status  Status  `json:"status"`
-	Nick    *string `json:"nick,omitempty"` // 최대 20
+	Address string `json:"address"`
+	Balance uint64 `json:"balance"`
+	Status  Status `json:"status"`
+	// 화면에 보이는 이름
+	Nick *string `json:"nick,omitempty"` // 최대 20
 }
 
 type Block struct {

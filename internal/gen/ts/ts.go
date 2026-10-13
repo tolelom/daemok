@@ -57,6 +57,9 @@ func Generate(m *model.Model) ([]byte, bool) {
 			if optional {
 				key += "?"
 			}
+			if f.Summary != "" {
+				b.WriteString("  " + doc(f.Summary))
+			}
 			fmt.Fprintf(&b, "  %s: %s;\n", key, ft)
 		}
 		b.WriteString("}\n")

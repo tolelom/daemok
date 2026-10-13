@@ -4,7 +4,8 @@ function filesFor(key) { return S.files.filter(f => f.sources.includes(key)); }
 function codeBlocks(key) { return filesFor(key).map(f => `<details><summary>${esc(f.path)}</summary><pre>${esc(f.code)}</pre></details>`).join(''); }
 function fieldsTable(fields) {
   if (!fields.length) return '<p class="muted">필드 없음</p>';
-  return `<table><thead><tr><th>필드</th><th>타입</th><th>제약</th></tr></thead><tbody>${fields.map(f => `<tr><td class="id">${esc(f.name)}</td><td class="id">${esc(f.ref ? (f.many ? '[]' : '*') + f.ref : (f.many ? '[]' : '') + f.type)}</td><td>${[f.optional ? 'optional' : '', f.max ? 'max ' + f.max : ''].filter(Boolean).join(', ') || '-'}</td></tr>`).join('')}</tbody></table>`;
+  const sum = fields.some(f => f.summary);
+  return `<table><thead><tr><th>필드</th><th>타입</th><th>제약</th>${sum ? '<th>설명</th>' : ''}</tr></thead><tbody>${fields.map(f => `<tr><td class="id">${esc(f.name)}</td><td class="id">${esc(f.ref ? (f.many ? '[]' : '*') + f.ref : (f.many ? '[]' : '') + f.type)}</td><td>${[f.optional ? 'optional' : '', f.max ? 'max ' + f.max : ''].filter(Boolean).join(', ') || '-'}</td>${sum ? `<td>${esc(f.summary || '')}</td>` : ''}</tr>`).join('')}</tbody></table>`;
 }
 const factRows = rows => `<dl class="facts" style="margin:0">${rows.map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('')}</dl>`;
 function drawerBody(key) {

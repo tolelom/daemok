@@ -93,7 +93,7 @@ func (mg *merger) fields(n *yaml.Node) []*Field {
 			f.Type = Ref{Name: e.Value.Value, Pos: e.Value.Pos}
 		case yaml.Map:
 			v := e.Value
-			d.allow(v, "type", "ref", "many", "optional", "max")
+			d.allow(v, "type", "ref", "many", "optional", "max", "summary")
 			f.Type, f.RefType = d.ref(v, "type"), d.ref(v, "ref")
 			switch {
 			case f.Type.Name != "" && f.RefType.Name != "":
@@ -103,6 +103,7 @@ func (mg *merger) fields(n *yaml.Node) []*Field {
 			}
 			f.Many, f.Optional = d.boolv(v, "many", false), d.boolv(v, "optional", false)
 			f.Max = d.ref(v, "max")
+			f.Summary = d.str(v, "summary")
 		default:
 			d.diags.Errorf(e.Pos, "타입 이름이나 맵이어야 한다: 필드 %q", e.Key)
 			continue

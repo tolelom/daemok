@@ -46,9 +46,10 @@ type AssetMintedData struct {
 	Amount  uint64   `json:"amount"`
 	Players []string `json:"players"`
 	Kind    MintKind `json:"kind"`
-	Memo    *string  `json:"memo,omitempty"`
-	Count   *int     `json:"count,omitempty"`
-	Tags    []string `json:"tags,omitempty"`
+	// 발행자가 남긴 메모
+	Memo  *string  `json:"memo,omitempty"`
+	Count *int     `json:"count,omitempty"`
+	Tags  []string `json:"tags,omitempty"`
 }
 
 // Map은 봉투의 map 본문으로 바꾼다. optional 필드는 값이 있을 때만 넣는다.
