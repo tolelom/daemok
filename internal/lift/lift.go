@@ -85,7 +85,7 @@ func Draft(designDir, root string) (*Result, error) {
 	for _, u := range c.units {
 		c.unit(u.id, u.path, expected[u.path])
 	}
-	nodes, err := validate(sources, designDir, root, dedupe(c.nodes), c.res)
+	nodes, err := validate(sources, designDir, root, dedupe(c.nodes, c.res), c.res)
 	if err != nil {
 		return nil, err
 	}
@@ -188,9 +188,50 @@ func (c *collector) add(kind, module, id string, name *ast.Ident, fields ...stri
 	c.nodes = append(c.nodes, n)
 }
 
+// platformVariants는 한 모듈에 같은 Go 이름의 같은 종류 선언이 여러 번 있으면(build 조건이 다른 플랫폼 파일)
+// 내용이 모두 같을 때 하나만 남기고, 다르면 모두 뺀다. 한 플랫폼의 값을 설계에 적으면 다른 플랫폼에서 틀린다.
+func platformVariants(nodes []Node, res *Result) []Node {
+	key := func(n Node) string { return n.Kind + " " + n.Module + " " + n.Name }
+	body := func(n Node) string {
+		var fs []string
+		for _, f := range n.fields {
+			if !strings.HasPrefix(f, "summary: ") {
+				fs = append(fs, f)
+			}
+		}
+		return strings.Join(fs, ", ")
+	}
+	first := map[string]Node{}
+	differs := map[string]bool{}
+	for _, n := range nodes {
+		if f, ok := first[key(n)]; !ok {
+			first[key(n)] = n
+		} else if body(f) != body(n) {
+			differs[key(n)] = true
+		}
+	}
+	var out []Node
+	emitted := map[string]bool{}
+	for _, n := range nodes {
+		k := key(n)
+		if emitted[k] {
+			continue
+		}
+		emitted[k] = true
+		if differs[k] {
+			res.Skipped = append(res.Skipped, Skip{n.Where, n.Name, "플랫폼 파일마다 선언이 다르다"})
+			continue
+		}
+		out = append(out, n)
+	}
+	return out
+}
+
 // dedupe는 초안 안에서 같은 종류의 ID가 겹치면(모듈마다 있는 Config, Service) 모듈 ID를 앞에 붙이고
-// go.name으로 Go 이름을 지킨다. 에러는 ID가 Go 이름이고 enum은 go 블록이 달라 그대로 두고 검증에 맡긴다.
-func dedupe(nodes []Node) []Node {
+// go.name으로 Go 이름을 지킨다. 에러는 ID가 Go 이름이고 enum은 go 블록이 달라 바꾸지 않는다.
+// 그래도 겹치는 노드는 첫 것만 남긴다. 초안 YAML에 같은 키가 두 번 나오면 설계를 읽을 수 없다.
+func dedupe(nodes []Node, res *Result) []Node {
+	nodes = platformVariants(nodes, res)
 	seen := map[string]int{}
 	for _, n := range nodes {
 		seen[n.Kind+" "+n.ID]++
@@ -206,5 +247,16 @@ func dedupe(nodes []Node) []Node {
 		}
 		n.render()
 	}
-	return nodes
+	kept := map[string]bool{}
+	var out []Node
+	for _, n := range nodes {
+		key := n.Kind + " " + n.ID
+		if kept[key] {
+			res.Skipped = append(res.Skipped, Skip{n.Where, n.Name, "초안 안에서 ID가 겹친다: " + n.ID})
+			continue
+		}
+		kept[key] = true
+		out = append(out, n)
+	}
+	return out
 }

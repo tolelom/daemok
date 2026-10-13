@@ -26,12 +26,18 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 	})
 	base := counts(workspace.RunSources(sources, designDir, root).Diags)
 	key := filepath.Join(designDir, draftName)
-	for len(nodes) > 0 {
+	// 한 라운드는 진단이 난 노드를 모두 빼므로 라운드 수는 참조 연쇄의 깊이다. YAML 문법 오류처럼 첫 오류에서
+	// 멈추는 진단이면 노드를 하나씩만 빼게 되어 상한에서 끝낸다.
+	for round := 0; len(nodes) > 0; round++ {
+		if round == maxRounds {
+			return nil, fmt.Errorf("초안 검증이 %d번 안에 끝나지 않았다", maxRounds)
+		}
 		files := map[string][]byte{key: render(nodes)}
 		for k, v := range sources {
 			files[k] = v
 		}
 		r := workspace.RunSources(files, designDir, root)
+
 		lineOf := lineNodes(nodes)
 		bad := map[int]string{}
 		var outside []string
@@ -89,6 +95,8 @@ func added(base map[string]int, now []string) []string {
 	}
 	return out
 }
+
+const maxRounds = 20
 
 // header는 초안 파일 머리 주석의 줄 수와 내용이다. lineNodes가 줄 번호를 맞추는 데 쓴다.
 const header = "# daemok init --l3가 만든 L3 초안이다. 설계에 없는 손으로 쓴 선언을 gen: false 노드로 옮겼다.\n" +

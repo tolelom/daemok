@@ -471,3 +471,32 @@ func TestCoverageBeforeAfter(t *testing.T) {
 		t.Fatalf("%+v", r.Coverage)
 	}
 }
+
+// 모듈마다 같은 이름의 에러는 ID가 Go 이름이라 바꿀 수 없다. 첫 것만 남기고 나머지는 이유와 함께 뺀다.
+// 초안 YAML에 같은 키가 두 번 나오면 설계를 읽을 수 없게 된다.
+func TestDuplicateErrors(t *testing.T) {
+	r := draft(t, "  web: { tier: a }\n", map[string]string{
+		"core/c.go": "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"a\")\n",
+		"web/w.go":  "package web\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"b\")\n",
+	})
+	if got := lines(r); got != `errors ErrNotFound: { in: core, gen: false, message: "a" }` {
+		t.Fatalf("got\n%s", got)
+	}
+	if len(r.Skipped) != 1 || r.Skipped[0].Where != "web/w.go:5" || !strings.Contains(r.Skipped[0].Reason, "초안 안에서") {
+		t.Fatalf("%+v", r.Skipped)
+	}
+}
+
+// 플랫폼 파일(build 조건)마다 같은 선언이 있으면, 내용이 같으면 하나로 두고 다르면 모두 뺀다.
+func TestPlatformVariants(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/a_linux.go":   "package core\n\nconst Same = 1\n\nconst Differs = 1\n",
+		"core/a_windows.go": "package core\n\nconst Same = 1\n\nconst Differs = 2\n",
+	})
+	if got := lines(r); got != "consts same: { in: core, gen: false, type: int, value: 1 }" {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
+	}
+	if len(r.Skipped) != 1 || r.Skipped[0].Name != "Differs" || !strings.Contains(r.Skipped[0].Reason, "플랫폼") {
+		t.Fatalf("%+v", r.Skipped)
+	}
+}
