@@ -67,9 +67,15 @@ modules:
   p: { tier: a }
   q: { tier: a }
   x: { tier: b, depends_on: [q] }
-  y: { tier: b, depends_on: [p] }
+  y: { tier: b, depends_on: [p, q] }
 errors:
   ErrBad: { in: p, message: bad }
+enums:
+  ev_type: { in: q, values: [done] }
+event_kinds:
+  evk: { in: q, key: ev_type, subscribers: [x] }
+events:
+  done: { kind: evk, publishers: [y], subscribers: [x] }
 `)
 	root := filepath.Dir(dir)
 	os.MkdirAll(filepath.Join(root, "p"), 0o755)

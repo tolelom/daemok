@@ -30,14 +30,23 @@ const steps = [
   ['no_labels', `(() => { const l = [...document.querySelectorAll('text.edge-label')].filter(e => +getComputedStyle(e).opacity > 0); return l.length === 0 ? 'ok' : '처음 보이는 라벨 ' + l.length; })()`],
   ['hidden_kind', `(async () => { const cb = document.querySelector('#mappanel input[data-kind="depends"]'); if (!cb) return '종류 칸 없음'; cb.click(); await new Promise(r => setTimeout(r, 300)); const o = +${opacity('path.edge.k-depends')}; cb.click(); return o === 0 ? 'ok' : '감춘 종류 opacity ' + o; })()`],
   ['no_crossing', `(() => { const x = id => +document.querySelector('g.unit[data-id="' + id + '"] rect.box').getAttribute('x'); return Math.sign(x('x') - x('y')) === Math.sign(x('q') - x('p')) ? 'ok' : 'x ' + x('x') + ', y ' + x('y') + ', q ' + x('q') + ', p ' + x('p'); })()`],
-  ['hover_rel', `(async () => { const sb = id => document.querySelector('g.unit[data-id="' + id + '"] text.sb').textContent; const before = sb('x'), beforeY = sb('y'); const g = id => document.querySelector('g.unit[data-id="' + id + '"]'); g('q').dispatchEvent(new MouseEvent('mouseenter')); await new Promise(r => setTimeout(r, 200)); const onQ = [sb('x'), sb('y')]; g('q').dispatchEvent(new MouseEvent('mouseleave')); g('x').dispatchEvent(new MouseEvent('mouseenter')); await new Promise(r => setTimeout(r, 200)); const onX = sb('q'); g('x').dispatchEvent(new MouseEvent('mouseleave')); const after = sb('x'); return onQ[0] === '사용' && onQ[1] === beforeY && onX === '제공' && after === before ? 'ok' : JSON.stringify({ before, onQ, onX, after }); })()`],
+  ['hover_rel', `(async () => { const sb = id => document.querySelector('g.unit[data-id="' + id + '"] text.sb').textContent; const before = sb('x'), beforeP = sb('p'); const g = id => document.querySelector('g.unit[data-id="' + id + '"]'); g('q').dispatchEvent(new MouseEvent('mouseenter')); await new Promise(r => setTimeout(r, 200)); const onQ = [sb('x'), sb('p')]; g('q').dispatchEvent(new MouseEvent('mouseleave')); g('x').dispatchEvent(new MouseEvent('mouseenter')); await new Promise(r => setTimeout(r, 200)); const onX = sb('q'); g('x').dispatchEvent(new MouseEvent('mouseleave')); const after = sb('x'); return onQ[0] === '사용' && onQ[1] === beforeP && onX === '제공' && after === before ? 'ok' : JSON.stringify({ before, onQ, onX, after }); })()`],
   ['rel_text', `(() => { const L = (...x) => new Set(x); const got = [
     relSub([{ kind: 'event', labels: L('A', 'B', 'C') }], [{ kind: 'depends', labels: L() }]),
     relSub([{ kind: 'register', labels: L('hk') }], [{ kind: 'event', labels: L('E') }, { kind: 'call', labels: L('C') }]),
     relSub([], [{ kind: 'register', labels: L('hk') }]),
   ]; const want = ['제공 / 발행 · A, B 외 1', '제공 · call 계약 C / 구독 · E / 등록 · hk', '등록받음 · hk']; return JSON.stringify(got) === JSON.stringify(want) ? 'ok' : JSON.stringify(got); })()`],
+  ['hover_no_labels', `(async () => {
+    const w = () => new Promise(r => setTimeout(r, 250)), y = document.querySelector('g.unit[data-id="y"]');
+    const vis = () => [...document.querySelectorAll('text.edge-label')].filter(e => +getComputedStyle(e).opacity > 0).length;
+    y.dispatchEvent(new MouseEvent('mouseenter')); await w();
+    const edge = +getComputedStyle(document.querySelector('path.edge[data-from="y"][data-to="x"][data-kind="event"]')).opacity, onHover = vis();
+    y.dispatchEvent(new MouseEvent('mouseleave'));
+    document.querySelector('#showall').click(); await w(); const onAll = vis(); document.querySelector('#showall').click(); await w();
+    return edge > .5 && onHover === 0 && onAll === 1 ? 'ok' : '이벤트 선 ' + edge + ', 올렸을 때 라벨 ' + onHover + ', 모두 보기 라벨 ' + onAll;
+  })()`],
   ['module_diag_group', `(() => { go('module', 'p'); const g = document.querySelectorAll('#main details.igroup'); return g.length === 1 && g[0].textContent.includes('3개') ? 'ok' : '묶음 ' + g.length + ': ' + document.querySelector('#main').textContent.slice(0, 200); })()`],
-  ['conn_design', `(() => { go('module', 'x'); const sec = [...document.querySelectorAll('#main table.conn tr.sec')].map(r => r.textContent.trim()); const bare = document.querySelector('#main table.conn tr.bare')?.textContent.trim(); return JSON.stringify(sec) === '["쓰는 것"]' && bare === 'q' ? 'ok' : JSON.stringify([sec, bare]); })()`],
+  ['conn_design', `(() => { go('module', 'x'); const sec = [...document.querySelectorAll('#main table.conn tr.sec')].map(r => r.textContent.trim()); const bare = document.querySelector('#main table.conn tr.bare')?.textContent.trim(); return JSON.stringify(sec) === '["쓰는 것","구독"]' && bare === 'q' ? 'ok' : JSON.stringify([sec, bare]); })()`],
   ['conn_words', `(() => { const t = connSections('m', [{ from: 'm', to: 'a', kind: 'event', label: 'E' }, { from: 'b', to: 'm', kind: 'event', label: 'F' }, { from: 'm', to: 'c', kind: 'depends' }, { from: 'd', to: 'm', kind: 'register', label: 'hk' }]).map(s => s.title + ':' + s.rows.map(r => r.other + '=' + r.what.join('|')).join(',')); const want = ['쓰는 것:c=', '발행:a=E', '구독:b=F', '등록받음:d=hk']; return JSON.stringify(t) === JSON.stringify(want) ? 'ok' : JSON.stringify(t); })()`],
 ];
 await runSteps(b, steps, 300);

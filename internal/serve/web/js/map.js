@@ -261,7 +261,8 @@ function renderMap() {
     svg.querySelectorAll('.edge, .edge-label').forEach(el => {
       // 공용 모듈로 가는 선은 그 공용 모듈에 올렸을 때만 보인다. 쓰는 쪽에 올렸을 때 선 대부분이 공용으로 가서다.
       const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id) && !(el.dataset.shared && el.dataset.to !== id)));
-      el.classList.toggle('show', !!on);
+      // 올렸을 때는 이어진 상자 부제가 같은 라벨을 적으므로 선 라벨은 "모두 보기"에서만 보인다. 선 위 라벨은 다른 선과 겹친다.
+      el.classList.toggle('show', !!on && (el.tagName !== 'text' || (showAll && !id)));
       el.classList.toggle('off', hiddenKinds.has(el.dataset.kind));
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
     });
