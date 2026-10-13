@@ -76,3 +76,68 @@ func TestGenerateDecimalValue(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateTypes(t *testing.T) {
+	m := load(t, `ts_out: x.gen.ts
+enums:
+  post_status: { in: core, values: [published, draft], export: [ts] }
+types:
+  user: { in: core, fields: { id: uint, name: string }, export: [ts] }
+  post:
+    in: core
+    summary: 글
+    export: [ts]
+    gen: false
+    fields:
+      id: uint
+      status: post_status
+      tags: "[]string"
+      author: { ref: user }
+      reviewers: { ref: user, many: true }
+      nick: { type: string, optional: true }
+      raw: bytes
+      meta: "map[string]any"
+      by_id: "map[uint][]*user"
+      created: time
+      ok: bool
+      extra: json.RawMessage
+      opt_tags: { type: "[]string", optional: true }
+      boss: { ref: user, optional: true }
+      opt_meta: { type: "map[string]int", optional: true }
+      opt_raw: { type: bytes, optional: true }
+  hidden: { in: core, fields: { n: int } }
+`)
+	got, _ := Generate(m)
+	want := `
+export const POST_STATUS = ["published", "draft"] as const;
+export type PostStatus = (typeof POST_STATUS)[number];
+
+/** 글 */
+export interface Post {
+  id: number;
+  status: PostStatus;
+  tags: string[] | null;
+  author: User | null;
+  reviewers: User[] | null;
+  nick?: string;
+  raw: string | null;
+  meta: Record<string, unknown> | null;
+  by_id: Record<string, (User | null)[] | null> | null;
+  created: string;
+  ok: boolean;
+  extra: unknown;
+  opt_tags?: string[];
+  boss?: User;
+  opt_meta?: Record<string, number> | null;
+  opt_raw?: string;
+}
+
+export interface User {
+  id: number;
+  name: string;
+}
+`
+	if !strings.HasSuffix(string(got), want) {
+		t.Fatalf("got\n%s", got)
+	}
+}

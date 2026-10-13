@@ -166,16 +166,21 @@ func (g *gen) types() error {
 	return nil
 }
 
-// structFields는 설계 필드를 struct 필드 줄로 바꾼다. optional이면 omitempty를 붙인다.
+// JSONTag는 설계 필드의 struct 태그다. optional이면 omitempty를 붙인다.
+func JSONTag(fl *model.Field) string {
+	tag := fl.Name
+	if fl.Optional {
+		tag += ",omitempty"
+	}
+	return "json:" + strconv.Quote(tag)
+}
+
+// structFields는 설계 필드를 struct 필드 줄로 바꾼다.
 func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax bool) []string {
 	var lines []string
 	for _, fl := range fields {
 		gt := g.fieldType(fl, dir, f)
-		tag := fl.Name
-		if fl.Optional {
-			tag += ",omitempty"
-		}
-		line := fmt.Sprintf("\t%s %s `json:%q`", model.GoName(fl.Name), gt, tag)
+		line := fmt.Sprintf("\t%s %s `%s`", model.GoName(fl.Name), gt, JSONTag(fl))
 		if withMax && fl.Max.Name != "" {
 			line += " // 최대 " + fl.Max.Name
 		}

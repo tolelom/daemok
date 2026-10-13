@@ -482,3 +482,30 @@ contracts:
 		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
 	}
 }
+
+// ts로 내보내는 손으로 쓴 타입은 JSON 키가 설계 필드 이름이어야 TS 인터페이스와 맞는다.
+func TestShapesTSJSONTags(t *testing.T) {
+	got := scanShapes(t, map[string]string{
+		"design/d.yaml": `version: 0.5
+go_module: example.com/j
+ts_out: web/x.gen.ts
+tiers: [a]
+modules:
+  model: { tier: a }
+types:
+  user: { in: model, gen: false, export: [ts], fields: { id: uint, avatar_url: string, nick: string, token: string, note: string, bio: string, alias: { type: string, optional: true }, tag: { type: string, optional: true } } }
+  plain: { in: model, gen: false, fields: { name: string } }
+`,
+		"model/m.go": "package model\n\ntype User struct {\n\tID        uint   `json:\"id\"`\n\tAvatarURL string `gorm:\"x\" json:\"avatar_url\"`\n\tNick      string `json:\"nick,omitempty\"`\n\tToken     string `json:\"-\"`\n\tNote      string\n\tBio       string `json:\"about\"`\n\tAlias     *string `json:\"alias,omitempty\"`\n\tTag       *string `json:\"tag\"`\n}\n\ntype Plain struct {\n\tName string\n}\n",
+	})
+	want := []string{
+		"오류: 손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 user, Bio: 설계 json:\"bio\", 코드 json:\"about\"",
+		"오류: 손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 user, Nick: 설계 json:\"nick\", 코드 json:\"nick,omitempty\"",
+		"오류: 손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 user, Note: 설계 json:\"note\", 코드 태그 없음",
+		"오류: 손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 user, Tag: 설계 json:\"tag,omitempty\", 코드 json:\"tag\"",
+		"오류: 손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 user, Token: 설계 json:\"token\", 코드 json:\"-\"",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("got:\n%s", strings.Join(got, "\n"))
+	}
+}

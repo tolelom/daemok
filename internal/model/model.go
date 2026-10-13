@@ -138,6 +138,7 @@ type Type struct {
 	Owned
 	Fields []*Field
 	Go     GoOpts
+	Export []string
 }
 
 type Param struct {

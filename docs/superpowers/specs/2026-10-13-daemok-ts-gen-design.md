@@ -1,6 +1,6 @@
 # daemok TS 생성
 
-> `export: [ts]`가 붙은 상수와 enum을 `ts_out` 파일 하나에 TypeScript로 생성합니다. 대상은 [tolelog 슬라이스](../../design/03-slice-tolelog.md)처럼 백엔드와 프론트엔드가 다른 저장소에 있는 구성입니다.
+> `export: [ts]`가 붙은 상수, enum, 타입을 `ts_out` 파일 하나에 TypeScript로 생성합니다. 대상은 [tolelog 슬라이스](../../design/03-slice-tolelog.md)처럼 백엔드와 프론트엔드가 다른 저장소에 있는 구성입니다.
 
 ## 경로
 
@@ -30,15 +30,50 @@ export type PostStatus = (typeof POST_STATUS)[number];
 - `int`는 숫자, `string`은 JSON 문자열로 씁니다.
 - `gen: false`와 관계없이 `export`를 따릅니다. `gen: false`는 Go 선언을 손으로 썼다는 뜻이고, TS 쪽에는 손으로 쓴 선언이 없습니다.
 
+## 타입
+
+`types`에 `export: [ts]`를 붙이면 `interface`로 씁니다. 상수, enum, 타입 순서로 각각 ID 순입니다.
+
+```ts
+/** 글 */
+export interface Post {
+  id: number;
+  status: PostStatus;
+  tags: string[] | null;
+  author: User | null;
+  nick?: string;
+  meta: Record<string, unknown> | null;
+}
+```
+
+- 이름은 ID의 CamelCase이고 필드 이름은 설계 필드 이름 그대로입니다. 생성 코드의 json 태그가 필드 이름이라 JSON 키와 같습니다.
+- Go에서 nil이 될 수 있는 값에 `| null`을 붙입니다: 포인터(`*`, `ref`), 슬라이스(`[]`, `many`), `bytes`, map.
+- `optional` 필드는 생성 코드가 `omitempty`로 nil이나 빈 값의 키를 빼므로 `이름?: 타입`으로 씁니다. 타입은 키가 있을 때의 값이라 포인터와 슬라이스·`bytes`의 `| null`은 붙이지 않습니다. map은 생성 코드가 포인터로 감싸 키가 있어도 `null`일 수 있으므로 `| null`을 남깁니다.
+
+| 설계 타입 | TS |
+|---|---|
+| `string`, `address` | `string` |
+| `int`, `uint`, `int64`, `uint64`, `float64` | `number` |
+| `bool` | `boolean` |
+| `time` | `string` |
+| `bytes` | `string \| null` |
+| `any`, `json.RawMessage` | `unknown` |
+| enum, 타입 | 그 TS 이름. 그 노드도 `export: [ts]`여야 합니다 |
+| `map[K]V` | `Record<string, V> \| null`. JSON 객체 키는 문자열입니다 |
+| `duration`, `error`, 그 밖의 외부 타입 | 오류 |
+
+손으로 쓴 타입(`gen: false`)은 JSON 키가 설계 필드 이름과 다를 수 있습니다. 코드 대조는 `export: [ts]`인 손으로 쓴 타입의 설계 필드마다 코드 필드의 json 태그가 생성 코드의 태그(`json:"필드 이름"`, `optional`이면 `json:"필드 이름,omitempty"`)와 같은지 보고, 다르면(`json:"-"`, 태그 없음 포함) 오류를 냅니다.
+
 ## 검사
 
 | 대상 | 수준 | 내용 |
 |---|---|---|
 | `export` 값 | 오류 | `ts` 말고는 받지 않습니다 |
+| 타입의 `export: [ts]` | 오류 | 필드가 TS로 옮길 수 없는 타입을 쓰거나, 내보내지 않는 enum·타입을 가리킴 |
 | `export: [ts]`가 있는데 `ts_out`이 없음 | 오류 | |
 | `ts_out` 형식 | 오류 | 절대 경로, `.ts`가 아닌 확장자 |
 | duration 상수의 `export: [ts]` | 오류 | 단위 표현을 정하지 않았습니다 |
-| TS 이름 충돌 | 오류 | 상수 이름, enum 값 목록 이름, enum 타입 이름이 파일 안에서 겹침 |
+| TS 이름 충돌 | 오류 | 상수 이름, enum 값 목록 이름, enum 타입 이름, 타입 이름이 파일 안에서 겹침 |
 | `ts_out`이 있는데 내보낼 것이 없음 | 경고 | |
 | `ts_out`의 상위 디렉토리가 없음 | 경고 | 생성 파일 대조 단계 |
 

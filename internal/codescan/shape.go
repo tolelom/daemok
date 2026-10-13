@@ -3,6 +3,8 @@ package codescan
 import (
 	"go/ast"
 	"path"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -148,6 +150,17 @@ func (s *scanner) shapes() {
 	}
 }
 
+// jsonTag는 struct 필드 태그의 json 부분을 `json:"값"`으로 준다. 없으면 "태그 없음"이다.
+func jsonTag(tag *ast.BasicLit) string {
+	if tag != nil {
+		raw, _ := strconv.Unquote(tag.Value)
+		if v, ok := reflect.StructTag(raw).Lookup("json"); ok {
+			return `json:"` + v + `"`
+		}
+	}
+	return "태그 없음"
+}
+
 // uncomparable은 타입 별칭과 제네릭 선언이면 정보로 알리고 true를 준다. 생성 코드에 없는 모양이다.
 func (s *scanner) uncomparable(ts typeSpec, what, id string, pos yaml.Pos) bool {
 	if ts.spec.Assign == 0 && ts.spec.TypeParams == nil {
@@ -222,8 +235,8 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 		return
 	}
 	type field struct {
-		name, typ string
-		ok        bool
+		name, typ, json string // json은 태그의 json 값. 태그가 없으면 "태그 없음"
+		ok              bool
 	}
 	code := map[string]*field{}
 	var order []string
@@ -238,10 +251,11 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 			if !n.IsExported() {
 				continue
 			}
-			code[matchName(n.Name)] = &field{n.Name, typ, ok}
+			code[matchName(n.Name)] = &field{n.Name, typ, jsonTag(fd.Tag), ok}
 			order = append(order, matchName(n.Name))
 		}
 	}
+	toTS := slices.Contains(t.Export, "ts")
 	seen := map[string]bool{}
 	var unknown []string
 	for i, want := range golang.TypeShape(s.m, t) {
@@ -258,6 +272,9 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 			s.diags.Infof(pos, "대조할 수 없는 타입식이라 건너뛴다: 타입 %s, %s", t.ID, got.name)
 		case want.Type != got.typ:
 			s.diags.Errorf(pos, "손으로 쓴 타입 필드의 타입이 설계와 다르다: 타입 %s, %s: 설계 %s, 코드 %s", t.ID, got.name, want.Type, got.typ)
+		}
+		if wantTag := golang.JSONTag(t.Fields[i]); ok && toTS && got.json != wantTag {
+			s.diags.Errorf(pos, "손으로 쓴 타입 필드의 json 태그가 설계와 다르다: 타입 %s, %s: 설계 %s, 코드 %s", t.ID, got.name, wantTag, got.json)
 		}
 	}
 	if len(unknown) > 0 {

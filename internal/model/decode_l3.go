@@ -64,11 +64,11 @@ func (mg *merger) errors(n *yaml.Node) {
 func (mg *merger) types(n *yaml.Node) {
 	d := mg.d
 	d.idMap(n, "types", func(id string, pos yaml.Pos, v *yaml.Node) {
-		d.allow(v, "in", "gen", "summary", "satisfies", "fields", "go")
+		d.allow(v, "in", "gen", "summary", "satisfies", "fields", "go", "export")
 		if !mg.unique("타입", id, pos) {
 			return
 		}
-		t := &Type{Owned: d.owned(id, pos, v), Go: d.goOpts(v)}
+		t := &Type{Owned: d.owned(id, pos, v), Go: d.goOpts(v), Export: d.strs(v, "export")}
 		if d.need(pos, v, "fields") {
 			t.Fields = mg.fields(v.Get("fields"))
 		}

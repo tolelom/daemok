@@ -91,7 +91,7 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 
 L3·L4 노드에 `gen: false`를 적으면 그 노드는 Go 생성에서 빠진다(`ts_out` TS 생성은 `export`를 따른다). 코드에 손으로 쓴 선언이 이미 있는 노드를 설계에 올릴 때 쓴다. 참조 해석과 설계 검사, 코드 대조는 `gen` 값과 무관하게 한다.
 
-코드 대조는 `gen: false`인 enum, 상수, 에러, 타입, `call` 계약, 핸들러 종류의 선언이 소유 모듈 패키지에 있는지 본다. 기대하는 이름은 생성했을 때의 이름이고, enum은 타입과 값 상수다. 없으면 오류다. `call` 계약과 타입은 모양도 본다. 생성했다면 나왔을 메서드 시그니처와 필드 타입이 코드 interface·struct와 같아야 하고, 다르거나 설계 메서드·필드가 코드에 없으면 오류, 코드에만 있으면 경고다. 이름은 대소문자와 밑줄을 무시하고 맞추고, 파라미터 이름과 필드 태그는 보지 않는다. 타입식은 설계 모듈과 생성기가 쓰는 표준 라이브러리 패키지를 import 경로의 마지막 요소로, 그 밖의 패키지는 코드에 쓴 이름 그대로 한정해 비교한다. 코드 선언이 타입 별칭이나 제네릭이면 정보로 알리고 비교하지 않는다. 이벤트 종류, 흐름, 함수는 손으로 쓴 코드가 생성 코드와 같은 이름을 쓴다고 볼 수 없어 보지 않는다. 코드 디렉토리가 없는 모듈도 보지 않는다.
+코드 대조는 `gen: false`인 enum, 상수, 에러, 타입, `call` 계약, 핸들러 종류의 선언이 소유 모듈 패키지에 있는지 본다. 기대하는 이름은 생성했을 때의 이름이고, enum은 타입과 값 상수다. 없으면 오류다. `call` 계약과 타입은 모양도 본다. 생성했다면 나왔을 메서드 시그니처와 필드 타입이 코드 interface·struct와 같아야 하고, 다르거나 설계 메서드·필드가 코드에 없으면 오류, 코드에만 있으면 경고다. 이름은 대소문자와 밑줄을 무시하고 맞추고, 파라미터 이름과 필드 태그는 보지 않는다. 단 `export: [ts]`인 타입은 필드의 json 태그가 생성 코드의 태그(`json:"필드 이름"`, `optional`이면 `,omitempty`)와 같아야 하고 다르면 오류다. 타입식은 설계 모듈과 생성기가 쓰는 표준 라이브러리 패키지를 import 경로의 마지막 요소로, 그 밖의 패키지는 코드에 쓴 이름 그대로 한정해 비교한다. 코드 선언이 타입 별칭이나 제네릭이면 정보로 알리고 비교하지 않는다. 이벤트 종류, 흐름, 함수는 손으로 쓴 코드가 생성 코드와 같은 이름을 쓴다고 볼 수 없어 보지 않는다. 코드 디렉토리가 없는 모듈도 보지 않는다.
 
 ### L3
 
@@ -100,13 +100,13 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 Go 생성에서 빠진�
 | `enums` | `values`(문자열 목록), `go.type`, `go.prefix`, `export` | 문자열 타입, 상수 블록, `Valid()` |
 | `consts` | `type`(int, string, duration), `value`, `go.name`, `export` | const 블록 |
 | `errors` | `message`, `http`, `go.name` | sentinel `var` 블록, `http`가 있으면 `HTTPStatus(err)`. Go 이름은 `go.name`, 없으면 ID |
-| `types` | `fields`: 타입 문자열 또는 `{type, ref, many, optional, max}` | struct |
+| `types` | `fields`: 타입 문자열 또는 `{type, ref, many, optional, max}`, `export` | struct |
 | `contracts` | `kind`(call, query, port, external), `methods`: `{params, returns, errors}`, `go.name` | interface. 반환 끝에 `error`가 붙는다 |
 | `handler_kinds` | `params`, `returns`, `key`, `go.name`, `go.register` | 함수 타입, 멤버별 `init()` 등록과 시그니처 확인 |
 | `event_kinds` | `key`(enum), `encoding`(map, json), `subscribers` | 이벤트마다 payload struct, map이면 변환 함수 |
 | `events` | `kind`, `publishers`, `subscribers`, `data`(`types.fields`와 같은 문법) | event_kind 파일에 들어간다 |
 
-`export: [ts]`가 붙은 상수와 enum은 `ts_out`에 TypeScript 상수로도 생성한다. 상수는 `export const PAGE_SIZE = 10;`, enum은 값 목록 `as const`와 그 원소 타입이다. `gen: false`와 관계없이 `export`를 따르고, duration 상수는 내보내지 않는다. 규칙은 [TS 생성 스펙](../superpowers/specs/2026-10-13-daemok-ts-gen-design.md)에 있다.
+`export: [ts]`가 붙은 상수, enum, 타입은 `ts_out`에 TypeScript로도 생성한다. 상수는 `export const PAGE_SIZE = 10;`, enum은 값 목록 `as const`와 그 원소 타입, 타입은 필드 이름을 키로 쓰는 `interface`다. Go JSON에서 nil이 될 수 있는 값(포인터, 슬라이스, `bytes`, map)은 `| null`, `optional` 필드는 `이름?:`이다. `gen: false`와 관계없이 `export`를 따른다. duration 상수와 duration·error·외부 타입 필드는 내보내지 않고, 내보내는 타입이 가리키는 enum·타입도 `export: [ts]`여야 한다. 규칙은 [TS 생성 스펙](../superpowers/specs/2026-10-13-daemok-ts-gen-design.md)에 있다.
 
 ### L4
 
@@ -186,7 +186,7 @@ flows:
 | 흐름을 가진 모듈 | `<모듈>/daemok_flow.gen.go` | `FlowError` |
 | cases가 있는 함수 하나 | `<모듈>/<함수 id>_gen_test.go` | 테이블 테스트 |
 | cases가 있는 함수를 가진 모듈 | `<모듈>/daemok_case_gen_test.go` | `caseInput`, `checkErr`, `checkExpect` 도우미 |
-| `export: [ts]`가 붙은 consts·enums 전부 | `ts_out` | TypeScript 상수와 타입. 상위 디렉토리가 없으면 쓰지 않고 경고. 설계에 없어져도 지우지 않는다 |
+| `export: [ts]`가 붙은 consts·enums·types 전부 | `ts_out` | TypeScript 상수와 타입. 상위 디렉토리가 없으면 쓰지 않고 경고. 설계에 없어져도 지우지 않는다 |
 
 - 이름 변환: ID `handle_transfer`는 함수 `handleTransfer`, enum 값 `mint_asset`은 `go.prefix` + `MintAsset`. `Id`로 끝나는 조각은 `ID`로 바꾼다.
 - 멤버의 `handles` 값에 대응하는 L4 함수 노드가 없으면 등록 코드는 `handle` + 값의 CamelCase(`handleMintAsset`)를 쓴다. 함수 노드가 있으면 그 ID를 쓴다.
@@ -209,7 +209,7 @@ flows:
 | 흐름 | 빈 흐름, 단계 ID와 undo 형식, 단계 중복, Go 메서드 이름 충돌, commit 하나, commit 단계와 커밋 뒤 단계의 undo, `calls`의 계약과 `uses`, `emits`의 발행자, `on`의 구독자 |
 | 외부 타입 | `모듈.이름` 형식의 외부 타입은 그 모듈에 대한 의존으로 본다 |
 | Go 이름 | 생성 코드가 있으면 `go_module` 필요, path 요소는 Go 식별자이고 `testdata`·`vendor`·`.`·`_`로 시작하지 않음, 노드 ID는 소문자 snake_case, 타입·enum ID는 내장 타입 이름(`error`, `time` 등)이 아님, enum 값은 Go 상수 이름이 되고 enum 안에서 겹치지 않음, 에러의 Go 이름(`go.name`, 없으면 ID)은 export되는 이름, 필드 이름과 이벤트의 `Map` 충돌, duration 형식, 같은 패키지의 생성 이름 충돌 |
-| TS | `export` 값은 `ts`만, `export: [ts]`에는 `ts_out` 필요, `ts_out`은 상대 경로이고 `.ts`, duration 상수는 내보내지 않음, TS 파일 안 이름 충돌, 내보낼 것 없는 `ts_out`(경고) |
+| TS | `export` 값은 `ts`만, `export: [ts]`에는 `ts_out` 필요, `ts_out`은 상대 경로이고 `.ts`, duration 상수는 내보내지 않음, 내보내는 타입의 필드는 TS로 옮길 수 있고 가리키는 enum·타입도 내보냄, TS 파일 안 이름 충돌, 내보낼 것 없는 `ts_out`(경고) |
 | 코드 | 설계에 없는 의존의 import, needs로만 이어진 모듈의 직접 import, query 패키지의 data 아닌 모듈 import, 관리하지 않는 패키지(정보), 쓰지 않는 depends_on(정보), 발행자·구독자의 이벤트 상수 참조, 적히지 않은 모듈의 이벤트 상수 참조(경고), 쓸 수 있는 설계 에러가 있는 모듈의 함수 본문에서 부르는 즉석 `errors.New`(정보), 쓸 수 있는 enum의 값과 같은 문자열 리터럴을 비교(`==`, `!=`), switch case, GORM·database/sql 메서드 호출에서 `?`가 든 쿼리 문자열 인자 뒤의 인자에 쓴 곳(정보) |
 
 ## 어긋남 유형별 대응
