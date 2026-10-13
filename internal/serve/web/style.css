@@ -124,7 +124,7 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .dim .unit:not(.near):not(.on) > * { opacity: .3; }
 .edge { fill: none; stroke: var(--c); stroke-width: 1.8; opacity: .16; transition: opacity .12s; }
 .edge.show { opacity: .95; }
-.dim .edge:not(.show), .edge.off { opacity: 0; }
+.dim .edge:not(.show), .many .edge:not(.show), .edge.off { opacity: 0; }
 .edge.dash { stroke-dasharray: 7 5; } .edge.dot { stroke-dasharray: 2 4; }
 .edge-label { font-size: 11.5px; paint-order: stroke; stroke: var(--bg-2); stroke-width: 4px; fill: var(--c); opacity: 0; }
 .edge-label.show { opacity: 1; }

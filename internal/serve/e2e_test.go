@@ -135,3 +135,40 @@ func TestUIGenE2E(t *testing.T) {
 		t.Fatal("미리보기가 파일을 썼다")
 	}
 }
+
+// 분석 모드 지도에서 많은 관계선, 긴 이름, 디렉토리 영역 띠를 본다. DAEMOK_E2E=1일 때만 돈다.
+func TestUIMapDenseE2E(t *testing.T) {
+	if os.Getenv("DAEMOK_E2E") != "1" {
+		t.Skip("DAEMOK_E2E=1일 때만 돈다")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node가 없다")
+	}
+	root := t.TempDir()
+	write := func(rel, src string) {
+		os.MkdirAll(filepath.Join(root, filepath.Dir(rel)), 0o755)
+		os.WriteFile(filepath.Join(root, rel), []byte(src), 0o644)
+	}
+	write("go.mod", "module example.com/d\n")
+	var leaves []string
+	for i := 0; i < 13; i++ {
+		p := "leaf" + string(rune('a'+i))
+		write("library/thirdparty/"+p+"/x.go", "package "+p+"\n")
+		leaves = append(leaves, `_ "example.com/d/library/thirdparty/`+p+`"`)
+	}
+	imp := "import (\n" + strings.Join(leaves, "\n") + "\n)\n"
+	for _, p := range []string{"reg", "reg/query", "reg/service", "shop", "shop/query", "shop/rulecheckevaluation/service"} {
+		write("box/core/"+p+"/x.go", "package "+filepath.Base(p)+"\n"+imp)
+	}
+	write("box/main.go", "package box\nimport _ \"example.com/d/box/core/reg\"\n")
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	out, err := exec.Command(node, filepath.Join("..", "..", "scripts", "e2e", "mapdense.mjs"), srv.URL+"/").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v\n%s", err, out)
+	}
+}
