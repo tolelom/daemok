@@ -114,8 +114,9 @@ h3 { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: var(--ink-2); }
 .unit.st-rem rect.box { stroke: var(--rem); stroke-dasharray: 5 4; } .unit.st-rem .nm { text-decoration: line-through; }
 .unit:focus { outline: none; }
 .dim .unit:not(.near):not(.on) > * { opacity: .3; }
-.edge { fill: none; stroke: var(--c); stroke-width: 1.8; opacity: 0; transition: opacity .12s; }
+.edge { fill: none; stroke: var(--c); stroke-width: 1.8; opacity: .16; transition: opacity .12s; }
 .edge.show { opacity: .95; }
+.dim .edge:not(.show), .edge.off { opacity: 0; }
 .edge.dash { stroke-dasharray: 7 5; } .edge.dot { stroke-dasharray: 2 4; }
 .edge-label { font-size: 11.5px; paint-order: stroke; stroke: var(--bg-2); stroke-width: 4px; fill: var(--c); opacity: 0; }
 .edge-label.show { opacity: 1; }
@@ -409,12 +410,32 @@ function mapPanel(id) {
   const sub = u.type === 'grp' ? `그룹, 멤버 ${u.members.length}` : (u.summary || '');
   return `<div><h2>${esc(id)}</h2>${sub ? `<p class="muted">${esc(sub)}</p>` : ''}</div>${part('쓰는 것', es.filter(e => e.from === id), 'to')}${part('쓰는 쪽', es.filter(e => e.to === id), 'from')}${tail}`;
 }
+// tierOrder는 tier마다 모듈 순서를 정한다. 다른 tier 이웃의 평균 칸 위치로 위아래를 번갈아 정렬해
+// 관계선 교차를 줄인다. 이웃이 없거나 값이 같으면 설계 순서를 유지한다.
+function tierOrder(units, edges) {
+  const tiers = tiersTopDown();
+  const rows = tiers.map(t => units.filter(u => (u.tier || '') === t).map(u => u.id));
+  const nb = {};
+  for (const e of edges) { (nb[e.from] ||= []).push(e.to); (nb[e.to] ||= []).push(e.from); }
+  const slot = {};
+  const place = r => r.forEach((id, i) => { slot[id] = i % PER; });
+  rows.forEach(place);
+  const sweep = r => {
+    const own = new Set(r);
+    const key = id => { const ns = (nb[id] || []).filter(n => n in slot && !own.has(n)); return ns.length ? ns.reduce((a, n) => a + slot[n], 0) / ns.length : slot[id]; };
+    const keyed = r.map((id, i) => [id, key(id), i]).sort((a, b) => a[1] - b[1] || a[2] - b[2]);
+    r.splice(0, r.length, ...keyed.map(k => k[0]));
+    place(r);
+  };
+  for (let k = 0; k < 4; k++) (k % 2 ? [...rows].reverse() : rows).forEach(sweep);
+  return Object.fromEntries(tiers.map((t, i) => [t, rows[i]]));
+}
 function renderMap() {
   setSide('');
-  const units = topUnits(), pos = {}, bands = [];
+  const units = topUnits(), pos = {}, bands = [], order = tierOrder(units, mapEdges());
   let y = TOP;
   for (const t of tiersTopDown()) {
-    const us = units.filter(u => (u.tier || '') === t);
+    const us = order[t].map(id => M.mods[id] || M.groups[id]);
     if (!us.length) continue;
     const top = y, rows = Math.ceil(us.length / PER);
     us.forEach((u, i) => { pos[u.id] = { x: LEFT + (i % PER) * (NW + GAP), y: y + BAND_PAD + Math.floor(i / PER) * (NH + GAP) }; });
@@ -455,6 +476,7 @@ function renderMap() {
     svg.querySelectorAll('.edge, .edge-label').forEach(el => {
       const on = !hiddenKinds.has(el.dataset.kind) && (showAll || (id && (el.dataset.from === id || el.dataset.to === id)));
       el.classList.toggle('show', !!on);
+      el.classList.toggle('off', hiddenKinds.has(el.dataset.kind));
       if (id && on) { near.add(el.dataset.from); near.add(el.dataset.to); }
     });
     svg.querySelectorAll('.unit').forEach(g => { g.classList.toggle('near', near.has(g.dataset.id)); g.classList.toggle('on', g.dataset.id === id); });
@@ -563,7 +585,7 @@ function renderModule() {
     facts.push(['depends_on', `<span class="deps">${deps.map(d => `<span class="dep">${unitLink(d)}<button type="button" class="x" data-rmdep="${esc(d)}" aria-label="${esc(d)} 의존 지우기">×</button></span>`).join('')}<select data-adddep="${esc(current)}" aria-label="의존 추가"><option value="">의존 추가</option>${cands.map(x => `<option>${esc(x)}</option>`).join('')}</select></span>`]);
   }
   const iss = issuesFor(ownedKeys(current));
-  if (iss.length) facts.push(['진단', diagList(iss)]);
+  if (iss.length) facts.push(['진단', `<div class="issuelist">${issueRows(iss)}</div>`]);
   const where = [kind === 'grp' ? '그룹' : kind === 'mem' ? '그룹 멤버' : '모듈', tierOf(current) ? `tier ${tierOf(current)}` : '', u.path && u.path !== current ? u.path : '', u.role].filter(Boolean).map(esc).join(', ');
   $('#main').innerHTML = `<h1>${esc(current)}${stMark(unitSt(current))}</h1><p class="sub">${where}</p>${u.summary ? `<p class="summary">${esc(u.summary)}</p>` : ''}
     ${facts.length ? `<dl class="facts">${facts.map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('')}</dl>` : ''}
@@ -753,24 +775,24 @@ function openDrawer(key) {
   $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="${esc(key)}">${body}</aside>`;
   $('#drawer .close').focus();
 }
+function issueRow(i) {
+  const target = i.key && (['mod', 'grp', 'mem'].includes(i.key.split(':')[0]) ? `data-go="${esc(i.key.split(':').slice(1).join(':'))}"` : `data-open="${esc(i.key)}"`);
+  const where = i.file ? `${i.file}${i.line ? ':' + i.line : ''}` : '';
+  const loc = i.abs ? i.abs + (i.line ? ':' + i.line : '') : '';
+  // VS Code는 URL 스킴으로 연다. 다른 에디터는 복사한 "경로:줄"을 파일 찾기에 붙여넣는다.
+  const acts = loc ? `<span class="iact"><a href="vscode://file/${encodeURI(loc.replace(/\\/g, '/'))}">VS Code</a><button type="button" data-copy="${esc(loc)}">경로 복사</button></span>` : '';
+  return `<div class="irow"><button type="button" ${target || 'disabled'}><span class="sev ${i.lv}">${SEV[i.lv]}</span><span>${esc(i.msg)}${where ? `<br><span class="where">${esc(where)}</span>` : ''}</span></button>${acts}</div>`;
+}
+// 같은 수준·같은 원인(메시지의 설명 부분)이 3개 이상이면 접히는 한 줄로 묶는다.
+function issueRows(l) {
+  const groups = new Map();
+  l.forEach(i => { const k = i.lv + '\u0000' + (i.group || i.msg); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  return [...groups.values()].map(g => g.length < 3 ? g.map(issueRow).join('')
+    : `<details class="igroup"><summary><span class="sev ${g[0].lv}">${SEV[g[0].lv]}</span><span>${esc(g[0].group)} <span class="muted">${g.length}개</span></span></summary>${g.map(issueRow).join('')}</details>`).join('');
+}
 function openIssues() {
   drawerOpen = '#issues';
-  const row = i => {
-    const target = i.key && (['mod', 'grp', 'mem'].includes(i.key.split(':')[0]) ? `data-go="${esc(i.key.split(':').slice(1).join(':'))}"` : `data-open="${esc(i.key)}"`);
-    const where = i.file ? `${i.file}${i.line ? ':' + i.line : ''}` : '';
-    const loc = i.abs ? i.abs + (i.line ? ':' + i.line : '') : '';
-    // VS Code는 URL 스킴으로 연다. 다른 에디터는 복사한 "경로:줄"을 파일 찾기에 붙여넣는다.
-    const acts = loc ? `<span class="iact"><a href="vscode://file/${encodeURI(loc.replace(/\\/g, '/'))}">VS Code</a><button type="button" data-copy="${esc(loc)}">경로 복사</button></span>` : '';
-    return `<div class="irow"><button type="button" ${target || 'disabled'}><span class="sev ${i.lv}">${SEV[i.lv]}</span><span>${esc(i.msg)}${where ? `<br><span class="where">${esc(where)}</span>` : ''}</span></button>${acts}</div>`;
-  };
-  // 같은 수준·같은 원인(메시지의 설명 부분)이 3개 이상이면 접히는 한 줄로 묶는다.
-  const rows = l => {
-    const groups = new Map();
-    l.forEach(i => { const k = i.lv + '\u0000' + (i.group || i.msg); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
-    return [...groups.values()].map(g => g.length < 3 ? g.map(row).join('')
-      : `<details class="igroup"><summary><span class="sev ${g[0].lv}">${SEV[g[0].lv]}</span><span>${esc(g[0].group)} <span class="muted">${g.length}개</span></span></summary>${g.map(row).join('')}</details>`).join('');
-  };
-  const sec = (o, title) => { const l = S.issues.filter(i => i.origin === o); return `<div><h3>${title} ${l.length}</h3><div class="issuelist">${rows(l) || '<span class="muted">없음</span>'}</div></div>`; };
+  const sec = (o, title) => { const l = S.issues.filter(i => i.origin === o); return `<div><h3>${title} ${l.length}</h3><div class="issuelist">${issueRows(l) || '<span class="muted">없음</span>'}</div></div>`; };
   $('#drawer').innerHTML = `<div class="scrim" data-close="1"></div><aside class="drawer" role="dialog" aria-label="진단"><div class="head"><h2>진단</h2><button type="button" class="close" data-close="1">닫기</button></div>${sec('design', '설계 검사')}${sec('code', '코드 대조')}</aside>`;
   $('#drawer .close').focus();
 }
