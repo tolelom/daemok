@@ -179,6 +179,10 @@ func TestSnakeID(t *testing.T) {
 		{"DefaultP2PPort", "default_p2p_port", "DefaultP2PPort"},
 		{"Sha256Size", "sha256_size", ""},
 		{"X", "x", ""},
+		{"PostIDs", "post_ids", "PostIDs"},
+		{"URLsByID", "urls_by_id", "URLsByID"},
+		{"IDs", "ids", "IDs"},
+		{"Status", "status", ""},
 	} {
 		id, goName, ok := snakeID(c.name)
 		if !ok || id != c.id || goName != c.goName {

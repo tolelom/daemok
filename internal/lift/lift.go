@@ -853,7 +853,9 @@ func snakeID(name string) (id, goName string, ok bool) {
 			j--
 		}
 		lowerToUpper := unicode.IsUpper(rs[i]) && unicode.IsLower(rs[j])
-		acronymEnd := unicode.IsUpper(rs[i]) && unicode.IsUpper(rs[i-1]) && i+1 < len(rs) && unicode.IsLower(rs[i+1])
+		// 약어 뒤의 복수 s(IDs, URLsByID)는 약어에 붙인다.
+		plural := i+1 < len(rs) && rs[i+1] == 's' && (i+2 == len(rs) || unicode.IsUpper(rs[i+2]))
+		acronymEnd := unicode.IsUpper(rs[i]) && unicode.IsUpper(rs[i-1]) && i+1 < len(rs) && unicode.IsLower(rs[i+1]) && !plural
 		if lowerToUpper || acronymEnd {
 			parts = append(parts, string(rs[start:i]))
 			start = i
