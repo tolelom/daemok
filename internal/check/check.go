@@ -37,6 +37,7 @@ func Run(m *model.Model) model.Diagnostics {
 	c.l4()
 	c.flows()
 	c.requirements()
+	c.ts()
 	c.diags.Sort()
 	return c.diags
 }

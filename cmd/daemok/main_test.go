@@ -211,3 +211,21 @@ func TestCheckUnknownFormat(t *testing.T) {
 		t.Fatalf("%d %s", code, errOut)
 	}
 }
+
+func TestGenWritesTSOutsideRoot(t *testing.T) {
+	base := t.TempDir()
+	root := filepath.Join(base, "back")
+	os.MkdirAll(filepath.Join(root, "design"), 0o755)
+	os.MkdirAll(filepath.Join(base, "web"), 0o755)
+	os.WriteFile(filepath.Join(root, "design", "d.yaml"), []byte("version: 0.5\ngo_module: example.com/x\nts_out: ../web/limits.gen.ts\ntiers: [a]\nmodules:\n  core: { tier: a }\nconsts:\n  title_max: { in: core, type: int, value: 255, export: [ts] }\n"), 0o644)
+	if code, out, errOut := runCLI(t, "gen", "--root", root); code != 0 {
+		t.Fatalf("gen exit %d\n%s%s", code, out, errOut)
+	}
+	b, err := os.ReadFile(filepath.Join(base, "web", "limits.gen.ts"))
+	if err != nil || !strings.Contains(string(b), "export const TITLE_MAX = 255;") {
+		t.Fatalf("%v %s", err, b)
+	}
+	if code, out, _ := runCLI(t, "check", "--root", root); code != 0 {
+		t.Fatalf("check exit %d\n%s", code, out)
+	}
+}

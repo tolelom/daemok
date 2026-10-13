@@ -62,6 +62,7 @@ func LoadSources(files map[string][]byte) (*Model, Diagnostics) {
 		mg.file(root)
 	}
 	mg.finish()
+	mg.m.TSOutPos = mg.once["ts_out"]
 	return mg.m, diags
 }
 

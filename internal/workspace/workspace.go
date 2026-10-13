@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -15,6 +16,7 @@ import (
 	"github.com/tolelom/daemok/internal/check"
 	"github.com/tolelom/daemok/internal/codescan"
 	"github.com/tolelom/daemok/internal/gen/golang"
+	"github.com/tolelom/daemok/internal/gen/ts"
 	"github.com/tolelom/daemok/internal/gosrc"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
@@ -91,6 +93,7 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 		diags.Sort()
 		return Result{Model: m, Diags: diags, Fatal: true}
 	}
+	files = withTS(m, root, files, existing, &diags)
 	var fresh model.Diagnostics
 	plan := &Plan{}
 	out := map[string]bool{}
@@ -137,6 +140,28 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 	all.Sort()
 	code := append(slices.Clone(fresh), scanned...)
 	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags, Code: code}
+}
+
+// withTS는 TS 생성 파일을 생성 목록에 더하고, 디스크의 것이 생성 파일이면 대조 대상에 넣는다.
+// ts_out은 코드 루트 밖일 수 있어 ScanGenerated가 찾지 않는다. 상위 디렉토리가 없으면 프론트 저장소가
+// 없는 곳으로 보고 쓰지 않는다. 경고는 gen도 출력하도록 대조 진단이 아닌 diags에 넣는다.
+func withTS(m *model.Model, root string, files []golang.File, existing map[string][]byte, diags *model.Diagnostics) []golang.File {
+	content, ok := ts.Generate(m)
+	if !ok {
+		return files
+	}
+	p := path.Clean(m.TSOut)
+	full := filepath.Join(root, filepath.FromSlash(p))
+	if st, err := os.Stat(filepath.Dir(full)); err != nil || !st.IsDir() {
+		diags.Warnf(m.TSOutPos, "ts_out 디렉토리가 없어 TS 파일을 쓰지 않는다: %s", p)
+		return files
+	}
+	if hasHeader(full) {
+		if src, err := os.ReadFile(full); err == nil {
+			existing[p] = bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
+		}
+	}
+	return append(files, golang.File{Path: p, Content: content})
 }
 
 // blocked는 생성 경로에 쓰면 안 되는 이유를 준다. 쓸 수 있으면 빈 문자열이다.

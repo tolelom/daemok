@@ -224,6 +224,7 @@ type Model struct {
 	Version  string
 	GoModule string
 	TSOut    string
+	TSOutPos yaml.Pos // ts_out 값 위치
 
 	Requirements []*Requirement
 	System       *System
