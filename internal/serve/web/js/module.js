@@ -1,8 +1,20 @@
 // 모듈. 여러 classic script가 전역을 함께 쓰며 index.html의 순서대로 읽힌다.
 /* ---------- 모듈 ---------- */
 function moduleSide() {
-  const item = (id, extra = '') => `<button type="button" data-go="${esc(id)}" aria-current="${id === current}">${esc(id)}${unitSt(id) ? `<small class="st ${unitSt(id)}">${ST[unitSt(id)]}</small>` : ''}</button>${extra}`;
+  const item = (id, extra = '', label = '') => `<button type="button" data-go="${esc(id)}" aria-current="${id === current}"${label ? ` title="${esc(id)}"` : ''}>${esc(label || id)}${unitSt(id) ? `<small class="st ${unitSt(id)}">${ST[unitSt(id)]}</small>` : ''}</button>${extra}`;
   let h = '';
+  // 분석 모드는 지도와 같은 영역으로 묶고, 하위 패키지는 뿌리 모듈 아래에 뿌리 기준 상대 경로로 넣는다. ID는 툴팁이다.
+  if (S.mode === 'analyze') {
+    for (const r of areaRows(topUnits())) {
+      const roots = r.ids.filter(id => r.rootOf[id] === id);
+      h += `<h2>${esc(r.label)}</h2><ul>${roots.map(id => {
+        const kids = r.ids.filter(k => k !== id && r.rootOf[k] === id);
+        const rel = k => unitPath(unitNode(k)).slice(unitPath(unitNode(id)).length + 1);
+        return `<li>${item(id, kids.length ? `<ul>${kids.map(k => `<li>${item(k, '', rel(k))}</li>`).join('')}</ul>` : '')}</li>`;
+      }).join('')}</ul>`;
+    }
+    return h;
+  }
   for (const t of tiersTopDown()) {
     const us = topUnits().filter(u => (u.tier || '') === t);
     if (!us.length) continue;
@@ -63,9 +75,19 @@ function renderModule() {
     facts.push(['depends_on', `<span class="deps">${deps.map(d => `<span class="dep">${unitLink(d)}<button type="button" class="x" data-rmdep="${esc(d)}" aria-label="${esc(d)} 의존 지우기">×</button></span>`).join('')}<select data-adddep="${esc(current)}" aria-label="의존 추가"><option value="">의존 추가</option>${cands.map(x => `<option>${esc(x)}</option>`).join('')}</select></span>`]);
     if (kind === 'mod') facts.push(['', `<button type="button" class="rmmod" data-rmmod="${esc(current)}">모듈 지우기</button>`]);
   }
+  if (S.mode === 'analyze' && S.draft) {
+    const r = areaRows(all).find(x => x.ids.includes(current));
+    const kids = r.ids.filter(k => k !== current && r.rootOf[k] === current);
+    if (kids.length) facts.push(['하위 패키지', inlineList(kids.map(unitLink))]);
+    const ext = (S.draft.report.external || []).filter(e => e.users.includes(current)).map(e => `<span class="id">${esc(e.module)}</span>`);
+    if (ext.length) facts.push(['외부 의존', inlineList(ext)]);
+    const hints = (S.draft.report.hints || []).filter(x => x.module === current);
+    if (hints.length) facts.push(['L3 후보', `<ul class="hints">${hints.map(x => `<li>${esc(x.kind)}${x.type ? ` <span class="id">${esc(x.type)}</span>` : ''}: ${x.names.map(n => `<span class="id">${esc(n)}</span>`).join(', ')} <span class="muted">${esc(x.where)}</span></li>`).join('')}</ul>`]);
+  }
   const iss = issuesFor(ownedKeys(current));
   if (iss.length) facts.push(['진단', `<div class="issuelist">${issueRows(iss)}</div>`]);
-  const where = [kind === 'grp' ? '그룹' : kind === 'mem' ? '그룹 멤버' : '모듈', tierOf(current) ? `tier ${tierOf(current)}` : '', u.path && u.path !== current ? u.path : '', u.role].filter(Boolean).map(esc).join(', ');
+  const area = S.mode === 'analyze' ? (areaRows(all).find(x => x.ids.includes(current)) || {}).label : '';
+  const where = [kind === 'grp' ? '그룹' : kind === 'mem' ? '그룹 멤버' : '모듈', area ? `영역 ${area}` : tierOf(current) ? `tier ${tierOf(current)}` : '', u.path && u.path !== current ? u.path : '', u.role].filter(Boolean).map(esc).join(', ');
   $('#main').innerHTML = `<h1>${esc(current)}${stMark(unitSt(current))}</h1><p class="sub">${where}</p>${u.summary ? `<p class="summary">${esc(u.summary)}</p>` : ''}
     ${facts.length ? `<dl class="facts">${facts.map(([t, d]) => `<dt>${t}</dt><dd>${d}</dd>`).join('')}</dl>` : ''}
     <div class="cols"><div><h2>이 모듈이 쓰는 것</h2>${relGroups(S.relations.filter(r => r.from === current), 'out')}</div><div><h2>이 모듈을 쓰는 쪽</h2>${relGroups(S.relations.filter(r => r.to === current), 'in')}</div></div>`;

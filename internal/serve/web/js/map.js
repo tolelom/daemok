@@ -63,6 +63,7 @@ const unitPath = u => u.path || u.id;
 // 하위 패키지는 가장 가까운 조상 모듈로 접고, 영역은 접은 뿌리의 부모 디렉토리다. 사이 디렉토리에 모듈 갈래가 둘 이상이면
 // 조상은 담는 그릇이라 접지 않는다. 사이 디렉토리가 internal이면 그 조상 전용이라 갈래를 세지 않는다.
 // 하위 패키지는 부모와 같은 띠에서 경로 순으로 부모 뒤에 온다. 띠는 tier 평균이 높은 영역부터다.
+// rootOf는 모듈 ID → 접은 뿌리 모듈 ID다. 모듈 탭이 하위 패키지를 뿌리 아래에 넣는 데 쓴다.
 function areaRows(units) {
   const paths = units.map(unitPath), has = new Set(paths);
   const branches = d => new Set(paths.filter(q => q.startsWith(d + '/')).map(q => q.slice(d.length + 1).split('/')[0])).size;
@@ -76,15 +77,17 @@ function areaRows(units) {
     }
     return p;
   };
-  const areas = new Map();
+  const areas = new Map(), idOf = Object.fromEntries(units.map(u => [unitPath(u), u.id])), root = {};
   for (const u of units) {
     const r = rootOf(unitPath(u)), a = r.includes('/') ? r.slice(0, r.lastIndexOf('/')) : '.';
+    root[u.id] = idOf[r];
     if (!areas.has(a)) areas.set(a, []);
     areas.get(a).push(u);
   }
   const avg = us => us.reduce((n, u) => n + M.tiers.indexOf(u.tier), 0) / us.length;
   return [...areas].map(([a, us]) => ({ area: a, label: a === '.' ? '루트' : a, avg: avg(us), ids: us.map(u => u.id).sort((x, y) => (unitPath(M.mods[x] || M.groups[x]) < unitPath(M.mods[y] || M.groups[y]) ? -1 : 1)) }))
-    .sort((x, y) => y.avg - x.avg || (x.area < y.area ? -1 : 1));
+    .sort((x, y) => y.avg - x.avg || (x.area < y.area ? -1 : 1))
+    .map(r => Object.assign(r, { rootOf: root }));
 }
 // fitName은 이름이 상자에 들어가도록 글자를 줄이고, 그래도 넘치면 가운데를 줄인다. 끝(_service, _query)이 구분에 쓰여서다.
 function fitName(id) {
