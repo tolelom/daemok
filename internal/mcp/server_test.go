@@ -161,3 +161,13 @@ func TestCheckToolMissingRoot(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+func TestDraftToolL3(t *testing.T) {
+	root := project(t)
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "core", "c.go"), []byte("package core\n\nconst ZetaLimit = 9\n\nconst Other = ZetaLimit + 1\n"), 0o644)
+	text, isErr := call(t, root, "draft", `{"l3":true}`)
+	if isErr || !strings.Contains(text, "zeta_limit: { in: core, gen: false, type: int, value: 9 }") || !strings.Contains(text, `"name": "Other"`) {
+		t.Fatal(text)
+	}
+}
