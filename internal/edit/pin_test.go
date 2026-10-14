@@ -63,7 +63,7 @@ func TestPinNotInFile(t *testing.T) {
 }
 
 func TestPinRefusesExistingKey(t *testing.T) {
-	if _, err := Pin([]byte("types:\n  a: { go: { name: A } }\n"), "d.yaml", []string{"types", "a"}, "go", "name", "B"); err == nil {
-		t.Fatal("이미 있는 키를 덮었다")
+	if _, err := Pin([]byte("types:\n  a: { go: { name: A } }\n"), "d.yaml", []string{"types", "a"}, "go", "name", "B"); !errors.Is(err, ErrKeyExists) {
+		t.Fatalf("이미 있는 키를 덮었다: %v", err)
 	}
 }

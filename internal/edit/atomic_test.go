@@ -26,7 +26,7 @@ func TestWriteAtomicWhileRead(t *testing.T) {
 	}()
 	defer func() { close(stop); <-done }()
 	for i := 0; i < 200; i++ {
-		if err := writeAtomic(p, []byte(fmt.Sprint(i))); err != nil {
+		if err := WriteAtomic(p, []byte(fmt.Sprint(i))); err != nil {
 			t.Fatalf("%d: %v", i, err)
 		}
 	}

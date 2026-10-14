@@ -84,7 +84,7 @@ func apply(designDir, op, id, value string, confined bool) (string, error) {
 		return "", lastErr
 	}
 	if confined {
-		if err := inside(designDir, target); err != nil {
+		if err := Inside(designDir, target); err != nil {
 			return "", err
 		}
 	}
@@ -101,7 +101,7 @@ func apply(designDir, op, id, value string, confined bool) (string, error) {
 	if len(added) > 0 {
 		return "", fmt.Errorf("%w: %s", ErrBreaksLoad, strings.Join(added, "; "))
 	}
-	if err := writeAtomic(target, patched); err != nil {
+	if err := WriteAtomic(target, patched); err != nil {
 		return "", fmt.Errorf("%w: %v", ErrIO, err)
 	}
 	return target, nil
@@ -121,7 +121,7 @@ func loadErrors(files map[string][]byte) map[string]int {
 
 // writeAtomic은 같은 디렉토리의 임시 파일에 쓴 뒤 이름을 바꾼다.
 // 심볼릭 링크면 링크는 두고 가리키는 파일을 바꾼다.
-func writeAtomic(path string, b []byte) error {
+func WriteAtomic(path string, b []byte) error {
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
 	}
@@ -172,8 +172,8 @@ func renameRetry(from, to string) error {
 	return err
 }
 
-// inside는 path의 실제 위치가 dir의 실제 위치 아래인지 본다.
-func inside(dir, path string) error {
+// Inside는 path의 실제 위치가 dir의 실제 위치 아래인지 본다.
+func Inside(dir, path string) error {
 	realDir, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrIO, err)
