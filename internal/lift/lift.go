@@ -108,7 +108,7 @@ func Draft(designDir, root string) (*Result, error) {
 	if c.res.Coverage, err = coverageDelta(m, sources, designDir, root, c.res.YAML); err != nil {
 		return nil, err
 	}
-	sort.Slice(c.res.Skipped, func(i, j int) bool { return c.res.Skipped[i].Where < c.res.Skipped[j].Where })
+	sort.SliceStable(c.res.Skipped, func(i, j int) bool { return skipLess(c.res.Skipped[i], c.res.Skipped[j]) })
 	return c.res, nil
 }
 
@@ -201,4 +201,28 @@ func (c *collector) add(kind, module, id string, name *ast.Ident, fields ...stri
 	n := Node{Kind: kind, Module: module, ID: id, Name: name.Name, Where: c.where(name.Pos()), fields: append(head, fields...)}
 	n.render()
 	c.nodes = append(c.nodes, n)
+}
+
+// skipLess는 경로, 줄 번호(숫자), 이름 순이다.
+func skipLess(a, b Skip) bool {
+	split := func(w string) (string, int) {
+		i := strings.LastIndex(w, ":")
+		if i < 0 {
+			return w, 0
+		}
+		n, err := strconv.Atoi(w[i+1:])
+		if err != nil {
+			return w, 0
+		}
+		return w[:i], n
+	}
+	ap, al := split(a.Where)
+	bp, bl := split(b.Where)
+	if ap != bp {
+		return ap < bp
+	}
+	if al != bl {
+		return al < bl
+	}
+	return a.Name < b.Name
 }

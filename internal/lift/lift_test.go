@@ -704,3 +704,31 @@ func TestEnumWithoutPrefix(t *testing.T) {
 		t.Fatalf("%+v", r.Skipped)
 	}
 }
+
+// 같은 줄에서 여러 선언을 빼도 옮기지 않은 목록의 순서는 정해져 있다.
+func TestSkippedOrderIsStable(t *testing.T) {
+	code := map[string]string{"core/c.go": "package core\n\nvar ErrB, ErrA = 1, 2\n\nvar ErrD, ErrC = 3, 4\n"}
+	first := ""
+	for i := 0; i < 20; i++ {
+		r := draft(t, "", code)
+		var names []string
+		for _, s := range r.Skipped {
+			names = append(names, s.Where+" "+s.Name)
+		}
+		got := strings.Join(names, ",")
+		if i == 0 {
+			first = got
+			if !strings.Contains(got, "c.go:3 ErrA,core/c.go:3 ErrB") {
+				t.Fatalf("이름 순이 아니다: %s", got)
+			}
+		} else if got != first {
+			t.Fatalf("순서가 바뀐다:\n%s\n%s", first, got)
+		}
+	}
+}
+
+func TestSkipLessLineNumber(t *testing.T) {
+	if !skipLess(Skip{Where: "a.go:3"}, Skip{Where: "a.go:10"}) {
+		t.Fatal("3줄이 10줄보다 뒤다")
+	}
+}
