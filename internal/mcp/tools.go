@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tolelom/daemok/internal/designdiff"
 	"github.com/tolelom/daemok/internal/edit"
 	"github.com/tolelom/daemok/internal/infer"
 	"github.com/tolelom/daemok/internal/lift"
@@ -44,6 +45,8 @@ func toolList(allowWrite bool) []map[string]any {
 			"inputSchema": with(map[string]any{"l3": map[string]any{"type": "boolean", "description": "L3 초안을 만든다. design은 이때만 쓴다"}})},
 		{"name": "gen", "description": "daemok gen이 쓰고 지울 생성 파일을 상태(same, new, changed, delete, refuse)와 함께 JSON으로 준다. path가 있으면 그 생성 파일의 생성할 내용을 준다. 설계를 고친 뒤 생성 코드를 확인하는 데 쓴다. 파일은 쓰지 않는다",
 			"inputSchema": with(map[string]any{"path": str("생성 파일 경로(코드 루트 기준 슬래시 경로)")})},
+		{"name": "diff", "description": "기준 git ref의 설계와 작업 폴더의 설계를 노드·키 단위로 비교한 마크다운을 준다(daemok diff와 같다). PR 설명의 설계 변경 요약에 쓴다",
+			"inputSchema": with(map[string]any{"base": str("기준 ref. 기본 HEAD")})},
 	}
 	for _, t := range tools {
 		t["annotations"] = read
@@ -77,6 +80,13 @@ func renameTool(design, root, kind, id, value string, code bool) map[string]any 
 	}
 	lines = append(lines, "승인은 사용자의 커밋이다. check 도구로 진단을 확인한다")
 	return toolResult(strings.Join(lines, "\n"), false)
+}
+
+func diffTool(design, base string) (string, error) {
+	if base == "" {
+		base = "HEAD"
+	}
+	return designdiff.Run(design, base)
 }
 
 func genTool(design, root, path string) (string, error) {

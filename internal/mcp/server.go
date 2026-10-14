@@ -151,6 +151,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			Path   string `json:"path"`
 			Kind   string `json:"kind"`
 			Code   bool   `json:"code"`
+			Base   string `json:"base"`
 		}
 		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
 			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
@@ -197,6 +198,8 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			}
 		case "gen":
 			text, err = genTool(design, root, args.Path)
+		case "diff":
+			text, err = diffTool(design, args.Base)
 		default:
 			return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
 		}

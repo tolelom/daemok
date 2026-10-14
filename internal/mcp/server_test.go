@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -90,7 +91,7 @@ func TestProtocol(t *testing.T) {
 			t.Fatalf("%v", tool)
 		}
 	}
-	if strings.Join(names, ",") != "design,check,draft,gen" {
+	if strings.Join(names, ",") != "design,check,draft,gen,diff" {
 		t.Fatal(names)
 	}
 	if errCode(res[3]) != -32601 || errCode(res[4]) != -32602 || errCode(res[5]) != -32700 {
@@ -196,6 +197,29 @@ func TestGenTool(t *testing.T) {
 		t.Fatal("gen 도구가 파일을 썼다")
 	}
 	if text, isErr := call(t, root, "gen", `{"path":"design/d.yaml"}`); !isErr || !strings.Contains(text, "생성 파일이 아니다") {
+		t.Fatal(text)
+	}
+}
+
+func TestDiffTool(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	root := project(t)
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"commit", "-q", "-m", "init"}} {
+		cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("%v %s", err, out)
+		}
+	}
+	p := filepath.Join(root, "design", "d.yaml")
+	b, _ := os.ReadFile(p)
+	os.WriteFile(p, []byte(strings.Replace(string(b), "api:  { tier: b", "api:  { tier: a", 1)), 0o644)
+	res := exchange(t, root, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"diff","arguments":{}}}`)
+	r := res[0]["result"].(map[string]any)
+	text := r["content"].([]any)[0].(map[string]any)["text"].(string)
+	if r["isError"] == true || !strings.Contains(text, "- 모듈 `api`\n  - tier: b → a") {
 		t.Fatal(text)
 	}
 }

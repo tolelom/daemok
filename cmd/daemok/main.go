@@ -11,6 +11,7 @@ const usage = `사용법:
   daemok check [--design DIR] [--root DIR] [--strict] [--format text|json]
   daemok gen   [--design DIR] [--root DIR] [--dry-run]
   daemok coverage [--design DIR] [--root DIR]
+  daemok diff     [--base REF] [--design DIR] [--root DIR]
   daemok rename <종류> <옛 ID> <새 ID> [--code] [--design DIR] [--root DIR]
   daemok mcp      [--design DIR] [--root DIR]
   daemok version
@@ -42,6 +43,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runInit(args[1:], stdout, stderr)
 	case "serve":
 		return runServe(args[1:], stdout, stderr)
+	case "diff":
+		return runDiff(args[1:], stdout, stderr)
 	case "rename":
 		return runRename(args[1:], stdout, stderr)
 	}
