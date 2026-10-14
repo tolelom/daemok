@@ -112,10 +112,15 @@ ${todo.length ? `<ul class="genlist">${todo.map(row).join('')}</ul>` : '<p class
 ${same.length ? `<details${todo.length ? '' : ' open'}><summary>그대로인 파일 ${same.length}개</summary><ul class="genlist">${same.map(row).join('')}</ul></details>` : ''}
 ${genSel ? `<h3 style="margin-top:22px"><code>${esc(genSel)}</code></h3>${genText === null ? '<p class="muted">읽는 중이다</p>' : `<pre class="yaml">${esc(genText)}</pre>`}` : ''}`;
 }
+// genReq는 파일 내용 요청 번호다. 늦게 끝난 옛 요청이 새 내용을 덮지 않게 마지막 요청만 반영한다.
+let genReq = 0;
 async function showGenFile(path) {
   genSel = path; genText = null;
   if (view === 'gen') paintGen();
+  const req = ++genReq;
   const r = await fetch('/api/gen/file?path=' + encodeURIComponent(path), { cache: 'no-store' }).catch(() => null);
-  genText = r && r.ok ? await r.text() : '내용을 받을 수 없다';
-  if (view === 'gen' && genSel === path) paintGen();
+  const text = r && r.ok ? await r.text() : '내용을 받을 수 없다';
+  if (req !== genReq) return;
+  genText = text;
+  if (view === 'gen') paintGen();
 }
