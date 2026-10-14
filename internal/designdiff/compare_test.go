@@ -72,6 +72,7 @@ func TestCompareValues(t *testing.T) {
 		{"짝 키 없는 목록", "contracts:\n  c: { methods: { m: { params: [{ a: int }] } } }\n", "contracts:\n  c: { methods: { m: { params: [{ a: string }] } } }\n", "~contracts/c: methods.m.params: 값 바뀜"},
 		{"추가 삭제", "errors:\n  ErrA: { message: a }\n", "errors:\n  ErrB: { message: b }\n", "+errors/ErrB\n-errors/ErrA"},
 		{"설정", "version: 0.5\ntiers: [a]\n", "version: 0.6\ntiers: [a, b]\n", "설정 version: 0.5 → 0.6\n설정 tiers: +b"},
+		{"cpp 설정", "cpp: { include_dirs: [a] }\n", "cpp: { include_dirs: [a, b] }\n", "설정 cpp.include_dirs: +b"},
 		{"멤버", "groups:\n  g:\n    tier: a\n    members:\n      m: { handles: [x] }\n", "groups:\n  g:\n    tier: b\n    members:\n      m: { handles: [x, y] }\n", "~groups/g: tier: a → b\n~members/m: handles: +y"},
 		{"멤버 그룹 이동", "groups:\n  g: { members: { m: { handles: [x] } } }\n  h: { members: {} }\n", "groups:\n  g: { members: {} }\n  h: { members: { m: { handles: [x] } } }\n", "~members/m: 그룹: g → h"},
 		{"system", "system:\n  id: s\n  actors:\n    a: { summary: x }\n", "system:\n  id: s\n  summary: y\n  actors:\n    a: { summary: z }\n", "~system/: summary 추가: y\n~actors/a: summary: x → z"},

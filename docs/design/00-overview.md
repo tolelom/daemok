@@ -50,7 +50,7 @@
 - 외부 의존성 없음. Go 표준 라이브러리만 쓴다.
 - 설계 파일은 YAML의 엄격한 부분집합이다. 지원하지 않는 문법은 줄 번호와 함께 에러를 낸다. 전용 언어는 YAML이 실제 병목이 될 때 따로 검토한다.
 - API 계약은 새로 정의하지 않고 OpenAPI 파일을 경로로 참조한다.
-- 1차 대상 언어는 Go다. 포맷의 언어 중립성은 이후 UE5 C++ 프로젝트로 확인한다.
+- 1차 대상 언어는 Go다. C++은 include 의존 검사만 하고 생성기는 없다.
 
 ## 다른 언어
 
@@ -58,7 +58,7 @@
 
 | 언어 | 의존 선언 |
 |---|---|
-| C, C++ | `#include` |
+| C, C++ | `#include`. 설계의 `cpp.include_dirs`로 검사함 |
 | UE5 C++ | `*.Build.cs`의 `PublicDependencyModuleNames`, `PrivateDependencyModuleNames` |
 | TypeScript | `import ... from`, `export ... from`, `import()` |
 | Python | `import`, `from ... import` |

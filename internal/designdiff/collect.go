@@ -16,7 +16,7 @@ var kinds = []string{
 }
 
 // settings는 노드가 아닌 최상위 설정 키다.
-var settings = []string{"version", "go_module", "ts_out", "tiers"}
+var settings = []string{"version", "go_module", "ts_out", "cpp", "tiers"}
 
 type node struct {
 	value *yaml.Node
@@ -49,7 +49,7 @@ func collect(files map[string][]byte) (*design, error) {
 		}
 		for _, e := range root.Entries {
 			switch e.Key {
-			case "version", "go_module", "ts_out", "tiers":
+			case "version", "go_module", "ts_out", "cpp", "tiers":
 				if d.settings[e.Key] == nil {
 					d.settings[e.Key] = e.Value
 				}
