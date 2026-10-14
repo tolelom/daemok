@@ -89,10 +89,16 @@ func Dirty(dir string) int {
 		return 0
 	}
 	n := 0
-	for _, f := range strings.Split(string(out), "\x00") {
-		// 이름 바꾸기는 원래 이름을 다음 칸에 하나 더 준다.
-		if len(f) > 3 && f[2] == ' ' {
-			n++
+	fields := strings.Split(string(out), "\x00")
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		if len(f) < 4 {
+			continue
+		}
+		n++
+		// 이름 바꾸기·복사는 원래 이름을 다음 칸에 하나 더 준다.
+		if f[0] == 'R' || f[0] == 'C' {
+			i++
 		}
 	}
 	return n

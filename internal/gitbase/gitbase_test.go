@@ -164,3 +164,19 @@ func TestNewWorktree(t *testing.T) {
 		t.Fatalf("이미 있는 경로: %v", err)
 	}
 }
+
+// 이름 바꾸기는 원래 이름이 어떤 글자로 시작하든 한 번만 센다.
+func TestDirtyRename(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	repo := t.TempDir()
+	run(t, repo, "init", "-q", "-b", "main")
+	os.WriteFile(filepath.Join(repo, "ab c.go"), []byte("package x\n"), 0o644)
+	run(t, repo, "add", ".")
+	run(t, repo, "commit", "-q", "-m", "init")
+	run(t, repo, "mv", "ab c.go", "new.go")
+	if n := Dirty(repo); n != 1 {
+		t.Fatalf("Dirty %d", n)
+	}
+}
