@@ -24,8 +24,9 @@ Go 1.27 이상. 외부 의존성은 없다.
 | `daemok gen` | 설계에서 Go 생성 파일과 `ts_out` TS 파일을 쓰고, 설계에 없는 Go 생성 파일을 지운다 | `--design DIR`, `--root DIR`, `--dry-run` |
 | `daemok init` | Go 모듈의 코드에서 L2 초안(모듈, tier, 의존)을 `design/`에 쓴다. 설계 파일이 이미 있으면 쓰지 않는다. `--dry-run`은 설계 파일과 관계없이 출력만 한다. `--l3`는 설계가 있을 때 설계에 없는 손으로 쓴 선언을 `gen: false` L3 노드 초안으로 출력한다 | `--root DIR`, `--design DIR`, `--dry-run`, `--l3` |
 | `daemok coverage` | 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율과 함수를 뺀 비율을 표로 출력한다 | `--design DIR`, `--root DIR` |
+| `daemok diff` | 기준 ref의 설계와 작업 폴더의 설계를 노드·키 단위로 비교해 PR 설명에 붙일 마크다운으로 출력한다. 주석·형식·파일 위치만 바뀐 것은 변경이 아니고, 고정 키만 다른 삭제·추가 짝은 이름 바뀜으로 묶는다 | `--base REF`(기본 `HEAD`), `--design DIR`, `--root DIR` |
 | `daemok rename` | 설계 노드 하나의 ID와 그 참조를 설계 파일 전체에서 바꾼다(`daemok rename types post article`). 기본은 코드 이름을 고정 키(`go.name`, `go.type`, `path`)로 유지하고 생성 코드가 그대로일 때만 쓴다. `--code`는 생성 코드 이름도 새 ID를 따르게 한다 | `--code`, `--design DIR`, `--root DIR` |
-| `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 읽기 도구는 `design`, `check`, `draft`, `gen`이고, `--allow-write`면 설계를 고치는 `edit`도 낸다 | `--design DIR`, `--root DIR`, `--allow-write` |
+| `daemok mcp` | 표준 입출력으로 MCP 서버를 돌린다. 읽기 도구는 `design`, `check`, `draft`, `gen`, `diff`이고, `--allow-write`면 설계를 고치는 `edit`도 낸다 | `--design DIR`, `--root DIR`, `--allow-write` |
 | `daemok serve` | 설계 지도를 로컬 웹 화면으로 띄운다 | `--design DIR`, `--root DIR`, `--addr HOST:PORT`(기본 `127.0.0.1:7412`), `--workspace DIR` |
 
 `daemok version`은 버전과 빌드한 커밋을 출력한다. 종료 코드는 0 통과, 1 문제 있음, 2 진행할 수 없음이다.

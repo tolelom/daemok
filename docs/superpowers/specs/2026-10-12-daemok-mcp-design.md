@@ -23,7 +23,7 @@
 
 ## 도구
 
-`design`, `check`, `draft`는 읽기 전용이고 `annotations.readOnlyHint`를 붙입니다. 설계를 고치는 `edit`은 서버를 `--allow-write`로 띄웠을 때만 목록에 나옵니다.
+`design`, `check`, `draft`, `gen`, `diff`는 읽기 전용이고 `annotations.readOnlyHint`를 붙입니다. 설계를 고치는 `edit`은 서버를 `--allow-write`로 띄웠을 때만 목록에 나옵니다.
 
 도구 인자의 `design`, `root`는 제한하지 않습니다. 서버는 클라이언트를 띄운 사용자의 권한으로 로컬에서 돌고, 클라이언트가 여러 프로젝트를 오가며 경로를 넘기기 때문입니다. 그래서 클라이언트가 넘긴 디렉토리의 `*.yaml` 원문을 그대로 돌려줄 수 있습니다.
 
@@ -32,6 +32,7 @@
 | `design` | `module`(선택), `design`, `root` | `module`이 없으면 설계 파일 원문(파일 이름과 내용). 있으면 그 모듈·그룹·멤버의 tier, 경로, summary, `depends_on`, 그걸 쓰는 쪽, 소속 L3·L4 노드 ID를 JSON으로 |
 | `check` | `design`, `root` | `daemok check --format json`과 같은 JSON |
 | `draft` | `root`, `design`, `l3` | `daemok init --dry-run`과 같은 초안 YAML과 분석 메모 JSON. `l3`가 참이면 `daemok init --l3`와 같은 L3 초안 YAML과 옮기지 않은 선언 JSON |
+| `diff` | `base`(기본 `HEAD`), `design`, `root` | `daemok diff`와 같은 설계 변경 요약 마크다운([설계 변경 요약 스펙](2026-10-14-daemok-diff-design.md)) |
 | `edit` | `op`, `id`, `value`, `kind`, `code` | 화면 편집과 같은 작업(`tier`, `add_dep`, `remove_dep`, `add_module`, `remove_module`)과 이름 바꾸기(`rename`, [이름 바꾸기 스펙](2026-10-14-daemok-rename-design.md))를 서버의 `--design`에 적용하고 고친 파일 경로를 줌 |
 
 `edit`의 확인은 세 겹입니다. 사용자가 `--allow-write`로 등록해야 도구가 보이고, `readOnlyHint: false`와 `destructiveHint: true`를 붙여 클라이언트가 호출마다 사용자에게 묻게 하며, 고친 내용은 커밋 전까지 지도에 HEAD 대비 변경으로 보입니다. `design`·`root` 인자를 주면 거부하고 서버의 설계 디렉토리만 고칩니다. 화면 편집과 달리, 설계 파일이 심볼릭 링크로 설계 디렉토리 밖을 가리키면 쓰지 않습니다. 호출마다 묻는지는 클라이언트 설정에 달려 있어 서버가 경로를 막습니다. 고친 결과가 새 읽기 오류를 내면 쓰지 않는 규칙은 화면 편집과 같습니다.
