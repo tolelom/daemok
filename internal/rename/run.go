@@ -287,7 +287,11 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	if code {
 		return nil, nil
 	}
-	renamed, err := sameCode(workspace.RunSources(before, designDir, root).Files, workspace.RunSources(after, designDir, root).Files)
+	bg := workspace.RunSources(before, designDir, root)
+	if bg.Files == nil {
+		return nil, fmt.Errorf("설계 검사 오류가 있어 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diags))
+	}
+	renamed, err := sameCode(bg.Files, workspace.RunSources(after, designDir, root).Files)
 	if err != nil {
 		return nil, err
 	}

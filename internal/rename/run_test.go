@@ -274,3 +274,17 @@ func TestRunReportsRenamedGeneratedFile(t *testing.T) {
 		t.Fatalf("%v", res.Notes)
 	}
 }
+
+// 설계 검사 오류로 생성하지 못하면 기본 모드는 코드가 그대로인지 확인할 수 없어 거부한다. --code는 받는다.
+func TestRunDefaultNeedsGeneratableDesign(t *testing.T) {
+	design, root := basicCopy(t)
+	p := filepath.Join(design, "basic.yaml")
+	b, _ := os.ReadFile(p)
+	os.WriteFile(p, []byte(strings.Replace(string(b), "store:  { tier: foundation", "store:  { tier: nowhere", 1)), 0o644)
+	if _, err := Run(design, root, "types", "account", "acct", Options{}); err == nil || !strings.Contains(err.Error(), "확인할 수 없다") {
+		t.Fatalf("%v", err)
+	}
+	if _, err := Run(design, root, "types", "account", "acct", Options{Code: true}); err != nil {
+		t.Fatal(err)
+	}
+}
