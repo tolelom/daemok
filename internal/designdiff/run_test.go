@@ -50,3 +50,25 @@ func TestRun(t *testing.T) {
 		t.Fatal("없는 ref를 받았다")
 	}
 }
+
+func TestRunMissingDesignDir(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	repo := t.TempDir()
+	git(t, repo, "init", "-q")
+	os.WriteFile(filepath.Join(repo, "README"), []byte("x"), 0o644)
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "zero")
+	if _, err := Run(filepath.Join(repo, "design"), "HEAD"); err == nil || !strings.Contains(err.Error(), "설계 디렉토리") {
+		t.Fatalf("%v", err)
+	}
+	glob := filepath.Join(repo, "설계 [1]")
+	os.MkdirAll(glob, 0o755)
+	os.WriteFile(filepath.Join(glob, "d.yaml"), []byte("modules:\n  a: {}\n"), 0o644)
+	git(t, repo, "add", ".")
+	git(t, repo, "commit", "-q", "-m", "one")
+	if out, err := Run(glob, "HEAD"); err != nil || out != "설계 변경 없음 (HEAD 대비)\n" {
+		t.Fatalf("%v %s", err, out)
+	}
+}

@@ -18,3 +18,10 @@ func TestMarkdown(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestMarkdownCodeSpan(t *testing.T) {
+	r := &Report{Added: []NodeRef{{"modules", "a`b"}}}
+	if got := r.Markdown("HEAD"); got != "## 설계 변경 (HEAD 대비)\n\n### 추가\n- 모듈 ``a`b``\n" {
+		t.Fatal(got)
+	}
+}

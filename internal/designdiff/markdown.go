@@ -16,7 +16,19 @@ func name(n NodeRef) string {
 	if n.Kind == "system" {
 		return labels[n.Kind]
 	}
-	return labels[n.Kind] + " `" + n.ID + "`"
+	return labels[n.Kind] + " " + code(n.ID)
+}
+
+// code는 s를 코드 스팬으로 감싼다. s에 백틱이 있으면 더 긴 백틱 묶음으로 감싼다.
+func code(s string) string {
+	fence := "`"
+	for strings.Contains(s, fence) {
+		fence += "`"
+	}
+	if strings.HasPrefix(s, "`") || strings.HasSuffix(s, "`") {
+		return fence + " " + s + " " + fence
+	}
+	return fence + s + fence
 }
 
 // Markdown은 PR 설명에 붙일 변경 요약이다. base는 제목에 쓰는 기준 ref다.
@@ -38,7 +50,7 @@ func (r *Report) Markdown(base string) string {
 		added = append(added, "- "+name(n))
 	}
 	for _, n := range r.Renamed {
-		renamed = append(renamed, "- "+labels[n.Kind]+" `"+n.From+"` → `"+n.To+"`")
+		renamed = append(renamed, "- "+labels[n.Kind]+" "+code(n.From)+" → "+code(n.To))
 	}
 	for _, m := range r.Modified {
 		modified = append(modified, "- "+name(m.NodeRef))

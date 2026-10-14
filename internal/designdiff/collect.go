@@ -3,6 +3,7 @@
 package designdiff
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/tolelom/daemok/internal/yaml"
@@ -20,6 +21,7 @@ var settings = []string{"version", "go_module", "ts_out", "tiers"}
 type node struct {
 	value *yaml.Node
 	group string // 멤버의 소속 그룹
+	file  string
 }
 
 // design은 설계 하나의 노드(종류 → ID → 값)와 설정이다.
@@ -28,9 +30,10 @@ type design struct {
 	settings map[string]*yaml.Node
 }
 
-// collect는 파일들을 이름순으로 읽어 노드를 모은다. 같은 종류·ID가 여러 번 나오면 처음 것을 쓴다.
+// collect는 파일들을 이름순으로 읽어 노드를 모은다. 같은 종류·ID가 두 번 나오면 어느 쪽 변경을 볼지 정할 수 없어 오류다.
 func collect(files map[string][]byte) (*design, error) {
 	d := &design{nodes: map[string]map[string]node{}, settings: map[string]*yaml.Node{}}
+	var dup error
 	for _, k := range kinds {
 		d.nodes[k] = map[string]node{}
 	}
@@ -51,40 +54,44 @@ func collect(files map[string][]byte) (*design, error) {
 					d.settings[e.Key] = e.Value
 				}
 			case "system":
-				d.add("system", "", without(e.Value, "actors", "interfaces"), "")
+				d.add("system", "", without(e.Value, "actors", "interfaces"), "", name, &dup)
 				for _, sub := range []string{"actors", "interfaces"} {
-					d.addAll(sub, e.Value.Get(sub), "")
+					d.addAll(sub, e.Value.Get(sub), "", name, &dup)
 				}
 			case "groups":
 				if e.Value.Kind != yaml.Map {
 					continue
 				}
 				for _, g := range e.Value.Entries {
-					d.add("groups", g.Key, without(g.Value, "members"), "")
-					d.addAll("members", g.Value.Get("members"), g.Key)
+					d.add("groups", g.Key, without(g.Value, "members"), "", name, &dup)
+					d.addAll("members", g.Value.Get("members"), g.Key, name, &dup)
 				}
 			default:
 				if _, ok := d.nodes[e.Key]; ok {
-					d.addAll(e.Key, e.Value, "")
+					d.addAll(e.Key, e.Value, "", name, &dup)
 				}
 			}
 		}
 	}
-	return d, nil
+	return d, dup
 }
 
-func (d *design) add(kind, id string, v *yaml.Node, group string) {
-	if _, dup := d.nodes[kind][id]; !dup {
-		d.nodes[kind][id] = node{v, group}
+func (d *design) add(kind, id string, v *yaml.Node, group, file string, dup *error) {
+	if prev, ok := d.nodes[kind][id]; ok {
+		if *dup == nil {
+			*dup = fmt.Errorf("같은 ID가 두 곳에 있다: %s %q (%s, %s)", kind, id, prev.file, file)
+		}
+		return
 	}
+	d.nodes[kind][id] = node{v, group, file}
 }
 
-func (d *design) addAll(kind string, m *yaml.Node, group string) {
+func (d *design) addAll(kind string, m *yaml.Node, group, file string, dup *error) {
 	if m == nil || m.Kind != yaml.Map {
 		return
 	}
 	for _, e := range m.Entries {
-		d.add(kind, e.Key, e.Value, group)
+		d.add(kind, e.Key, e.Value, group, file, dup)
 	}
 }
 

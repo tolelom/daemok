@@ -75,9 +75,19 @@ func TestCompareValues(t *testing.T) {
 		{"멤버", "groups:\n  g:\n    tier: a\n    members:\n      m: { handles: [x] }\n", "groups:\n  g:\n    tier: b\n    members:\n      m: { handles: [x, y] }\n", "~groups/g: tier: a → b\n~members/m: handles: +y"},
 		{"멤버 그룹 이동", "groups:\n  g: { members: { m: { handles: [x] } } }\n  h: { members: {} }\n", "groups:\n  g: { members: {} }\n  h: { members: { m: { handles: [x] } } }\n", "~members/m: 그룹: g → h"},
 		{"system", "system:\n  id: s\n  actors:\n    a: { summary: x }\n", "system:\n  id: s\n  summary: y\n  actors:\n    a: { summary: z }\n", "~system/: summary 추가: y\n~actors/a: summary: x → z"},
-		{"이름 바뀜 모듈", "types:\n  post: { in: core }\nmodules:\n  core: { tier: a }\n", "types:\n  post: { in: base }\nmodules:\n  base: { tier: a, path: core }\n", "=modules/core>base\n~types/post: in: core → base"},
-		{"이름 바뀜 고정 키", "types:\n  post: { in: core, fields: { a: int } }\n", "types:\n  article: { in: core, fields: { a: int }, go: { name: Post } }\n", "=types/post>article"},
-		{"이름 바뀜 go 맵 안", "enums:\n  k: { go: { prefix: K }, values: [a] }\n", "enums:\n  k2: { go: { prefix: K, type: K }, values: [a] }\n", "=enums/k>k2"},
+		{"이름 바뀜 모듈", "types:\n  post: { in: core }\nmodules:\n  core: { tier: a }\n", "types:\n  post: { in: base }\nmodules:\n  base: { tier: a, path: core }\n", "=modules/core>base\n~modules/base: path 추가: core\n~types/post: in: core → base"},
+		{"이름 바뀜 고정 키", "types:\n  post: { in: core, fields: { a: int } }\n", "types:\n  article: { in: core, fields: { a: int }, go: { name: Post } }\n", "=types/post>article\n~types/article: go 추가: { name: Post }"},
+		{"이름 바뀜 go 맵 안", "enums:\n  k: { go: { prefix: K }, values: [a] }\n", "enums:\n  k2: { go: { prefix: K, type: K }, values: [a] }\n", "=enums/k>k2\n~enums/k2: go.type 추가: K"},
+		{"이름 바뀜 고정 키 보임", "modules:\n  core: { tier: a }\n", "modules:\n  base: { tier: a, path: core }\n", "=modules/core>base\n~modules/base: path 추가: core"},
+		{"이름 바뀜 go.name 바뀜", "types:\n  post: { in: c, go: { name: Foo } }\n", "types:\n  article: { in: c, go: { name: Bar } }\n", "+types/article\n-types/post"},
+		{"인터페이스 path는 고정 키 아님", "system:\n  interfaces:\n    users: { protocol: http, path: /users }\n", "system:\n  interfaces:\n    posts: { protocol: http, path: /posts }\n", "+interfaces/posts\n-interfaces/users"},
+		{"모듈 path 바뀌면 짝 아님", "modules:\n  core: { tier: a, path: internal/core }\n", "modules:\n  web: { tier: a, path: cmd/web }\n", "+modules/web\n-modules/core"},
+		{"따옴표로 뜻이 바뀜", "funcs:\n  f: { cases: [{ name: c, expect: { id: 1 } }] }\n", "funcs:\n  f: { cases: [{ name: c, expect: { id: \"1\" } }] }\n", "~funcs/f: cases[c].expect.id: 1 → \"1\""},
+		{"따옴표 문자열은 같음", "modules:\n  a: { summary: x }\n", "modules:\n  a: { summary: \"x\" }\n", ""},
+		{"null 표기", "modules:\n  a:\n    summary: null\n    depends_on:\n    go:\n", "modules:\n  a: { depends_on: [] }\n", ""},
+		{"노드 값 종류", "system:\n", "system:\n  id: s\n", "~system/: 값 추가: { id: s }"},
+		{"필드 순서", "types:\n  t: { fields: { a: int, b: int } }\n", "types:\n  t: { fields: { b: int, a: int } }\n", "~types/t: fields: 순서 바뀜"},
+		{"빈 노드는 짝 아님", "groups:\n  g: { members: { m: {} } }\n", "groups:\n  g: { members: { n: {} } }\n", "+members/n\n-members/m"},
 		{"이름 바뀜 둘", "errors:\n  ErrA: { message: m }\n", "errors:\n  ErrB: { message: m }\n  ErrC: { message: m }\n", "+errors/ErrB\n+errors/ErrC\n-errors/ErrA"},
 	}
 	for _, c := range cases {
@@ -92,5 +102,19 @@ func TestCompareValues(t *testing.T) {
 func TestCompareParseError(t *testing.T) {
 	if _, err := Compare(map[string][]byte{}, map[string][]byte{"a.yaml": []byte("a: [\n")}); err == nil {
 		t.Fatal("읽을 수 없는 파일을 받았다")
+	}
+}
+
+func TestCompareRefusesDuplicateID(t *testing.T) {
+	_, err := Compare(map[string][]byte{}, map[string][]byte{"a.yaml": []byte("types:\n  t: {}\n"), "b.yaml": []byte("types:\n  t: {}\n")})
+	if err == nil {
+		t.Fatal("두 곳에 있는 ID를 받았다")
+	}
+}
+
+func TestRenderEscapes(t *testing.T) {
+	got := one(t, "modules:\n  a: { summary: x }\n", "modules:\n  a: { summary: \"x\\\"y\\n## z, w\" }\n")
+	if got != `~modules/a: summary: x → "x\"y\n## z, w"` {
+		t.Fatal(got)
 	}
 }
