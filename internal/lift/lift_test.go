@@ -605,3 +605,52 @@ func TestCrossModuleRefsKeepLiterals(t *testing.T) {
 		}
 	}
 }
+
+// 함수가 반환하는 초안 에러가 ID 충돌로 빠지면, 같은 ID의 다른 모듈 에러를 가리키지 않고 함수를 뺀다.
+func TestFreeFuncErrorDroppedByDraftDuplicate(t *testing.T) {
+	r := draft(t, "  web: { tier: a }\n", map[string]string{
+		"core/c.go": "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"core missing\")\n",
+		"web/w.go":  "package web\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"web missing\")\n\nfunc Get() error { return ErrNotFound }\n",
+	})
+	if got := lines(r); strings.Contains(got, "funcs get") {
+		t.Fatalf("web 함수가 core 에러를 가리킨다:\n%s", got)
+	}
+	if !hasSkip(r, "Get", "ErrNotFound") {
+		t.Fatalf("Get을 뺀 이유가 없다: %+v", r.Skipped)
+	}
+}
+
+// 설계에 있는 다른 모듈 에러와 ID가 같은 초안 에러를 반환하는 함수도 뺀다.
+func TestFreeFuncErrorShadowedByDesign(t *testing.T) {
+	r := draft(t, "  web: { tier: a }\nerrors:\n  ErrNotFound: { in: core, gen: false, message: \"core missing\" }\n", map[string]string{
+		"core/c.go": "package core\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"core missing\")\n",
+		"web/w.go":  "package web\n\nimport \"errors\"\n\nvar ErrNotFound = errors.New(\"web missing\")\n\nfunc Get() error { return ErrNotFound }\n",
+	})
+	if got := lines(r); strings.Contains(got, "funcs get") {
+		t.Fatalf("web 함수가 core 에러를 가리킨다:\n%s", got)
+	}
+	if !hasSkip(r, "Get", "ErrNotFound") {
+		t.Fatalf("Get을 뺀 이유가 없다: %+v", r.Skipped)
+	}
+}
+
+func hasSkip(r *Result, name, reasonPart string) bool {
+	for _, s := range r.Skipped {
+		if s.Name == name && strings.Contains(s.Reason, reasonPart) {
+			return true
+		}
+	}
+	return false
+}
+
+// 플랫폼 파일마다 반환하는 에러가 다른 함수는 다른 선언으로 본다.
+func TestPlatformVariantFuncErrors(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/e.go":         "package core\n\nimport \"errors\"\n\nvar ErrA = errors.New(\"a\")\n\nvar ErrB = errors.New(\"b\")\n",
+		"core/f_linux.go":   "package core\n\nfunc Open() error { return ErrA }\n",
+		"core/f_windows.go": "package core\n\nfunc Open() error { return ErrB }\n",
+	})
+	if got := lines(r); strings.Contains(got, "funcs open") {
+		t.Fatalf("플랫폼마다 다른 함수가 남았다:\n%s", got)
+	}
+}

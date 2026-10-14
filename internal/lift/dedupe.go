@@ -17,6 +17,9 @@ func platformVariants(nodes []Node, res *Result) []Node {
 				fs = append(fs, f)
 			}
 		}
+		for _, r := range n.errRefs {
+			fs = append(fs, "returns "+r.module+"."+r.name)
+		}
 		return strings.Join(fs, ", ")
 	}
 	first := map[string]Node{}

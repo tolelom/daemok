@@ -27,6 +27,8 @@ type Node struct {
 	Line   string `json:"line"`
 	Where  string `json:"where"` // 코드 루트 기준 "경로:줄"
 	fields []string
+	// errRefs는 funcs 노드가 반환하는 에러다. dedupe 뒤 resolveFuncErrors가 ID로 푼다.
+	errRefs []errorRef
 }
 
 func (n *Node) render() { n.Line = n.ID + ": { " + strings.Join(n.fields, ", ") + " }" }
@@ -85,7 +87,7 @@ func Draft(designDir, root string) (*Result, error) {
 		c.unit(u.id, u.path, expected[u.path])
 	}
 	c.funcs()
-	nodes, err := validate(sources, designDir, root, relink(dedupe(c.nodes, c.res)), c.res)
+	nodes, err := validate(sources, designDir, root, relink(resolveFuncErrors(dedupe(c.nodes, c.res), c.m, c.res)), c.res)
 	if err != nil {
 		return nil, err
 	}
