@@ -54,7 +54,7 @@ func flowInterface(fl *model.Flow, name string) string {
 		seen[id] = true
 		line := "\t" + model.GoName(id) + "() error"
 		if doc != "" {
-			line = "\t// " + doc + "\n" + line
+			line = comment("\t", doc) + "\n" + line
 		}
 		lines = append(lines, line)
 	}
@@ -65,7 +65,7 @@ func flowInterface(fl *model.Flow, name string) string {
 	lines = append(lines, "\t// Fatal은 되돌릴 수 없는 실패에서 불린다. 돌아오지 않는 것을 전제로 한다.\n\tFatal(step string, err error)")
 	doc := fmt.Sprintf("// %sSteps는 %s 흐름의 단계다. 본문은 손으로 쓴다.", name, fl.ID)
 	if fl.Summary != "" {
-		doc += "\n// " + fl.Summary
+		doc += "\n" + comment("", fl.Summary)
 	}
 	return fmt.Sprintf("%s\ntype %sSteps interface {\n%s\n}", doc, name, strings.Join(lines, "\n"))
 }

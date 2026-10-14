@@ -1,6 +1,9 @@
 package golang
 
 import (
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,5 +208,38 @@ types:
 	}
 	if !strings.Contains(files["web/types.gen.go"], "encoding/json") {
 		t.Errorf("json import가 없다:\n%s", files["web/types.gen.go"])
+	}
+}
+
+func TestMultilineSummaryStaysComment(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a]
+modules:
+  core: { tier: a }
+types:
+  post: { in: core, fields: { title: { type: string, summary: "first\nsecond" } } }
+flows:
+  run:
+    in: core
+    summary: "flow one\nflow two"
+    steps:
+      - { id: step, summary: "step one\nstep two" }
+`)
+	for path, src := range files {
+		if _, err := parser.ParseFile(token.NewFileSet(), path, src, parser.ParseComments); err != nil {
+			t.Errorf("%s: %v\n%s", path, err, src)
+		}
+	}
+	got := files["core/types.gen.go"]
+	if !strings.Contains(got, "\t// first\n\t// second\n") {
+		t.Errorf("여러 줄 summary가 주석으로 남지 않았다:\n%s", got)
+	}
+	f, err := parser.ParseFile(token.NewFileSet(), "types.go", got, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	st := f.Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec).Type.(*ast.StructType)
+	if n := len(st.Fields.List); n != 1 {
+		t.Errorf("필드가 %d개다(summary 줄이 필드가 됐다):\n%s", n, got)
 	}
 }
