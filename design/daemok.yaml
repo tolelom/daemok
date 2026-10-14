@@ -1,0 +1,28 @@
+# daemok 자신의 설계다. tier는 아래에서 위로 읽기 → 모델 → 생성 → 대조 → 흐름 → 진입점이다.
+version: 0.5
+go_module: github.com/tolelom/daemok
+
+system:
+  id: daemok
+
+executables:
+  daemok: { summary: "daemok은 설계 파일을 읽어 검사하고 코드를 생성하는 CLI다.", composes: [check, coverage, infer, lift, mcp, model, serve, workspace, yaml] }
+
+tiers: [parse, model, generate, verify, pipeline, interface]
+
+modules:
+  gitbase: { tier: parse, path: internal/gitbase, summary: "Package gitbase는 git HEAD에 있는 설계 파일과 저장소의 worktree를 읽는다." }
+  gosrc: { tier: parse, path: internal/gosrc, summary: "Package gosrc는 디렉토리의 Go 소스 파일을 고르고 읽는다." }
+  yaml: { tier: parse, path: internal/yaml, summary: "Package yaml은 daemok 설계 파일이 쓰는 YAML 부분집합을 파싱한다." }
+  infer: { tier: model, path: internal/infer, summary: "Package infer는 Go 모듈의 코드에서 L2 설계 초안을 만든다.", depends_on: [gosrc] }
+  model: { tier: model, path: internal/model, summary: "Package model은 설계 파일을 노드 타입으로 옮기고 여러 파일을 하나로 합친다.", depends_on: [yaml] }
+  edit: { tier: generate, path: internal/edit, summary: "Package edit는 설계 파일의 L2 모듈과 그룹을 줄 단위로 고친다.", depends_on: [model, yaml] }
+  golang: { tier: generate, path: internal/gen/golang, summary: "Package golang은 모델에서 Go 생성 파일을 만든다.", depends_on: [model, yaml] }
+  ts: { tier: generate, path: internal/gen/ts, summary: "Package ts는 export: [ts]가 붙은 상수, enum, 타입을 ts_out 파일 하나의 TypeScript로 만든다.", depends_on: [model] }
+  check: { tier: verify, path: internal/check, summary: "Package check는 모델만 보고 설계 검사를 한다.", depends_on: [model, ts, yaml] }
+  codescan: { tier: verify, path: internal/codescan, summary: "Package codescan은 코드의 import와 이벤트 상수 참조를 설계와 대조한다.", depends_on: [golang, gosrc, model, yaml] }
+  coverage: { tier: verify, path: internal/coverage, summary: "Package coverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 수를 센다.", depends_on: [golang, gosrc, model] }
+  workspace: { tier: pipeline, path: internal/workspace, summary: "Package workspace는 설계 읽기, 설계 검사, 생성, 디스크의 생성 파일 대조를 묶는다.", depends_on: [check, codescan, golang, gosrc, model, ts, yaml] }
+  lift: { tier: pipeline, path: internal/lift, summary: "Package lift는 설계 모듈 패키지에 손으로 쓴 선언 중 설계에 없는 것을 gen: false L3 노드 초안으로 만든다.", depends_on: [check, coverage, golang, gosrc, model, workspace] }
+  mcp: { tier: interface, path: internal/mcp, summary: "Package mcp는 표준 입출력으로 MCP(JSON-RPC 2.0, 한 줄에 메시지 하나)를 주고받아 AI가 설계를 읽고 검사를 돌리게 한다.", depends_on: [edit, infer, lift, model, workspace] }
+  serve: { tier: interface, path: internal/serve, summary: "Package serve는 설계 지도를 로컬 웹 페이지로 보여준다.", depends_on: [edit, gitbase, golang, gosrc, infer, lift, model, workspace, yaml] }
