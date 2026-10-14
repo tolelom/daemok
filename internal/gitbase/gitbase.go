@@ -131,6 +131,26 @@ func NewWorktree(dir, branch string) (string, error) {
 	return path, nil
 }
 
+// Prefix는 dir의 저장소 최상위 기준 상대 경로다. 최상위면 빈 문자열이다.
+func Prefix(dir string) (string, error) {
+	out, err := git(dir, "rev-parse", "--show-prefix")
+	if err != nil {
+		return "", fmt.Errorf("git 저장소가 아니다: %s", dir)
+	}
+	return filepath.FromSlash(strings.TrimSuffix(strings.TrimSpace(string(out)), "/")), nil
+}
+
+// RemoveWorktree는 NewWorktree가 만든 worktree와 브랜치를 지운다. 만든 뒤 실패했을 때 되돌린다.
+func RemoveWorktree(dir, path, branch string) error {
+	if out, err := gitOut(dir, "worktree", "remove", "--force", path); err != nil {
+		return fmt.Errorf("git worktree remove: %s", strings.TrimSpace(out))
+	}
+	if out, err := gitOut(dir, "branch", "-D", branch); err != nil {
+		return fmt.Errorf("git branch -D: %s", strings.TrimSpace(out))
+	}
+	return nil
+}
+
 // excludeWorktrees는 저장소의 info/exclude에 /.worktrees/ 줄이 없으면 더한다.
 func excludeWorktrees(dir string) error {
 	out, err := git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")

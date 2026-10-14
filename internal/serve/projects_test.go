@@ -2,6 +2,7 @@ package serve
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -313,5 +314,61 @@ func TestInitWorktreeNeedsGit(t *testing.T) {
 	s.SetOptions(Options{Local: false})
 	if code, _ := post(t, s, "/api/init-worktree", `{"branch":"x"}`); code != 403 {
 		t.Fatalf("%d", code)
+	}
+}
+
+// 저장소 하위 디렉토리의 Go 모듈이면 새 worktree에서도 같은 하위 디렉토리를 코드 루트로 쓴다.
+func TestInitWorktreeSubdirModule(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	top := t.TempDir()
+	root := filepath.Join(top, "svc")
+	os.MkdirAll(filepath.Join(root, "core"), 0o755)
+	os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/demo\n"), 0o644)
+	os.WriteFile(filepath.Join(root, "core", "c.go"), []byte("package core\n"), 0o644)
+	gitRun(t, top, "init", "-q", "-b", "main")
+	gitRun(t, top, "add", ".")
+	gitRun(t, top, "commit", "-q", "-m", "init")
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`)
+	want := filepath.Join(top, ".worktrees", "daemok-design", "svc")
+	if code != 200 || out["root"] != want {
+		t.Fatalf("%d %v", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(want, "design", "demo.yaml")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// worktree를 만든 뒤 실패하면 worktree와 브랜치를 지워 같은 이름으로 다시 할 수 있다.
+func TestInitWorktreeCleansUpOnFailure(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	root := goModule(t)
+	os.MkdirAll(filepath.Join(root, "design"), 0o755)
+	os.WriteFile(filepath.Join(root, "design", "d.yaml"), []byte("version: 0.5\n"), 0o644)
+	gitRun(t, root, "init", "-q", "-b", "main")
+	gitRun(t, root, "add", ".")
+	gitRun(t, root, "commit", "-q", "-m", "init")
+	os.RemoveAll(filepath.Join(root, "design"))
+	s := New(filepath.Join(root, "design"), root)
+	s.Poll()
+	local(t, s)
+	for i := 0; i < 2; i++ {
+		code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`)
+		if code == 200 || strings.Contains(fmt.Sprint(out["error"]), "이미 있는") {
+			t.Fatalf("%d번째: %d %v", i+1, code, out)
+		}
+	}
+	list, _ := exec.Command("git", "-C", root, "worktree", "list", "--porcelain").Output()
+	if n := strings.Count(string(list), "worktree "); n != 1 {
+		t.Fatalf("worktree가 남았다:\n%s", list)
+	}
+	if err := exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/daemok/design").Run(); err == nil {
+		t.Fatal("브랜치가 남았다")
 	}
 }

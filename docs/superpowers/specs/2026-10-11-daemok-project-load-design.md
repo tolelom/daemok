@@ -123,7 +123,7 @@ codescan과 infer는 `internal/gosrc` 하나로 파일을 고릅니다. 둘이 �
 | `GET /api/projects` | 현재 프로젝트, 같은 저장소의 worktree, 최근 목록, 작업 폴더 목록. worktree와 최근 항목은 브랜치, 모드(`check`, `analyze`), 지금 연 것인지를 함께 줍니다 | |
 | `POST /api/open` `{"path": "..."}` | 위 열기 | 400과 이유 |
 | `POST /api/init` | 분석 모드의 초안을 infer의 쓰기 함수로 저장 | 분석 모드가 아니거나 `design/`에 `*.yaml`이 있으면 409 |
-| `POST /api/init-worktree` `{"branch": "..."}` | 지금 저장소 HEAD에서 브랜치를 만들어 `<주 worktree>/.worktrees/<브랜치의 /를 ->`에 꺼내고, 그 코드로 다시 추정한 초안을 그 안의 `design/`에 쓴 뒤 엽니다. 저장소의 `info/exclude`에 `/.worktrees/`가 없으면 더합니다 | `design/`에 `*.yaml`이 있으면 409. 브랜치 이름이 아니거나, 브랜치·경로가 이미 있거나, 커밋이 없거나, git 저장소가 아니면 400 |
+| `POST /api/init-worktree` `{"branch": "..."}` | 지금 저장소 HEAD에서 브랜치를 만들어 `<주 worktree>/.worktrees/<브랜치의 /를 ->`에 꺼내고, 그 코드로 다시 추정한 초안을 그 안의 `design/`에 쓴 뒤 엽니다. 코드 루트가 저장소 하위 디렉토리면 새 worktree에서도 같은 하위 디렉토리를 씁니다. 저장소의 `info/exclude`에 `/.worktrees/`가 없으면 더합니다. worktree를 만든 뒤 실패하면 worktree와 브랜치를 지웁니다 | `design/`에 `*.yaml`이 있거나 HEAD에 설계 파일이 있거나 새 worktree를 분석하지 못하면 409. 브랜치 이름이 아니거나, 브랜치·경로가 이미 있거나, 커밋이 없거나, git 저장소가 아니면 400 |
 
 - 경로가 `~`나 `~/`로 시작하면 홈 디렉토리로 바꿉니다.
 - 같은 저장소의 worktree: 지금 연 루트에서 `git worktree list`로 읽습니다. 하나뿐이거나 git 저장소가 아니면 비어 있습니다.

@@ -298,23 +298,41 @@ func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "design/에 이미 설계 파일이 있다")
 		return
 	}
-	wt, err := gitbase.NewWorktree(root, strings.TrimSpace(req.Branch))
+	prefix, err := gitbase.Prefix(root)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	branch := strings.TrimSpace(req.Branch)
+	top, err := gitbase.NewWorktree(root, branch)
+	if err != nil {
+		writeErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// 만든 뒤 실패하면 worktree와 브랜치를 지워 같은 이름으로 다시 할 수 있게 한다.
+	fail := func(code int, msg string) {
+		if err := gitbase.RemoveWorktree(root, top, branch); err != nil {
+			msg += fmt.Sprintf(". worktree를 지우지 못했다(%s): %v", top, err)
+		}
+		writeErr(w, code, msg)
+	}
+	wt := filepath.Join(top, prefix)
+	if infer.HasDesignFiles(filepath.Join(wt, "design")) {
+		fail(http.StatusConflict, "HEAD에 이미 설계 파일이 있다. 작업 폴더에서만 지운 설계는 커밋해야 반영된다")
+		return
+	}
 	a, err := infer.Analyze(wt)
 	if err != nil {
-		writeErr(w, http.StatusConflict, fmt.Sprintf("worktree를 만들었지만 분석하지 못했다(%s): %v", wt, err))
+		fail(http.StatusConflict, fmt.Sprintf("새 worktree를 분석하지 못했다: %v", err))
 		return
 	}
 	p, err := infer.Write(filepath.Join(wt, "design"), a)
 	if err != nil {
-		writeErr(w, http.StatusInternalServerError, fmt.Sprintf("worktree를 만들었지만 초안을 쓰지 못했다(%s): %v", wt, err))
+		fail(http.StatusInternalServerError, fmt.Sprintf("새 worktree에 초안을 쓰지 못했다: %v", err))
 		return
 	}
 	if err := s.Open(wt); err != nil {
-		writeErr(w, http.StatusInternalServerError, err.Error())
+		fail(http.StatusInternalServerError, err.Error())
 		return
 	}
 	if rel, err := filepath.Rel(wt, p); err == nil {
