@@ -705,30 +705,33 @@ func TestEnumWithoutPrefix(t *testing.T) {
 	}
 }
 
-// 같은 줄에서 여러 선언을 빼도 옮기지 않은 목록의 순서는 정해져 있다.
-func TestSkippedOrderIsStable(t *testing.T) {
-	code := map[string]string{"core/c.go": "package core\n\nvar ErrB, ErrA = 1, 2\n\nvar ErrD, ErrC = 3, 4\n"}
-	first := ""
-	for i := 0; i < 20; i++ {
-		r := draft(t, "", code)
-		var names []string
-		for _, s := range r.Skipped {
-			names = append(names, s.Where+" "+s.Name)
-		}
-		got := strings.Join(names, ",")
-		if i == 0 {
-			first = got
-			if !strings.Contains(got, "c.go:3 ErrA,core/c.go:3 ErrB") {
-				t.Fatalf("이름 순이 아니다: %s", got)
-			}
-		} else if got != first {
-			t.Fatalf("순서가 바뀐다:\n%s\n%s", first, got)
-		}
+// 같은 줄에서 여러 선언을 빼면 옮기지 않은 목록은 이름 순이다.
+func TestSkippedOrderByName(t *testing.T) {
+	r := draft(t, "", map[string]string{"core/c.go": "package core\n\nvar ErrB, ErrA = 1, 2\n\nvar ErrD, ErrC = 3, 4\n"})
+	var names []string
+	for _, s := range r.Skipped {
+		names = append(names, s.Where+" "+s.Name)
+	}
+	want := "core/c.go:3 ErrA,core/c.go:3 ErrB,core/c.go:5 ErrC,core/c.go:5 ErrD"
+	if got := strings.Join(names, ","); got != want {
+		t.Fatalf("got  %s\nwant %s", got, want)
 	}
 }
 
 func TestSkipLessLineNumber(t *testing.T) {
 	if !skipLess(Skip{Where: "a.go:3"}, Skip{Where: "a.go:10"}) {
 		t.Fatal("3줄이 10줄보다 뒤다")
+	}
+}
+
+// 플랫폼 파일마다 반환 순서만 다른 함수는 같은 선언으로 본다.
+func TestPlatformVariantFuncErrorOrder(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/e.go":         "package core\n\nimport \"errors\"\n\nvar ErrA = errors.New(\"a\")\n\nvar ErrB = errors.New(\"b\")\n",
+		"core/f_linux.go":   "package core\n\nfunc Open(x int) error {\n\tif x > 0 {\n\t\treturn ErrA\n\t}\n\treturn ErrB\n}\n",
+		"core/f_windows.go": "package core\n\nfunc Open(x int) error {\n\tif x > 0 {\n\t\treturn ErrB\n\t}\n\treturn ErrA\n}\n",
+	})
+	if got := lines(r); !strings.Contains(got, "funcs open: { in: core, gen: false, errors: [ErrA, ErrB] }") {
+		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
 	}
 }

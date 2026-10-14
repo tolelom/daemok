@@ -17,10 +17,12 @@ func platformVariants(nodes []Node, res *Result) []Node {
 				fs = append(fs, f)
 			}
 		}
+		var refs []string
 		for _, r := range n.errRefs {
-			fs = append(fs, "returns "+r.module+"."+r.name)
+			refs = append(refs, "returns "+r.module+"."+r.name)
 		}
-		return strings.Join(fs, ", ")
+		slices.Sort(refs)
+		return strings.Join(append(fs, refs...), ", ")
 	}
 	first := map[string]Node{}
 	differs := map[string]bool{}
