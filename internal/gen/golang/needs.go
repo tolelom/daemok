@@ -71,10 +71,11 @@ func (g *gen) needs() error {
 					lines = append(lines, g.methodSig(me, dir, f))
 				}
 			}
-			doc := fmt.Sprintf("// %s는 %s 계약(%s)에서 이 패키지가 쓰는 메서드다.", ct.GoName(), ct.ID, ct.Kind)
+			text := fmt.Sprintf("%s는 %s 계약(%s)에서 이 패키지가 쓰는 메서드다.", ct.GoName(), ct.ID, ct.Kind)
 			if n.Why != "" {
-				doc += " " + n.Why
+				text += " " + n.Why
 			}
+			doc := comment("", text)
 			f.add("%s\ntype %s interface {\n%s\n}", doc, ct.GoName(), strings.Join(lines, "\n"))
 		}
 	}

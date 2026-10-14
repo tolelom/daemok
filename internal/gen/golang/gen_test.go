@@ -243,3 +243,23 @@ flows:
 		t.Errorf("필드가 %d개다(summary 줄이 필드가 됐다):\n%s", n, got)
 	}
 }
+
+func TestMultilineNeedWhyStaysComment(t *testing.T) {
+	files := genSrc(t, `
+tiers: [a, b]
+modules:
+  store: { tier: a, role: infra }
+  app: { tier: b, needs: [{ contract: kv, why: "first\nsecond" }] }
+contracts:
+  kv:
+    in: store
+    kind: port
+    methods:
+      get: { params: { key: string }, returns: [bytes], errors: [] }
+`)
+	for path, src := range files {
+		if _, err := parser.ParseFile(token.NewFileSet(), path, src, parser.ParseComments); err != nil {
+			t.Errorf("%s: %v\n%s", path, err, src)
+		}
+	}
+}
