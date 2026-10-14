@@ -30,6 +30,9 @@ func Replace(src []byte, file string, reps []Replacement) ([]byte, error) {
 	out := src
 	for i, r := range sorted {
 		if i > 0 && r.Pos == sorted[i-1].Pos {
+			if r != sorted[i-1] {
+				return nil, fmt.Errorf("%s: 같은 위치에 다른 교체가 있다: %q, %q", r.Pos, sorted[i-1].New, r.New)
+			}
 			continue
 		}
 		s := t.off(r.Pos)

@@ -56,3 +56,10 @@ func TestReplaceRefusesEscapes(t *testing.T) {
 		t.Fatal("이스케이프가 든 토큰을 바꿨다")
 	}
 }
+
+func TestReplaceRefusesConflictAtSamePos(t *testing.T) {
+	_, err := Replace([]byte("a: x\n"), "d.yaml", []Replacement{{Pos: at(1, 4), Old: "x", New: "y"}, {Pos: at(1, 4), Old: "x", New: "z"}})
+	if err == nil {
+		t.Fatal("같은 위치의 다른 교체를 버렸다")
+	}
+}

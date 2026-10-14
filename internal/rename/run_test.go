@@ -288,3 +288,36 @@ func TestRunDefaultNeedsGeneratableDesign(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// YAML이 값으로 읽는 이름은 참조를 빈 값으로 만들어 받지 않는다.
+func TestRunRefusesYAMLKeywords(t *testing.T) {
+	for _, id := range []string{"null", "true", "false", "Null", "TRUE"} {
+		design, root := basicCopy(t)
+		if _, err := Run(design, root, "events", "block_commit", id, Options{Code: true}); err == nil {
+			t.Fatalf("%s를 받았다", id)
+		}
+	}
+}
+
+// ts_out 디렉토리가 없어도 TS 이름이 바뀌면 기본 모드는 거부한다. TS 이름은 ID에서 나온다.
+func TestRunComparesTSWithoutDir(t *testing.T) {
+	design, root := basicCopy(t)
+	p := filepath.Join(design, "basic.yaml")
+	b, _ := os.ReadFile(p)
+	s := strings.Replace(string(b), "go_module: example.com/basic", "go_module: example.com/basic\nts_out: web/src/gen.ts", 1)
+	s = strings.Replace(s, "status:     { in: core, values", "status:     { in: core, export: [ts], values", 1)
+	os.WriteFile(p, []byte(s), 0o644)
+	if _, err := Run(design, root, "enums", "status", "acct_status", Options{}); err == nil || !strings.Contains(err.Error(), "TS") {
+		t.Fatalf("%v", err)
+	}
+}
+
+// 파일 이름을 ID로 짓는 종류는 Go 빌드 제약 접미사로 끝나는 새 ID를 받지 않는다.
+func TestRunRefusesBuildSuffix(t *testing.T) {
+	for _, id := range []string{"status_windows", "status_arm64", "status_linux_amd64"} {
+		design, root := basicCopy(t)
+		if _, err := Run(design, root, "enums", "status", id, Options{}); err == nil || !strings.Contains(err.Error(), "빌드 제약") {
+			t.Fatalf("%s: %v", id, err)
+		}
+	}
+}

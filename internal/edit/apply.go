@@ -119,7 +119,7 @@ func loadErrors(files map[string][]byte) map[string]int {
 	return out
 }
 
-// writeAtomic은 같은 디렉토리의 임시 파일에 쓴 뒤 이름을 바꾼다.
+// WriteAtomic은 같은 디렉토리의 임시 파일에 쓴 뒤 이름을 바꾼다.
 // 심볼릭 링크면 링크는 두고 가리키는 파일을 바꾼다.
 func WriteAtomic(path string, b []byte) error {
 	if real, err := filepath.EvalSymlinks(path); err == nil {

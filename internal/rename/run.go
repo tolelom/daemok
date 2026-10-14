@@ -1,18 +1,21 @@
 package rename
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/check"
 	"github.com/tolelom/daemok/internal/edit"
 	"github.com/tolelom/daemok/internal/gen/golang"
+	"github.com/tolelom/daemok/internal/gen/ts"
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/workspace"
 )
@@ -34,6 +37,37 @@ type Result struct {
 // yamlID는 따옴표 없이 YAML에 쓸 수 있는 ID다. 종류별 형식 규칙은 설계 검사가 본다.
 var yamlID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
 
+// yamlKeyword는 따옴표 없이 쓰면 YAML이 문자열이 아닌 값(null, 불리언)으로 읽는 이름이다.
+// 참조 자리에 쓰면 참조가 빈 값이 되어 검사도 잡지 못한다.
+func yamlKeyword(id string) bool {
+	switch strings.ToLower(id) {
+	case "null", "true", "false", "yes", "no", "on", "off":
+		return true
+	}
+	return false
+}
+
+// fileNamed는 생성 파일 이름을 ID로 짓는 종류다.
+var fileNamed = map[string]bool{"enums": true, "handler_kinds": true, "event_kinds": true, "flows": true}
+
+var (
+	knownOS   = strings.Fields("aix android darwin dragonfly freebsd hurd illumos ios js linux nacl netbsd openbsd plan9 solaris wasip1 windows zos")
+	knownArch = strings.Fields("386 amd64 amd64p32 arm armbe arm64 arm64be loong64 mips mipsle mips64 mips64le mips64p32 mips64p32le ppc ppc64 ppc64le riscv riscv64 s390 s390x sparc sparc64 wasm")
+)
+
+// buildSuffix는 id로 지은 파일 이름을 go/build가 GOOS·GOARCH 제약으로 읽는지다. 규칙은 go/build의 goodOSArchFile과 같다.
+func buildSuffix(id string) bool {
+	l := strings.Split(id, "_")
+	if n := len(l); n > 0 && l[n-1] == "test" {
+		l = l[:n-1]
+	}
+	n := len(l)
+	if n >= 2 && slices.Contains(knownOS, l[n-2]) && slices.Contains(knownArch, l[n-1]) {
+		return true
+	}
+	return n >= 2 && (slices.Contains(knownOS, l[n-1]) || slices.Contains(knownArch, l[n-1]))
+}
+
 // failAfter는 테스트에서 쓴 파일 수가 이 값이 되면 다음 쓰기를 실패로 본다. -1이면 끈다.
 var failAfter = -1
 
@@ -50,8 +84,11 @@ func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 	if old == new {
 		return nil, fmt.Errorf("옛 ID와 새 ID가 같다: %s", old)
 	}
-	if !yamlID.MatchString(new) {
+	if !yamlID.MatchString(new) || yamlKeyword(new) {
 		return nil, fmt.Errorf("ID로 쓸 수 없는 이름: %q", new)
+	}
+	if fileNamed[kind] && buildSuffix(new) {
+		return nil, fmt.Errorf("새 ID가 Go 빌드 제약 접미사(_windows, _arm64 등)로 끝나 생성 파일이 다른 플랫폼에서만 빌드된다: %s", new)
 	}
 	files, err := readDesign(designDir)
 	if err != nil {
@@ -289,7 +326,13 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	}
 	bg := workspace.RunSources(before, designDir, root)
 	if bg.Files == nil {
-		return nil, fmt.Errorf("설계 검사 오류가 있어 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diags))
+		return nil, fmt.Errorf("바꾸기 전 설계로 생성하지 못해 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diags))
+	}
+	// TS 파일은 ts_out 디렉토리가 없으면 Files에 빠지므로 따로 비교한다. TS 이름은 고정 키가 아니라 ID에서 나온다.
+	bt, _ := ts.Generate(bm)
+	at, _ := ts.Generate(am)
+	if !bytes.Equal(bt, at) {
+		return nil, fmt.Errorf("바꾸면 TS 생성 이름이 달라진다(%s). 생성 코드 이름까지 바꾸려면 --code를 쓴다", bm.TSOut)
 	}
 	renamed, err := sameCode(bg.Files, workspace.RunSources(after, designDir, root).Files)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/rename"
@@ -30,6 +31,10 @@ func runRename(args []string, stdout, stderr io.Writer) int {
 	}
 	if len(pos) != 3 {
 		fmt.Fprintf(stderr, "사용법: daemok rename <종류> <옛 ID> <새 ID> [--code] [--design DIR] [--root DIR]\n종류: %s\n", strings.Join(rename.Kinds(), ", "))
+		return 2
+	}
+	if !slices.Contains(rename.Kinds(), pos[0]) {
+		fmt.Fprintf(stderr, "알 수 없는 종류 %q\n종류: %s\n", pos[0], strings.Join(rename.Kinds(), ", "))
 		return 2
 	}
 	res, err := rename.Run(designDir(*design, *root), *root, pos[0], pos[1], pos[2], rename.Options{Code: *code})

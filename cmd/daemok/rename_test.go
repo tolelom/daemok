@@ -43,6 +43,9 @@ func TestRenameCommandFlagsFirst(t *testing.T) {
 func TestRenameCommandRefuses(t *testing.T) {
 	root := renameRoot(t)
 	var out, errb bytes.Buffer
+	if code := run([]string{"rename", "bogus", "a", "b", "--root", root}, &out, &errb); code != 2 {
+		t.Fatalf("알 수 없는 종류: %d", code)
+	}
 	if code := run([]string{"rename", "types", "post", "--root", root}, &out, &errb); code != 2 {
 		t.Fatalf("인자 둘: %d", code)
 	}
