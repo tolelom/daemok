@@ -60,8 +60,20 @@ type Coverage struct {
 // ErrDesign은 설계를 읽지 못했거나 설계 검사 오류가 있다는 뜻이다.
 var ErrDesign = errors.New("설계에 오류가 있어 초안을 만들 수 없다")
 
-// draftName은 검증할 때 초안에 붙이는 설계 파일 이름이다.
+// draftName은 검증할 때 초안에 붙이는 설계 파일 이름의 끝이다.
 const draftName = "daemok-l3-draft.yaml"
+
+// draftKey는 검증할 때 초안에 붙이는 경로다. 설계는 경로 순으로 합쳐지고 중복 ID 진단은 뒤에 나온 쪽에 붙으므로,
+// 초안이 언제나 마지막에 오도록 가장 뒤의 설계 경로에 이름을 덧붙인다.
+func draftKey(sources map[string][]byte, designDir string) string {
+	last := filepath.Join(designDir, "")
+	for p := range sources {
+		if p > last {
+			last = p
+		}
+	}
+	return last + "." + draftName
+}
 
 var kindOrder = map[string]int{"errors": 0, "consts": 1, "enums": 2, "types": 3, "contracts": 4, "funcs": 5}
 
@@ -115,7 +127,7 @@ func coverageDelta(m *model.Model, sources map[string][]byte, designDir, root st
 	if cov.Decls, cov.Before, err = total(m); err != nil {
 		return cov, err
 	}
-	files := map[string][]byte{filepath.Join(designDir, draftName): yaml}
+	files := map[string][]byte{draftKey(sources, designDir): yaml}
 	for k, v := range sources {
 		files[k] = v
 	}

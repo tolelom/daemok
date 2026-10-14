@@ -3,7 +3,6 @@ package lift
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -25,7 +24,7 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 		return a.ID < b.ID
 	})
 	base := counts(workspace.RunSources(sources, designDir, root).Diags)
-	key := filepath.Join(designDir, draftName)
+	key := draftKey(sources, designDir)
 	// 한 라운드는 진단이 난 노드를 모두 빼므로 라운드 수는 참조 연쇄의 깊이다. YAML 문법 오류처럼 첫 오류에서
 	// 멈추는 진단이면 노드를 하나씩만 빼게 되어 상한에서 끝낸다.
 	for round := 0; len(nodes) > 0; round++ {

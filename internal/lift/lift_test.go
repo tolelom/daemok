@@ -654,3 +654,26 @@ func TestPlatformVariantFuncErrors(t *testing.T) {
 		t.Fatalf("플랫폼마다 다른 함수가 남았다:\n%s", got)
 	}
 }
+
+// 설계 파일 이름이 검증용 초안 이름보다 뒤에 정렬돼도 중복 진단은 초안 노드에 붙는다.
+func TestValidateDesignFileNameOrder(t *testing.T) {
+	for _, name := range []string{"design.yaml", "z.yaml", "설계.yaml"} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			write(t, root, "go.mod", "module example.com/x\n\ngo 1.22\n")
+			write(t, root, "design/"+name, head+"  other: { tier: a }\nconsts:\n  limit: { in: other, gen: false, value: 1 }\n")
+			write(t, root, "core/core.go", "package core\n\nconst Limit = 3\n\nconst Size = 4\n")
+			write(t, root, "other/other.go", "package other\n\nconst Limit = 1\n")
+			r, err := Draft(filepath.Join(root, "design"), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := lines(r); got != "consts size: { in: core, gen: false, type: int, value: 4 }" {
+				t.Fatalf("got\n%s", got)
+			}
+			if !hasSkip(r, "Limit", "중복 ID") {
+				t.Fatalf("%+v", r.Skipped)
+			}
+		})
+	}
+}
