@@ -14,7 +14,14 @@ import (
 
 // unit은 모듈 하나의 패키지에서 설계에 없는 exported 선언을 옮긴다. known은 설계가 만드는 이름이다.
 func (c *collector) unit(module, dir string, known map[string]bool) {
-	files, _ := gosrc.Files(c.fset, filepath.Join(c.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
+	files, perrs := gosrc.Files(c.fset, filepath.Join(c.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
+	for _, pe := range perrs {
+		rel, err := filepath.Rel(c.root, pe.Path)
+		if err != nil {
+			rel = pe.Path
+		}
+		c.res.Skipped = append(c.res.Skipped, Skip{filepath.ToSlash(rel), "", "파일을 파싱하지 못해 선언을 옮기지 않았다: " + pe.Err.Error()})
+	}
 	fresh := func(n *ast.Ident) bool { return n.IsExported() && !known[n.Name] }
 	var hand []*ast.File
 	for _, f := range files {

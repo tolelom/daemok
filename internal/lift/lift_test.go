@@ -677,3 +677,17 @@ func TestValidateDesignFileNameOrder(t *testing.T) {
 		})
 	}
 }
+
+// 파싱하지 못한 Go 파일은 그 선언이 초안에 없는 이유로 알린다.
+func TestParseErrorIsSkipped(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/ok.go":  "package core\n\nconst Size = 4\n",
+		"core/bad.go": "package core\n\nconst = \n",
+	})
+	for _, s := range r.Skipped {
+		if s.Where == "core/bad.go" && strings.Contains(s.Reason, "파싱") {
+			return
+		}
+	}
+	t.Fatalf("%+v", r.Skipped)
+}
