@@ -26,6 +26,22 @@ func (mg *merger) requirements(n *yaml.Node) {
 	})
 }
 
+func (mg *merger) cpp(n *yaml.Node) {
+	if n == nil {
+		return
+	}
+	d := mg.d
+	if !d.mapping(n, "cpp") {
+		return
+	}
+	if mg.m.CPP != nil {
+		d.diags.Errorf(n.Pos, "cpp는 한 파일에만 있어야 한다 (처음: %s)", mg.m.CPP.Pos)
+		return
+	}
+	d.allow(n, "include_dirs")
+	mg.m.CPP = &CPP{IncludeDirs: d.refs(n, "include_dirs"), Pos: n.Pos}
+}
+
 func (mg *merger) system(n *yaml.Node) {
 	if n == nil {
 		return

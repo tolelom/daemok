@@ -485,7 +485,7 @@ types:
 	for typ, want := range map[string]TypeKind{
 		"map[string]int": MapType, "map[tx_type]*payload": MapType, "[]map[string][]payload": MapType,
 		"map[string]map[uint]json.RawMessage": MapType,
-		"map[payload]int": UnknownType, "map[string]nothing": UnknownType, "map[string": UnknownType, "map[]int": UnknownType,
+		"map[payload]int":                     UnknownType, "map[string]nothing": UnknownType, "map[string": UnknownType, "map[]int": UnknownType,
 	} {
 		if k, _ := m.ResolveType(typ); k != want {
 			t.Errorf("ResolveType(%q) = %v, want %v", typ, k, want)
@@ -763,4 +763,19 @@ func TestErrorGoName(t *testing.T) {
 func TestErrorGoKeys(t *testing.T) {
 	_, ds := loadOne(t, "errors:\n  e: { in: m, message: a, go: { name: ErrA, prefix: P } }\n")
 	wantDiag(t, ds, Error, `알 수 없는 키 "prefix"`)
+}
+
+func TestCPP(t *testing.T) {
+	m, ds := loadOne(t, "cpp:\n  include_dirs: [a/Public, a/Private]\n")
+	wantClean(t, ds)
+	if m.CPP == nil || len(m.CPP.IncludeDirs) != 2 || m.CPP.IncludeDirs[1].Name != "a/Private" || m.CPP.IncludeDirs[1].Pos.Col != 28 {
+		t.Fatalf("%+v", m.CPP)
+	}
+	_, ds = loadOne(t, "cpp: { include_dirs: [a], extra: 1 }\n")
+	wantDiag(t, ds, Error, `알 수 없는 키 "extra"`)
+	_, ds = load(t, map[string]string{
+		"a.yaml": "version: 0.5\ncpp: { include_dirs: [a] }\n",
+		"b.yaml": "version: 0.5\ncpp: { include_dirs: [a] }\n",
+	})
+	wantDiag(t, ds, Error, "cpp는 한 파일에만 있어야 한다")
 }

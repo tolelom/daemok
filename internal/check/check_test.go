@@ -678,3 +678,17 @@ func TestDurationRange(t *testing.T) {
 		}
 	}
 }
+
+func TestCPPIncludeDirs(t *testing.T) {
+	ds := run(t, "cpp: { include_dirs: [] }\n")
+	want(t, ds, model.Error, "include_dirs가 비어 있다")
+	ds = run(t, "cpp: { include_dirs: [/abs, ../up, a/../../b, ok/Public] }\n")
+	want(t, ds, model.Error, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: /abs")
+	want(t, ds, model.Error, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: ../up")
+	want(t, ds, model.Error, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: a/../../b")
+	for _, d := range ds {
+		if strings.Contains(d.Msg, "ok/Public") {
+			t.Fatalf("%v", d)
+		}
+	}
+}

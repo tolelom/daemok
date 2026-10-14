@@ -9,7 +9,7 @@ import (
 )
 
 var topKeys = []string{
-	"version", "go_module", "ts_out",
+	"version", "go_module", "ts_out", "cpp",
 	"requirements", "system", "executables", "tiers", "modules", "groups",
 	"enums", "consts", "errors", "types", "contracts", "handler_kinds", "event_kinds", "events",
 	"funcs", "flows",
@@ -90,6 +90,7 @@ func (mg *merger) file(root *yaml.Node) {
 	}
 	mg.scalarOnce(root, "go_module", &mg.m.GoModule)
 	mg.scalarOnce(root, "ts_out", &mg.m.TSOut)
+	mg.cpp(root.Get("cpp"))
 	mg.requirements(root.Get("requirements"))
 	mg.system(root.Get("system"))
 	mg.executables(root.Get("executables"))

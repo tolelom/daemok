@@ -2,6 +2,7 @@ package check
 
 import (
 	"math"
+	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ var (
 func (c *checker) names() {
 	c.goModule()
 	c.paths()
+	c.cppDirs()
 	c.nodeIDs()
 	c.enumValues()
 	c.errorIDs()
@@ -76,6 +78,22 @@ func (c *checker) goModule() {
 	}
 	if first != nil {
 		c.errorf(*first, "필요한 키가 없다: %q", "go_module")
+	}
+}
+
+// cppDirs는 include 디렉토리가 있고 코드 루트 안의 상대 경로인지 본다.
+func (c *checker) cppDirs() {
+	if c.m.CPP == nil {
+		return
+	}
+	if len(c.m.CPP.IncludeDirs) == 0 {
+		c.errorf(c.m.CPP.Pos, "include_dirs가 비어 있다")
+	}
+	for _, d := range c.m.CPP.IncludeDirs {
+		p := path.Clean(d.Name)
+		if d.Name == "" || path.IsAbs(d.Name) || strings.Contains(d.Name, `\`) || p == ".." || strings.HasPrefix(p, "../") {
+			c.errorf(d.Pos, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: %s", d.Name)
+		}
 	}
 }
 

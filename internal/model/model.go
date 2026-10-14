@@ -223,11 +223,18 @@ type Flow struct {
 	Steps []*Step
 }
 
+// CPP는 C++ include 검사 설정이다. 모듈 path는 각 include 디렉토리 아래 폴더다.
+type CPP struct {
+	IncludeDirs []Ref // 코드 루트 기준 상대 경로
+	Pos         yaml.Pos
+}
+
 type Model struct {
 	Version  string
 	GoModule string
 	TSOut    string
 	TSOutPos yaml.Pos // ts_out 값 위치
+	CPP      *CPP
 
 	Requirements []*Requirement
 	System       *System
