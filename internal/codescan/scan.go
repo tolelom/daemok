@@ -51,6 +51,9 @@ func Scan(m *model.Model, root string) model.Diagnostics {
 	for _, u := range us {
 		s.scanUnit(u)
 	}
+	if m.CPP != nil {
+		s.cppScan(us)
+	}
 	s.reportAdHoc()
 	s.queryPackages()
 	s.unusedDeps(us)
@@ -120,20 +123,25 @@ func (s *scanner) scanUnit(u unit) {
 			if target == u.id {
 				continue
 			}
-			s.imports[u.id][target] = true
-			if s.m.CanDepend(u.id, target) {
-				continue
-			}
-			if s.receivesFrom(u.id, target) {
-				s.diags.Errorf(s.pos(im.Pos()), "needs로만 이어진 모듈을 직접 import한다: %s → %s", u.id, target)
-			} else {
-				s.diags.Errorf(s.pos(im.Pos()), "설계에 없는 의존을 import한다: %s → %s", u.id, target)
-			}
+			s.depend(u.id, target, s.pos(im.Pos()), "import")
 		}
 		if !generated(f) {
 			s.collectRefs(u.id, f)
 			s.adHocErrors(u.id, f)
 			s.enumLiterals(u.id, f)
 		}
+	}
+}
+
+// depend는 id가 target을 쓴 것을 기록하고 설계가 허용하지 않으면 알린다. verb는 import나 include다.
+func (s *scanner) depend(id, target string, pos yaml.Pos, verb string) {
+	s.imports[id][target] = true
+	if s.m.CanDepend(id, target) {
+		return
+	}
+	if s.receivesFrom(id, target) {
+		s.diags.Errorf(pos, "needs로만 이어진 모듈을 직접 %s한다: %s → %s", verb, id, target)
+	} else {
+		s.diags.Errorf(pos, "설계에 없는 의존을 %s한다: %s → %s", verb, id, target)
 	}
 }

@@ -1,6 +1,7 @@
 package codescan
 
 import (
+	"path"
 	"slices"
 	"strconv"
 
@@ -57,10 +58,10 @@ func (s *scanner) queryPackages() {
 }
 
 // unusedDeps는 모듈의 depends_on 대상을 import하지 않으면 정보로 알린다. 그룹 대상은 멤버 하나를 import하면 된다.
-// 코드 디렉토리가 없는 모듈은 보지 않는다.
+// 코드 디렉토리가 없는 모듈은 보지 않는다. cpp가 있으면 include 디렉토리 아래 폴더도 코드 디렉토리다.
 func (s *scanner) unusedDeps(us []unit) {
 	for _, mod := range s.m.Modules {
-		if !s.dirExists(mod.Path) {
+		if !s.hasCode(mod.Path) {
 			continue
 		}
 		for _, d := range mod.DependsOn {
@@ -80,4 +81,18 @@ func (s *scanner) unusedDeps(us []unit) {
 			}
 		}
 	}
+}
+
+func (s *scanner) hasCode(dir string) bool {
+	if s.dirExists(dir) {
+		return true
+	}
+	if s.m.CPP != nil {
+		for _, inc := range s.m.CPP.IncludeDirs {
+			if s.dirExists(path.Join(inc.Name, dir)) {
+				return true
+			}
+		}
+	}
+	return false
 }
