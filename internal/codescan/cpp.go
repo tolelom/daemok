@@ -78,13 +78,15 @@ func stripComments(src []byte) []byte {
 				state = blockComment
 				out[i], out[i+1] = ' ', ' '
 				i++
+			case c == '\'' && i > 0 && isAlnum(out[i-1]):
+				// 영숫자 뒤의 '는 숫자 구분자(1'000)로 본다. u'x' 같은 접두사 붙은 문자 리터럴은 리터럴로 보지 않는다
 			case c == '"' || c == '\'':
 				state, quote = literal, c
 			}
 		case lineComment:
-			if c == '\n' {
+			if c == '\n' && !continued(src, i) {
 				state = code
-			} else {
+			} else if c != '\n' {
 				out[i] = ' '
 			}
 		case blockComment:
@@ -122,7 +124,12 @@ func (s *scanner) cppScan(us []unit) {
 	owners := map[string]string{} // 폴더 → 모듈·멤버 ID
 	for _, u := range us {
 		for _, inc := range incDirs {
-			owners[filepath.Join(inc, filepath.FromSlash(u.dir))] = u.id
+			dir := filepath.Join(inc, filepath.FromSlash(u.dir))
+			if prev, ok := owners[dir]; ok && prev != u.id {
+				s.diags.Errorf(s.m.CPP.Pos, "두 모듈이 같은 C++ 폴더를 가진다: %s, %s (%s)", prev, u.id, dir)
+				continue
+			}
+			owners[dir] = u.id
 		}
 	}
 	owner := func(file string) (string, bool) {
@@ -144,7 +151,9 @@ func (s *scanner) cppScan(us []unit) {
 			cands = append(cands, filepath.Join(d, filepath.FromSlash(inc.path)))
 		}
 		for _, c := range cands {
-			if st, err := os.Stat(c); err == nil && st.Mode().IsRegular() {
+			if st, err := os.Lstat(c); err == nil && st.Mode()&fs.ModeSymlink != 0 {
+				return "", false
+			} else if err == nil && st.Mode().IsRegular() {
 				rel, err := filepath.Rel(s.root, c)
 				return c, err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 			}
@@ -161,7 +170,7 @@ func (s *scanner) cppScan(us []unit) {
 				}
 				return nil
 			}
-			if !d.Type().IsRegular() || !cppExts[filepath.Ext(p)] || seen[p] {
+			if !d.Type().IsRegular() || !cppExts[strings.ToLower(filepath.Ext(p))] || seen[p] {
 				return nil
 			}
 			seen[p] = true
@@ -194,4 +203,17 @@ func (s *scanner) cppScan(us []unit) {
 			return nil
 		})
 	}
+}
+
+func isAlnum(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
+}
+
+// continued는 i의 줄바꿈 앞이 줄 잇기 \인지다.
+func continued(src []byte, i int) bool {
+	j := i - 1
+	if j >= 0 && src[j] == '\r' {
+		j--
+	}
+	return j >= 0 && src[j] == '\\'
 }

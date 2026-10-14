@@ -77,7 +77,11 @@ func (s *scanner) unusedDeps(us []unit) {
 				used = used || s.imports[mod.ID][t]
 			}
 			if !used {
-				s.diags.Infof(d.Pos, "설계상 의존하지만 import하지 않는다: %s → %s", mod.ID, d.Name)
+				verb := "import"
+				if s.m.CPP != nil && !s.dirExists(mod.Path) {
+					verb = "include"
+				}
+				s.diags.Infof(d.Pos, "설계상 의존하지만 %s하지 않는다: %s → %s", verb, mod.ID, d.Name)
 			}
 		}
 	}

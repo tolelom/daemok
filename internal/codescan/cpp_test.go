@@ -102,7 +102,7 @@ func TestScanCPP(t *testing.T) {
 		"오류: 설계에 없는 의존을 include한다: zone → shared",
 		"오류: 설계에 없는 의존을 include한다: zone → ui",
 		"정보: 관리하지 않는 파일을 include한다: core → src/Public/Misc/Thing.h",
-		"정보: 설계상 의존하지만 import하지 않는다: core → extra",
+		"정보: 설계상 의존하지만 include하지 않는다: core → extra",
 	}
 	sort.Strings(want)
 	if !reflect.DeepEqual(got, want) {
@@ -143,4 +143,57 @@ func want(t *testing.T, ds model.Diagnostics, level model.Level, substr string) 
 		}
 	}
 	t.Fatalf("%q 진단이 없다: %v", substr, ds)
+}
+
+func TestIncludesEdgeCases(t *testing.T) {
+	src := "int x = 1'000; /*\n#include \"no1.h\"\n*/\n" +
+		"// note \\\n#include \"no2.h\"\n" +
+		"#include \"a.h\"\n"
+	got := includes([]byte(src))
+	want := []include{{line: 6, col: 1, path: "a.h"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestScanCPPUpperExtAndUnusedWording(t *testing.T) {
+	_, ds := cppScanOf(t, cppDesign, map[string]string{
+		"src/Public/Shared/Types.h": "#pragma once\n",
+		"src/Public/UI/Hud.H":       "#include \"Shared/Types.h\"\n",
+		"src/Public/Core/Core.h":    "#pragma once\n",
+	})
+	want(t, ds, model.Error, "설계에 없는 의존을 include한다: ui → shared")
+	want(t, ds, model.Info, "설계상 의존하지만 include하지 않는다: core → shared")
+}
+
+func TestScanCPPSymlinkTargetIsExternal(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	writeTree(t, outside, map[string]string{"ext.h": ""})
+	writeTree(t, root, map[string]string{
+		"design/d.yaml":          cppDesign,
+		"src/Public/Core/Core.h": "#include \"UI/ext.h\"\n",
+	})
+	os.MkdirAll(filepath.Join(root, "src", "Public", "UI"), 0o755)
+	if err := os.Symlink(filepath.Join(outside, "ext.h"), filepath.Join(root, "src", "Public", "UI", "ext.h")); err != nil {
+		t.Skip(err)
+	}
+	m, _ := model.Load(filepath.Join(root, "design"))
+	for _, d := range Scan(m, root) {
+		if strings.Contains(d.Msg, "core → ui") {
+			t.Fatalf("링크 대상은 외부로 봐야 한다: %v", d)
+		}
+	}
+}
+
+func TestScanCPPSharedFolder(t *testing.T) {
+	design := `version: 0.5
+cpp: { include_dirs: [src, src/Public] }
+tiers: [a]
+modules:
+  a: { tier: a, path: Public/Core }
+  b: { tier: a, path: Core }
+`
+	_, ds := cppScanOf(t, design, map[string]string{"src/Public/Core/x.h": ""})
+	want(t, ds, model.Error, "두 모듈이 같은 C++ 폴더를 가진다: a, b")
 }
