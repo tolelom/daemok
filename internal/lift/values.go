@@ -81,6 +81,10 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 			prefix = p
 			lits = append(lits, v.lit)
 		}
+		if reason == "" && prefix == "" {
+			// go.prefix를 비우면 타입 이름이 접두사가 되므로 설계로 적을 수 없다.
+			reason = "접두사 없는 enum 상수는 설계로 적을 수 없다"
+		}
 		if reason != "" {
 			c.skip(ts.Name.Pos(), name, reason)
 			continue

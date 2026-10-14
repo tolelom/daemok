@@ -691,3 +691,16 @@ func TestParseErrorIsSkipped(t *testing.T) {
 	}
 	t.Fatalf("%+v", r.Skipped)
 }
+
+// 접두사 없는 enum 상수는 설계로 적을 수 없어 이유를 알리고 뺀다.
+func TestEnumWithoutPrefix(t *testing.T) {
+	r := draft(t, "", map[string]string{
+		"core/c.go": "package core\n\ntype Color string\n\nconst (\n\tRed  Color = \"red\"\n\tBlue Color = \"blue\"\n)\n",
+	})
+	if got := lines(r); strings.Contains(got, "color") {
+		t.Fatalf("got\n%s", got)
+	}
+	if !hasSkip(r, "Color", "접두사 없는") {
+		t.Fatalf("%+v", r.Skipped)
+	}
+}
