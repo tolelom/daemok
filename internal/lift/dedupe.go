@@ -50,7 +50,7 @@ var qualified = regexp.MustCompile(`(^|[^A-Za-z0-9_.])([a-z][a-z0-9_]*)\.([A-Z][
 
 // relink는 다른 모듈 패키지의 타입을 코드 이름(core.Block)으로 가리킨 곳을, 그 타입·enum이 같은 초안에
 // 남아 있으면 ID로 바꾼다. 수집할 때는 다른 모듈의 어떤 선언이 초안에 남을지 몰라 코드 이름으로 둔다.
-// 요약 문장은 바꾸지 않는다.
+// 요약 문장, 에러 메시지, 상수 값처럼 글자 그대로인 항목은 바꾸지 않는다.
 func relink(nodes []Node) []Node {
 	ids := map[string]string{}
 	for _, n := range nodes {
@@ -62,7 +62,7 @@ func relink(nodes []Node) []Node {
 		n := &nodes[i]
 		changed := false
 		for j, f := range n.fields {
-			if strings.HasPrefix(f, "summary: ") {
+			if literalField(f) {
 				continue
 			}
 			g := qualified.ReplaceAllStringFunc(f, func(m string) string {
@@ -115,4 +115,14 @@ func dedupe(nodes []Node, res *Result) []Node {
 		out = append(out, n)
 	}
 	return out
+}
+
+// literalField는 값이 타입이 아니라 글자 그대로인 항목이다.
+func literalField(f string) bool {
+	for _, k := range []string{"summary: ", "message: ", "value: "} {
+		if strings.HasPrefix(f, k) {
+			return true
+		}
+	}
+	return false
 }

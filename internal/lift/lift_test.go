@@ -591,3 +591,17 @@ contracts store: { in: web, gen: false, kind: call, methods: { get: { params: { 
 		t.Fatalf("got\n%s\n%+v", got, r.Skipped)
 	}
 }
+
+// 에러 메시지와 문자열 상수 값 안의 "모듈.Go이름" 글자는 ID로 바꾸지 않는다.
+func TestCrossModuleRefsKeepLiterals(t *testing.T) {
+	r := draft(t, "  web: { tier: a, depends_on: [core] }\n", map[string]string{
+		"core/core.go": "package core\n\ntype Block struct{ Height int }\n",
+		"web/web.go":   "package web\n\nimport (\n\t\"errors\"\n\n\t\"example.com/x/core\"\n)\n\nvar ErrBad = errors.New(\"bad core.Block\")\n\nconst Hint = \"see core.Block\"\n\nvar _ core.Block\n",
+	})
+	got := lines(r)
+	for _, want := range []string{`message: "bad core.Block"`, `value: "see core.Block"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("%s가 없다:\n%s", want, got)
+		}
+	}
+}
