@@ -11,17 +11,24 @@ import (
 	"strings"
 )
 
-// Files는 designDir의 HEAD 시점 *.yaml 파일을 준다. 키는 "HEAD:<저장소 기준 경로>"다.
-// git 저장소가 아니거나 커밋이 없으면 ok가 거짓이다.
-func Files(designDir string) (files map[string][]byte, ok bool, err error) {
+// Files는 designDir의 ref 시점 *.yaml 파일을 준다. 키는 "<ref>:<저장소 기준 경로>"다.
+// git 저장소가 아니거나 커밋이 없어 HEAD가 없으면 ok가 거짓이다. HEAD가 아닌 ref가 없으면 오류다.
+// ref 시점에 설계 디렉토리가 없으면 빈 목록이다.
+func Files(designDir, ref string) (files map[string][]byte, ok bool, err error) {
+	if ref == "" || strings.HasPrefix(ref, "-") {
+		return nil, false, fmt.Errorf("ref가 아니다: %q", ref)
+	}
 	if _, err := git(designDir, "rev-parse", "--is-inside-work-tree"); err != nil {
 		return nil, false, nil
 	}
-	if _, err := git(designDir, "rev-parse", "--verify", "--quiet", "HEAD"); err != nil {
-		return nil, false, nil
+	if _, err := git(designDir, "rev-parse", "--verify", "--quiet", ref+"^{commit}"); err != nil {
+		if ref == "HEAD" {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("없는 ref: %s", ref)
 	}
 	// -z는 경로를 따옴표로 감싸지 않고 NUL로 구분한다. 비ASCII 경로도 그대로 받는다.
-	out, err := git(designDir, "ls-tree", "-z", "--full-name", "--name-only", "HEAD", ".")
+	out, err := git(designDir, "ls-tree", "-z", "--full-name", "--name-only", ref, ".")
 	if err != nil {
 		return nil, false, err
 	}
@@ -30,11 +37,11 @@ func Files(designDir string) (files map[string][]byte, ok bool, err error) {
 		if p == "" || !strings.HasSuffix(p, ".yaml") {
 			continue
 		}
-		src, err := git(designDir, "show", "HEAD:"+p)
+		src, err := git(designDir, "show", ref+":"+p)
 		if err != nil {
 			return nil, false, err
 		}
-		files["HEAD:"+p] = src
+		files[ref+":"+p] = src
 	}
 	return files, true, nil
 }

@@ -111,7 +111,7 @@ func (s *Server) refresh() {
 	} else if infer.HasDesignFiles(design) {
 		st.Mode = "check"
 		fill(&st, workspace.Run(design, root), root)
-		if files, ok, err := gitbase.Files(design); err == nil && ok {
+		if files, ok, err := gitbase.Files(design, "HEAD"); err == nil && ok {
 			base, _ := model.LoadSources(files)
 			st.Base, st.HasBase = toView(base), true
 		}

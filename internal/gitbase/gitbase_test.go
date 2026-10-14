@@ -25,14 +25,14 @@ func TestFiles(t *testing.T) {
 	design := filepath.Join(repo, "design")
 	os.MkdirAll(design, 0o755)
 	// 저장소 밖
-	if _, ok, err := Files(design); ok || err != nil {
+	if _, ok, err := Files(design, "HEAD"); ok || err != nil {
 		t.Fatalf("저장소 밖: ok=%v err=%v", ok, err)
 	}
 	run(t, repo, "init", "-q")
 	os.WriteFile(filepath.Join(design, "a.yaml"), []byte("version: 0.5\n"), 0o644)
 	os.WriteFile(filepath.Join(design, "note.txt"), []byte("x"), 0o644)
 	// 커밋 전
-	if _, ok, _ := Files(design); ok {
+	if _, ok, _ := Files(design, "HEAD"); ok {
 		t.Fatal("커밋 전에는 기준이 없다")
 	}
 	run(t, repo, "add", ".")
@@ -40,14 +40,14 @@ func TestFiles(t *testing.T) {
 	// 작업 트리에서 지워도 HEAD에는 있다
 	os.Remove(filepath.Join(design, "a.yaml"))
 	os.WriteFile(filepath.Join(design, "b.yaml"), []byte("version: 0.5\n"), 0o644)
-	files, ok, err := Files(design)
+	files, ok, err := Files(design, "HEAD")
 	if !ok || err != nil || len(files) != 1 || string(files["HEAD:design/a.yaml"]) != "version: 0.5\n" {
 		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
 	}
 	// HEAD에 설계 디렉토리가 없으면 빈 목록
 	other := filepath.Join(repo, "other")
 	os.MkdirAll(other, 0o755)
-	if files, ok, err := Files(other); !ok || err != nil || len(files) != 0 {
+	if files, ok, err := Files(other, "HEAD"); !ok || err != nil || len(files) != 0 {
 		t.Fatalf("빈 기준: ok=%v err=%v files=%v", ok, err, files)
 	}
 }
@@ -63,7 +63,7 @@ func TestNonASCIIPath(t *testing.T) {
 	run(t, repo, "init", "-q")
 	run(t, repo, "add", ".")
 	run(t, repo, "commit", "-q", "-m", "init")
-	files, ok, err := Files(design)
+	files, ok, err := Files(design, "HEAD")
 	if !ok || err != nil || string(files["HEAD:d 설계/모듈.yaml"]) != "version: 0.5\n" {
 		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
 	}
@@ -178,5 +178,29 @@ func TestDirtyRename(t *testing.T) {
 	run(t, repo, "mv", "ab c.go", "new.go")
 	if n := Dirty(repo); n != 1 {
 		t.Fatalf("Dirty %d", n)
+	}
+}
+
+func TestFilesAtRef(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git이 없다")
+	}
+	repo := t.TempDir()
+	design := filepath.Join(repo, "design")
+	os.MkdirAll(design, 0o755)
+	run(t, repo, "init", "-q")
+	os.WriteFile(filepath.Join(design, "a.yaml"), []byte("v: 1\n"), 0o644)
+	run(t, repo, "add", ".")
+	run(t, repo, "commit", "-q", "-m", "one")
+	os.WriteFile(filepath.Join(design, "a.yaml"), []byte("v: 2\n"), 0o644)
+	run(t, repo, "commit", "-q", "-am", "two")
+	files, ok, err := Files(design, "HEAD~1")
+	if !ok || err != nil || string(files["HEAD~1:design/a.yaml"]) != "v: 1\n" {
+		t.Fatalf("ok=%v err=%v files=%v", ok, err, files)
+	}
+	for _, ref := range []string{"nope", "--output=x"} {
+		if _, _, err := Files(design, ref); err == nil {
+			t.Fatalf("%s를 받았다", ref)
+		}
 	}
 }
