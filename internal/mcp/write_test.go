@@ -117,3 +117,39 @@ func TestEditToolFollowsSymlinkInside(t *testing.T) {
 		t.Fatal(string(b))
 	}
 }
+
+func callText(t *testing.T, res map[string]any) (string, bool) {
+	t.Helper()
+	r := res["result"].(map[string]any)
+	return r["content"].([]any)[0].(map[string]any)["text"].(string), r["isError"] == true
+}
+
+func TestEditToolRename(t *testing.T) {
+	root := project(t)
+	text, isErr := callText(t, send(t, root, true, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit","arguments":{"op":"rename","kind":"modules","id":"core","value":"base"}}}`))
+	if isErr || !strings.Contains(text, "path: core") {
+		t.Fatal(text)
+	}
+	b, _ := os.ReadFile(filepath.Join(root, "design", "d.yaml"))
+	if !strings.Contains(string(b), `base: { tier: a, summary: "도메인", path: core }`) || !strings.Contains(string(b), "depends_on: [base]") {
+		t.Fatal(string(b))
+	}
+}
+
+func TestEditToolRenameRefusesSymlinkOutside(t *testing.T) {
+	root := project(t)
+	outside := filepath.Join(t.TempDir(), "outside.yaml")
+	link := filepath.Join(root, "design", "d.yaml")
+	b, _ := os.ReadFile(link)
+	os.WriteFile(outside, b, 0o644)
+	os.Remove(link)
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skip("심볼릭 링크를 만들 수 없다: ", err)
+	}
+	if _, isErr := callText(t, send(t, root, true, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit","arguments":{"op":"rename","kind":"modules","id":"core","value":"base"}}}`)); !isErr {
+		t.Fatal("설계 디렉토리 밖 파일을 고쳤다")
+	}
+	if after, _ := os.ReadFile(outside); string(after) != string(b) {
+		t.Fatal("링크 대상이 바뀌었다")
+	}
+}

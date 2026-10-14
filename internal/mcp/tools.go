@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/tolelom/daemok/internal/infer"
 	"github.com/tolelom/daemok/internal/lift"
 	"github.com/tolelom/daemok/internal/model"
+	"github.com/tolelom/daemok/internal/rename"
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
@@ -48,12 +50,33 @@ func toolList(allowWrite bool) []map[string]any {
 	}
 	if allowWrite {
 		tools = append(tools, map[string]any{"name": "edit",
-			"description": "설계 파일의 L2를 한 곳 고친다. op는 tier(id의 tier를 value로), add_dep·remove_dep(id의 depends_on에 value를 더하거나 뺀다), add_module(id 모듈을 tier value로 더한다), remove_module(id 모듈을 지운다). id는 모듈이나 그룹. 서버의 설계 디렉토리만 고치고, 승인은 사용자의 커밋이다",
+			"description": "설계 파일을 고친다. op는 tier(id의 tier를 value로), add_dep·remove_dep(id의 depends_on에 value를 더하거나 뺀다), add_module(id 모듈을 tier value로 더한다), remove_module(id 모듈을 지운다), rename(kind 종류의 id 노드 ID와 모든 참조를 value로 바꾼다. code가 거짓이면 코드 이름을 고정 키로 유지하고 생성 코드가 그대로일 때만 쓴다). rename 외의 id는 모듈이나 그룹. 서버의 설계 디렉토리만 고치고, 승인은 사용자의 커밋이다",
 			"inputSchema": map[string]any{"type": "object", "required": []string{"op", "id"}, "properties": map[string]any{
-				"op": map[string]any{"type": "string", "enum": edit.Ops}, "id": str("모듈이나 그룹 ID"), "value": str("tier 이름이나 의존 대상")}},
+				"op": map[string]any{"type": "string", "enum": append(slices.Clone(edit.Ops), "rename")}, "id": str("모듈이나 그룹 ID. rename이면 옛 ID"), "value": str("tier 이름, 의존 대상, rename이면 새 ID"),
+				"kind": map[string]any{"type": "string", "enum": rename.Kinds(), "description": "rename할 노드 종류(설계 파일의 키)"},
+				"code": map[string]any{"type": "boolean", "description": "rename에서 생성 코드 이름도 새 ID를 따르게 한다"}}},
 			"annotations": map[string]any{"readOnlyHint": false, "destructiveHint": true, "idempotentHint": false}})
 	}
 	return tools
+}
+
+func renameTool(design, root, kind, id, value string, code bool) map[string]any {
+	res, err := rename.Run(design, root, kind, id, value, rename.Options{Code: code, Confined: true})
+	if err != nil {
+		return toolResult(err.Error(), true)
+	}
+	lines := []string{"고쳤다: " + strings.Join(res.Files, ", ")}
+	if res.Pinned != "" {
+		lines = append(lines, "고정: "+res.Pinned)
+	}
+	for _, mv := range res.Moves {
+		lines = append(lines, "옮길 디렉토리: "+mv)
+	}
+	for _, n := range res.Notes {
+		lines = append(lines, "안내: "+n)
+	}
+	lines = append(lines, "승인은 사용자의 커밋이다. check 도구로 진단을 확인한다")
+	return toolResult(strings.Join(lines, "\n"), false)
 }
 
 func genTool(design, root, path string) (string, error) {

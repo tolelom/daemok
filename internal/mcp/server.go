@@ -149,6 +149,8 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			Value  string `json:"value"`
 			L3     bool   `json:"l3"`
 			Path   string `json:"path"`
+			Kind   string `json:"kind"`
+			Code   bool   `json:"code"`
 		}
 		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
 			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
@@ -160,6 +162,9 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			// 쓰기는 사용자가 등록한 서버의 설계 디렉토리에만 한다. 도구 인자로 경로를 바꾸지 못한다.
 			if args.Design != "" || args.Root != "" {
 				return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
+			}
+			if args.Op == "rename" {
+				return renameTool(s.design, s.root, args.Kind, args.ID, args.Value, args.Code), nil
 			}
 			file, err := edit.ApplyConfined(s.design, args.Op, args.ID, args.Value)
 			if err != nil {
