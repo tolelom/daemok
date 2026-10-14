@@ -68,7 +68,7 @@ func typeString(m *model.Model, t string) (string, error) {
 			return "", fmt.Errorf("TS로 옮길 수 없는 타입 %s", t)
 		}
 		inner, err := typeString(m, value)
-		return "Record<string, " + inner + ">" + orNull, err
+		return "{ [key: string]: " + inner + " }" + orNull, err
 	}
 	if s, ok := builtin[t]; ok {
 		return s, nil

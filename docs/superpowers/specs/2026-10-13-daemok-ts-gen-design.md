@@ -42,7 +42,7 @@ export interface Post {
   tags: string[] | null;
   author: User | null;
   nick?: string;
-  meta: Record<string, unknown> | null;
+  meta: { [key: string]: unknown } | null;
 }
 ```
 
@@ -59,7 +59,7 @@ export interface Post {
 | `bytes` | `string \| null` |
 | `any`, `json.RawMessage` | `unknown` |
 | enum, 타입 | 그 TS 이름. 그 노드도 `export: [ts]`여야 합니다 |
-| `map[K]V` | `Record<string, V> \| null`. JSON 객체 키는 문자열입니다 |
+| `map[K]V` | `{ [key: string]: V } \| null`. JSON 객체 키는 문자열입니다. 전역 `Record`는 같은 이름의 타입(`record`)이 가릴 수 있어 쓰지 않습니다 |
 | `duration`, `error`, 그 밖의 외부 타입 | 오류 |
 
 손으로 쓴 타입(`gen: false`)은 JSON 키가 설계 필드 이름과 다를 수 있습니다. 코드 대조는 `export: [ts]`인 손으로 쓴 타입의 설계 필드마다 코드 필드의 json 태그가 생성 코드의 태그(`json:"필드 이름"`, `optional`이면 `json:"필드 이름,omitempty"`)와 같은지 보고, 다르면(`json:"-"`, 태그 없음 포함) 오류를 냅니다.

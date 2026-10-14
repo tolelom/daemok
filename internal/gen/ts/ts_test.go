@@ -122,14 +122,14 @@ export interface Post {
   /** 별명 */
   nick?: string;
   raw: string | null;
-  meta: Record<string, unknown> | null;
-  by_id: Record<string, (User | null)[] | null> | null;
+  meta: { [key: string]: unknown } | null;
+  by_id: { [key: string]: (User | null)[] | null } | null;
   created: string;
   ok: boolean;
   extra: unknown;
   opt_tags?: string[];
   boss?: User;
-  opt_meta?: Record<string, number> | null;
+  opt_meta?: { [key: string]: number } | null;
   opt_raw?: string;
 }
 
@@ -140,5 +140,23 @@ export interface User {
 `
 	if !strings.HasSuffix(string(got), want) {
 		t.Fatalf("got\n%s", got)
+	}
+}
+
+func TestMapFieldDoesNotDependOnGlobalRecord(t *testing.T) {
+	m := load(t, `ts_out: ../web/x.gen.ts
+types:
+  record: { in: core, export: [ts], fields: { tags: "map[string]int" } }
+`)
+	b, _ := Generate(m)
+	got := string(b)
+	if !strings.Contains(got, "export interface Record {") {
+		t.Fatalf("Record 타입이 없다:\n%s", got)
+	}
+	if strings.Contains(got, "Record<") {
+		t.Errorf("map 필드가 전역 Record를 쓴다. 같은 이름의 타입이 가린다:\n%s", got)
+	}
+	if !strings.Contains(got, "tags: { [key: string]: number } | null;") {
+		t.Errorf("map 필드 표현이 다르다:\n%s", got)
 	}
 }
