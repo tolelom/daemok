@@ -85,7 +85,13 @@ function renderGen() {
   fetch('/api/gen', { cache: 'no-store' })
     .then(r => r.json().then(j => (r.ok ? j : { error: j.error || `요청이 거부되었다 (${r.status})` })))
     .catch(() => ({ error: '서버에 연결할 수 없다' }))
-    .then(j => { gen = j; genVersion = version; genLoading = false; genText = null; if (view === 'gen') renderGen(); });
+    .then(j => {
+      gen = j; genVersion = version; genLoading = false; genText = null;
+      // 열어 둔 파일이 새 목록에도 있으면 내용을 다시 받는다.
+      const keep = genSel && (j.files || []).some(f => f.path === genSel && f.status !== 'delete' && f.status !== 'refuse');
+      if (!keep) genSel = '';
+      if (keep) showGenFile(genSel); else if (view === 'gen') renderGen();
+    });
 }
 function paintGen() {
   const d = gen;
@@ -107,7 +113,8 @@ ${same.length ? `<details${todo.length ? '' : ' open'}><summary>그대로인 파
 ${genSel ? `<h3 style="margin-top:22px"><code>${esc(genSel)}</code></h3>${genText === null ? '<p class="muted">읽는 중이다</p>' : `<pre class="yaml">${esc(genText)}</pre>`}` : ''}`;
 }
 async function showGenFile(path) {
-  genSel = path; genText = null; paintGen();
+  genSel = path; genText = null;
+  if (view === 'gen') paintGen();
   const r = await fetch('/api/gen/file?path=' + encodeURIComponent(path), { cache: 'no-store' }).catch(() => null);
   genText = r && r.ok ? await r.text() : '내용을 받을 수 없다';
   if (view === 'gen' && genSel === path) paintGen();
