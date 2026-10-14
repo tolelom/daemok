@@ -661,3 +661,20 @@ contracts:
 `)
 	want(t, ds, model.Error, "query 계약의 모듈 경로가 /query로 끝난다: xq(x/query)")
 }
+
+// time.Duration(int64 나노초)에 들어가지 않는 duration은 생성 코드가 컴파일되지 않는다.
+func TestDurationRange(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "d.yaml"), []byte("version: 0.5\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\nconsts:\n  big: { in: core, type: duration, value: 9999999999h }\n  ok: { in: core, type: duration, value: 2562047h }\n"), 0o644)
+	m, ds := model.Load(dir)
+	if ds.HasErrors() {
+		t.Fatal(ds)
+	}
+	ds = Run(m)
+	want(t, ds, model.Error, `duration이 time.Duration 범위를 넘는다: 상수 big "9999999999h"`)
+	for _, d := range ds {
+		if strings.Contains(d.Msg, "상수 ok ") {
+			t.Fatalf("범위 안 값에 진단: %v", d)
+		}
+	}
+}

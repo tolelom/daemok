@@ -1,8 +1,11 @@
 package check
 
 import (
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tolelom/daemok/internal/model"
 	"github.com/tolelom/daemok/internal/yaml"
@@ -214,9 +217,19 @@ func (c *checker) fieldNames() {
 }
 
 func (c *checker) durations() {
+	unit := map[string]int64{"ms": int64(time.Millisecond), "s": int64(time.Second), "m": int64(time.Minute), "h": int64(time.Hour)}
 	for _, k := range c.m.Consts {
-		if k.Type == "duration" && !durationValue.MatchString(k.Value) {
+		if k.Type != "duration" {
+			continue
+		}
+		if !durationValue.MatchString(k.Value) {
 			c.errorf(k.ValuePos, "duration 형식이 아니다: 상수 %s %q", k.ID, k.Value)
+			continue
+		}
+		digits := strings.TrimRight(k.Value, "smh")
+		n, err := strconv.ParseInt(digits, 10, 64)
+		if err != nil || n > math.MaxInt64/unit[k.Value[len(digits):]] {
+			c.errorf(k.ValuePos, "duration이 time.Duration 범위를 넘는다: 상수 %s %q", k.ID, k.Value)
 		}
 	}
 }
