@@ -161,7 +161,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 			if args.Design != "" || args.Root != "" {
 				return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
 			}
-			file, err := edit.Apply(s.design, args.Op, args.ID, args.Value)
+			file, err := edit.ApplyConfined(s.design, args.Op, args.ID, args.Value)
 			if err != nil {
 				return toolResult(err.Error(), true), nil
 			}

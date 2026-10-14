@@ -80,3 +80,40 @@ func TestEditToolIgnoresPaths(t *testing.T) {
 		t.Fatal("다른 설계를 고쳤다")
 	}
 }
+
+// 설계 파일이 설계 디렉토리 밖을 가리키는 심볼릭 링크면 edit은 고치지 않는다.
+func TestEditToolRefusesSymlinkOutside(t *testing.T) {
+	root := project(t)
+	outside := filepath.Join(t.TempDir(), "outside.yaml")
+	link := filepath.Join(root, "design", "d.yaml")
+	b, _ := os.ReadFile(link)
+	os.WriteFile(outside, b, 0o644)
+	os.Remove(link)
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skip("심볼릭 링크를 만들 수 없다: ", err)
+	}
+	res := send(t, root, true, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit","arguments":{"op":"tier","id":"api","value":"a"}}}`)
+	if r := res["result"].(map[string]any); r["isError"] != true {
+		t.Fatalf("설계 디렉토리 밖 파일을 고쳤다: %v", res)
+	}
+	if after, _ := os.ReadFile(outside); string(after) != string(b) {
+		t.Fatal("링크 대상이 바뀌었다")
+	}
+}
+
+// 설계 디렉토리 안을 가리키는 링크는 고친다.
+func TestEditToolFollowsSymlinkInside(t *testing.T) {
+	root := project(t)
+	design := filepath.Join(root, "design")
+	os.Rename(filepath.Join(design, "d.yaml"), filepath.Join(design, "real.yml"))
+	if err := os.Symlink("real.yml", filepath.Join(design, "d.yaml")); err != nil {
+		t.Skip("심볼릭 링크를 만들 수 없다: ", err)
+	}
+	res := send(t, root, true, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"edit","arguments":{"op":"tier","id":"api","value":"a"}}}`)
+	if r := res["result"].(map[string]any); r["isError"] == true {
+		t.Fatalf("%v", res)
+	}
+	if b, _ := os.ReadFile(filepath.Join(design, "real.yml")); !strings.Contains(string(b), "api:  { tier: a") {
+		t.Fatal(string(b))
+	}
+}

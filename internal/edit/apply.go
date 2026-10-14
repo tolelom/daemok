@@ -39,9 +39,23 @@ func Do(op string, src []byte, file, id, value string) ([]byte, error) {
 // Ops는 Do가 받는 작업 이름이다.
 var Ops = []string{"tier", "add_dep", "remove_dep", "add_module", "remove_module"}
 
+// ErrOutsideDir는 고칠 설계 파일이 심볼릭 링크로 설계 디렉토리 밖을 가리킨다는 뜻이다. 쓰지 않는다.
+var ErrOutsideDir = errors.New("설계 파일이 설계 디렉토리 밖을 가리킨다")
+
 // Apply는 설계 디렉토리의 *.yaml 가운데 대상이 있는 파일에 작업을 적용해 쓰고 그 경로를 준다.
 // 고친 결과가 편집 전에 없던 읽기 오류를 내면 쓰지 않는다. 설계 검사 오류는 막지 않는다.
+// 설계 파일이 심볼릭 링크면 가리키는 파일을 고친다.
 func Apply(designDir, op, id, value string) (string, error) {
+	return apply(designDir, op, id, value, false)
+}
+
+// ApplyConfined는 Apply와 같되, 설계 파일이 심볼릭 링크로 설계 디렉토리 밖을 가리키면 쓰지 않는다.
+// 사람이 화면에서 누르지 않는 경로(MCP)가 설계 디렉토리 밖을 고치지 못하게 한다.
+func ApplyConfined(designDir, op, id, value string) (string, error) {
+	return apply(designDir, op, id, value, true)
+}
+
+func apply(designDir, op, id, value string, confined bool) (string, error) {
 	paths, _ := filepath.Glob(filepath.Join(designDir, "*.yaml"))
 	sort.Strings(paths)
 	files := map[string][]byte{}
@@ -68,6 +82,11 @@ func Apply(designDir, op, id, value string) (string, error) {
 	}
 	if target == "" {
 		return "", lastErr
+	}
+	if confined {
+		if err := inside(designDir, target); err != nil {
+			return "", err
+		}
 	}
 	before := loadErrors(files)
 	files[target] = patched
@@ -151,4 +170,21 @@ func renameRetry(from, to string) error {
 		err = os.Rename(from, to)
 	}
 	return err
+}
+
+// inside는 path의 실제 위치가 dir의 실제 위치 아래인지 본다.
+func inside(dir, path string) error {
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrIO, err)
+	}
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrIO, err)
+	}
+	rel, err := filepath.Rel(realDir, real)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("%w: %s → %s", ErrOutsideDir, path, real)
+	}
+	return nil
 }
