@@ -91,6 +91,11 @@ func SkipDir(name string) bool {
 	return strings.HasPrefix(name, ".") || name == "vendor" || name == "testdata" || name == "node_modules"
 }
 
+// SkipPackageDir는 패키지를 찾을 때 내려가지 않는 디렉토리다. go 도구처럼 _로 시작하는 디렉토리도 뺀다.
+func SkipPackageDir(name string) bool {
+	return SkipDir(name) || strings.HasPrefix(name, "_")
+}
+
 // ignored는 파일의 build 조건이 ignore 태그 없이는 참이 될 수 없는지다.
 func ignored(f *ast.File) bool {
 	for _, cg := range f.Comments {

@@ -11,7 +11,6 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/tolelom/daemok/internal/gen/golang"
 	"github.com/tolelom/daemok/internal/gosrc"
@@ -47,7 +46,7 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 		if !d.IsDir() {
 			return nil
 		}
-		if p != root && (gosrc.SkipDir(d.Name()) || strings.HasPrefix(d.Name(), "_")) {
+		if p != root && gosrc.SkipPackageDir(d.Name()) {
 			return filepath.SkipDir
 		}
 		files, errs := gosrc.Files(fset, p, parser.SkipObjectResolution)

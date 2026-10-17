@@ -102,7 +102,7 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 			return nil
 		}
 		if p != root {
-			if gosrc.SkipDir(d.Name()) || strings.HasPrefix(d.Name(), "_") {
+			if gosrc.SkipPackageDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			if _, err := os.Stat(filepath.Join(p, "go.mod")); err == nil {

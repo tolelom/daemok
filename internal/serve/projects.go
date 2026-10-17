@@ -128,7 +128,7 @@ func findModules(dir string, maxDepth int) []string {
 		if err != nil || !d.IsDir() {
 			return nil
 		}
-		if p != base && (gosrc.SkipDir(d.Name()) || strings.HasPrefix(d.Name(), "_")) {
+		if p != base && gosrc.SkipPackageDir(d.Name()) {
 			return filepath.SkipDir
 		}
 		if _, err := os.Stat(filepath.Join(p, "go.mod")); err == nil {
