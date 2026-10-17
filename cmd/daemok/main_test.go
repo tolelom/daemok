@@ -229,3 +229,30 @@ func TestGenWritesTSOutsideRoot(t *testing.T) {
 		t.Fatalf("check exit %d\n%s", code, out)
 	}
 }
+
+// 명령마다 -h가 보이는 플래그는 usage의 그 명령 줄에 모두 있다.
+func TestUsageListsEveryFlag(t *testing.T) {
+	lines := map[string]string{}
+	for _, l := range strings.Split(usage, "\n") {
+		if f := strings.Fields(l); len(f) > 1 && f[0] == "daemok" {
+			lines[f[1]] = l
+		}
+	}
+	for _, cmd := range []string{"check", "gen", "coverage", "diff", "rename", "mcp", "init", "serve"} {
+		_, _, errOut := runCLI(t, cmd, "-h")
+		var flags []string
+		for _, l := range strings.Split(errOut, "\n") {
+			if strings.HasPrefix(l, "  -") {
+				flags = append(flags, strings.Fields(l)[0][1:])
+			}
+		}
+		if len(flags) == 0 {
+			t.Fatalf("%s -h에 플래그가 없다: %q", cmd, errOut)
+		}
+		for _, f := range flags {
+			if !strings.Contains(lines[cmd]+" ", "[--"+f+" ") && !strings.Contains(lines[cmd], "[--"+f+"]") {
+				t.Errorf("usage의 %s 줄에 --%s가 없다: %q", cmd, f, lines[cmd])
+			}
+		}
+	}
+}

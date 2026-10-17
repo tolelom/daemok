@@ -13,9 +13,9 @@ const usage = `사용법:
   daemok coverage [--design DIR] [--root DIR]
   daemok diff     [--base REF] [--design DIR] [--root DIR]
   daemok rename <종류> <옛 ID> <새 ID> [--code] [--design DIR] [--root DIR]
-  daemok mcp      [--design DIR] [--root DIR]
+  daemok mcp      [--design DIR] [--root DIR] [--allow-write]
   daemok version
-  daemok init  [--root DIR] [--design DIR] [--dry-run]
+  daemok init  [--root DIR] [--design DIR] [--dry-run] [--l3]
   daemok serve [--design DIR] [--root DIR] [--addr HOST:PORT] [--workspace DIR]
 `
 
