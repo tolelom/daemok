@@ -25,7 +25,7 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 	fresh := func(n *ast.Ident) bool { return n.IsExported() && !known[n.Name] }
 	var hand []*ast.File
 	for _, f := range files {
-		if !generated(f) {
+		if !golang.IsGenerated(f) {
 			hand = append(hand, f)
 		}
 	}
@@ -137,8 +137,4 @@ func summary(doc *ast.CommentGroup) string {
 		return ""
 	}
 	return text
-}
-
-func generated(f *ast.File) bool {
-	return len(f.Comments) > 0 && f.Comments[0].List[0].Text == golang.Header && f.Comments[0].Pos() < f.Package
 }
