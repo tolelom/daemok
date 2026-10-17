@@ -248,6 +248,7 @@ func TestOpenTilde(t *testing.T) {
 	local(t, s)
 	root := goModule(t)
 	t.Setenv("HOME", filepath.Dir(root))
+	t.Setenv("USERPROFILE", filepath.Dir(root)) // Windows의 os.UserHomeDir
 	body, _ := json.Marshal(map[string]string{"path": "~/" + filepath.Base(root)})
 	if code, out := post(t, s, "/api/open", string(body)); code != 200 {
 		t.Fatalf("%d %v", code, out)
