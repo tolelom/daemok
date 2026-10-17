@@ -132,80 +132,92 @@ func (s *Server) handle(req request) (any, *rpcError) {
 	case "tools/list":
 		return map[string]any{"tools": toolList(s.AllowWrite)}, nil
 	case "tools/call":
-		var p struct {
-			Name      string          `json:"name"`
-			Arguments json.RawMessage `json:"arguments"`
-		}
-		if err := json.Unmarshal(req.Params, &p); err != nil {
-			return nil, &rpcError{-32602, "params를 읽을 수 없다"}
-		}
-		var args struct {
-			Module string `json:"module"`
-			Design string `json:"design"`
-			Root   string `json:"root"`
-			Op     string `json:"op"`
-			ID     string `json:"id"`
-			Value  string `json:"value"`
-			L3     bool   `json:"l3"`
-			Path   string `json:"path"`
-			Kind   string `json:"kind"`
-			Code   bool   `json:"code"`
-			Base   string `json:"base"`
-		}
-		if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
-			return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
-		}
-		if p.Name == "edit" {
-			if !s.AllowWrite {
-				return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
-			}
-			// 쓰기는 사용자가 등록한 서버의 설계 디렉토리에만 한다. 도구 인자로 경로를 바꾸지 못한다.
-			if args.Design != "" || args.Root != "" {
-				return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
-			}
-			if args.Op == "rename" {
-				return renameTool(s.design, s.root, args.Kind, args.ID, args.Value, args.Code), nil
-			}
-			file, err := edit.ApplyConfined(s.design, args.Op, args.ID, args.Value)
-			if err != nil {
-				return toolResult(err.Error(), true), nil
-			}
-			return toolResult("고쳤다: "+file+". 승인은 사용자의 커밋이다. check 도구로 진단을 확인한다", false), nil
-		}
-		design, root := s.design, s.root
-		if args.Root != "" {
-			root = args.Root
-			if args.Design == "" {
-				design = workspace.DefaultDesignDir(root)
-			}
-		}
-		if args.Design != "" {
-			design = args.Design
-		}
-		var text string
-		var err error
-		switch p.Name {
-		case "design":
-			text, err = designTool(design, args.Module)
-		case "check":
-			text = string(workspace.ReportJSON(workspace.Check(design, root).Diags))
-		case "draft":
-			if args.L3 {
-				text, err = draftL3Tool(design, root)
-			} else {
-				text, err = draftTool(root)
-			}
-		case "gen":
-			text, err = genTool(design, root, args.Path)
-		case "diff":
-			text, err = diffTool(design, args.Base)
-		default:
+		return s.callTool(req.Params)
+	}
+	return nil, &rpcError{-32601, fmt.Sprintf("지원하지 않는 메서드 %q", req.Method)}
+}
+
+// callTool은 tools/call 요청 하나를 처리한다. 도구 오류는 isError 결과로, 요청 형식 오류는 rpcError로 준다.
+func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
+	var p struct {
+		Name      string          `json:"name"`
+		Arguments json.RawMessage `json:"arguments"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, &rpcError{-32602, "params를 읽을 수 없다"}
+	}
+	var args struct {
+		Module string `json:"module"`
+		Design string `json:"design"`
+		Root   string `json:"root"`
+		Op     string `json:"op"`
+		ID     string `json:"id"`
+		Value  string `json:"value"`
+		L3     bool   `json:"l3"`
+		Path   string `json:"path"`
+		Kind   string `json:"kind"`
+		Code   bool   `json:"code"`
+		Base   string `json:"base"`
+	}
+	if len(p.Arguments) > 0 && json.Unmarshal(p.Arguments, &args) != nil {
+		return nil, &rpcError{-32602, "arguments를 읽을 수 없다"}
+	}
+	if p.Name == "edit" {
+		if !s.AllowWrite {
 			return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
 		}
+		// 쓰기는 사용자가 등록한 서버의 설계 디렉토리에만 한다. 도구 인자로 경로를 바꾸지 못한다.
+		if args.Design != "" || args.Root != "" {
+			return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
+		}
+		if args.Op == "rename" {
+			return renameTool(s.design, s.root, args.Kind, args.ID, args.Value, args.Code), nil
+		}
+		file, err := edit.ApplyConfined(s.design, args.Op, args.ID, args.Value)
 		if err != nil {
 			return toolResult(err.Error(), true), nil
 		}
-		return toolResult(text, false), nil
+		return toolResult("고쳤다: "+file+". 승인은 사용자의 커밋이다. check 도구로 진단을 확인한다", false), nil
 	}
-	return nil, &rpcError{-32601, fmt.Sprintf("지원하지 않는 메서드 %q", req.Method)}
+	design, root := s.toolPaths(args.Design, args.Root)
+	var text string
+	var err error
+	switch p.Name {
+	case "design":
+		text, err = designTool(design, args.Module)
+	case "check":
+		text = string(workspace.ReportJSON(workspace.Check(design, root).Diags))
+	case "draft":
+		if args.L3 {
+			text, err = draftL3Tool(design, root)
+		} else {
+			text, err = draftTool(root)
+		}
+	case "gen":
+		text, err = genTool(design, root, args.Path)
+	case "diff":
+		text, err = diffTool(design, args.Base)
+	default:
+		return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
+	}
+	if err != nil {
+		return toolResult(err.Error(), true), nil
+	}
+	return toolResult(text, false), nil
+}
+
+// toolPaths는 도구 인자의 design·root로 쓸 설계 디렉토리와 코드 루트를 정한다.
+// root만 주면 설계는 그 root 아래 design이고, 둘 다 없으면 서버의 --design, --root다.
+func (s *Server) toolPaths(design, root string) (string, string) {
+	d, r := s.design, s.root
+	if root != "" {
+		r = root
+		if design == "" {
+			d = workspace.DefaultDesignDir(r)
+		}
+	}
+	if design != "" {
+		d = design
+	}
+	return d, r
 }
