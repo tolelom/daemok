@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"path/filepath"
+
+	"github.com/tolelom/daemok/internal/workspace"
 )
 
 // pathFlags는 모든 명령이 같은 뜻으로 쓰는 --design과 --root를 등록한다.
@@ -29,7 +30,7 @@ func parse(fs *flag.FlagSet, args []string) bool {
 // designDir는 --design이 비어 있으면 코드 루트 아래 design이다.
 func designDir(design, root string) string {
 	if design == "" {
-		return filepath.Join(root, "design")
+		return workspace.DefaultDesignDir(root)
 	}
 	return design
 }

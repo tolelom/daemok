@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 
 	"github.com/tolelom/daemok/internal/edit"
@@ -177,7 +176,7 @@ func (s *Server) handle(req request) (any, *rpcError) {
 		if args.Root != "" {
 			root = args.Root
 			if args.Design == "" {
-				design = filepath.Join(root, "design")
+				design = workspace.DefaultDesignDir(root)
 			}
 		}
 		if args.Design != "" {

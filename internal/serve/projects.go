@@ -14,6 +14,7 @@ import (
 	"github.com/tolelom/daemok/internal/gitbase"
 	"github.com/tolelom/daemok/internal/gosrc"
 	"github.com/tolelom/daemok/internal/infer"
+	"github.com/tolelom/daemok/internal/workspace"
 )
 
 // Options는 프로젝트 열기에 쓰는 설정이다.
@@ -54,7 +55,7 @@ func (s *Server) Open(path string) error {
 	if st, err := os.Stat(abs); err != nil || !st.IsDir() {
 		return fmt.Errorf("디렉토리가 아니다: %s", abs)
 	}
-	design := filepath.Join(abs, "design")
+	design := workspace.DefaultDesignDir(abs)
 	if !infer.HasDesignFiles(design) {
 		if _, err := os.Stat(filepath.Join(abs, "go.mod")); err != nil {
 			return fmt.Errorf("설계 파일도 go.mod도 없다: %s", abs)
@@ -161,7 +162,7 @@ func project(path, branch, current string, branchKnown bool) vProject {
 	}
 	p.Exists = true
 	switch {
-	case infer.HasDesignFiles(filepath.Join(path, "design")):
+	case infer.HasDesignFiles(workspace.DefaultDesignDir(path)):
 		p.Mode = "check"
 	case fileExists(filepath.Join(path, "go.mod")):
 		p.Mode = "analyze"
@@ -317,7 +318,7 @@ func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, code, msg)
 	}
 	wt := filepath.Join(top, prefix)
-	if infer.HasDesignFiles(filepath.Join(wt, "design")) {
+	if infer.HasDesignFiles(workspace.DefaultDesignDir(wt)) {
 		fail(http.StatusConflict, "HEAD에 이미 설계 파일이 있다. 작업 폴더에서만 지운 설계는 커밋해야 반영된다")
 		return
 	}
@@ -326,7 +327,7 @@ func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
 		fail(http.StatusConflict, fmt.Sprintf("새 worktree를 분석하지 못했다: %v", err))
 		return
 	}
-	p, err := infer.Write(filepath.Join(wt, "design"), a)
+	p, err := infer.Write(workspace.DefaultDesignDir(wt), a)
 	if err != nil {
 		fail(http.StatusInternalServerError, fmt.Sprintf("새 worktree에 초안을 쓰지 못했다: %v", err))
 		return

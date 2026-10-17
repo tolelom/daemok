@@ -199,6 +199,9 @@ func hasHeader(p string) bool {
 	return strings.TrimSuffix(string(first), "\r") == golang.Header
 }
 
+// DefaultDesignDir는 설계 디렉토리를 따로 주지 않았을 때 쓰는 코드 루트 아래 design이다.
+func DefaultDesignDir(root string) string { return filepath.Join(root, "design") }
+
 // SkipDir는 생성 파일 범위와 코드 감시에서 빼는 디렉토리다.
 func SkipDir(name string) bool { return gosrc.SkipDir(name) }
 
