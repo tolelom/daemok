@@ -15,7 +15,7 @@ const until = (cond, what) => `(async () => { for (let i = 0; i < 40; i++) { if 
 const steps = [
   ['hint_shown', until(`S.mode === 'analyze' && !document.querySelector('#wthint').hidden && document.querySelector('#wthint').textContent === '설계 있음: feat/daemok'`, `S.mode + ' ' + document.querySelector('#wthint').outerHTML`)],
   ['hint_opens', `(async () => { document.querySelector('#wthint button').click(); for (let i = 0; i < 40; i++) { await new Promise(r => setTimeout(r, 100)); if (S.mode === 'check' && document.querySelector('#wthint').hidden) return 'ok'; } return S.mode + ' ' + document.querySelector('#wthint').hidden; })()`],
-  ['header_names_repo', `(() => { const t = document.querySelector('#projbtn').textContent, repo = S.root.split('/').slice(-3)[0]; return t === repo + ' · feat/daemok' ? 'ok' : t; })()`],
+  ['header_names_repo', `(() => { const t = document.querySelector('#projbtn').textContent, repo = S.root.split(/[\\\\/]/).slice(-3)[0]; return t === repo + ' · feat/daemok' ? 'ok' : t; })()`],
   ['drawer_list', `(async () => {
     openProjects();
     for (let i = 0; i < 40; i++) {
