@@ -3,7 +3,6 @@
 package workspace
 
 import (
-	"bufio"
 	"bytes"
 	"io/fs"
 	"os"
@@ -195,8 +194,7 @@ func hasHeader(p string) bool {
 	if err != nil {
 		return false
 	}
-	first, _, _ := bufio.NewReader(bytes.NewReader(src)).ReadLine()
-	return strings.TrimSuffix(string(first), "\r") == golang.Header
+	return golang.IsDaemokGenerated(src)
 }
 
 // DefaultDesignDir는 설계 디렉토리를 따로 주지 않았을 때 쓰는 코드 루트 아래 design이다.
@@ -230,8 +228,7 @@ func ScanGenerated(root string) (map[string][]byte, error) {
 			return err
 		}
 		src = bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n"))
-		first, _, _ := bufio.NewReader(bytes.NewReader(src)).ReadLine()
-		if string(first) != golang.Header {
+		if !golang.IsDaemokGenerated(src) {
 			return nil
 		}
 		rel, err := filepath.Rel(root, p)

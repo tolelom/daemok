@@ -25,7 +25,7 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 	fresh := func(n *ast.Ident) bool { return n.IsExported() && !known[n.Name] }
 	var hand []*ast.File
 	for _, f := range files {
-		if !golang.IsGenerated(f) {
+		if !golang.IsDaemokGeneratedFile(f) {
 			hand = append(hand, f)
 		}
 	}

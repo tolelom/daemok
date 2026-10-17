@@ -121,7 +121,7 @@ func (s *scanner) scanUnit(u unit) {
 			}
 			s.depend(u.id, target, s.pos(im.Pos()), "import")
 		}
-		if !golang.IsGenerated(f) {
+		if !golang.IsDaemokGeneratedFile(f) {
 			s.collectRefs(u.id, f)
 			s.adHocErrors(u.id, f)
 			s.enumLiterals(u.id, f)

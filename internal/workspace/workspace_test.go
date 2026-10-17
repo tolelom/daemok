@@ -124,6 +124,18 @@ func TestStaleGeneratedFileAnywhere(t *testing.T) {
 	}
 }
 
+// 생성 파일 범위는 첫 줄이 생성 헤더인 파일이다. 줄 끝 \r은 무시하고, 헤더가 첫 줄에 없으면 범위 밖이다.
+func TestGeneratedScopeIsFirstLine(t *testing.T) {
+	root, dir := setup(t, design)
+	Apply(root, Run(dir, root).Plan)
+	write(t, filepath.Join(root, "old", "cr.go"), golang.Header+"\r")
+	write(t, filepath.Join(root, "old", "blank.go"), "\n"+golang.Header+"\n\npackage old\n")
+	r := Run(dir, root)
+	if len(r.Plan.Delete) != 1 || r.Plan.Delete[0] != "old/cr.go" {
+		t.Fatalf("%+v", r.Plan)
+	}
+}
+
 func TestCodeScanIncluded(t *testing.T) {
 	root, dir := setup(t, "version: 0.5\ngo_module: example.com/x\ntiers: [a]\nmodules:\n  core: { tier: a }\n  api: { tier: a }\n")
 	write(t, filepath.Join(root, "core", "core.go"), "package core\n\nimport _ \"example.com/x/api\"\n")
