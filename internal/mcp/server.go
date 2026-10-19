@@ -176,7 +176,7 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 	case "design":
 		text, err = designTool(design, args.Module)
 	case "check":
-		text = string(workspace.ReportJSON(workspace.Check(design, root).Diags))
+		text = string(workspace.ReportJSON(workspace.Check(design, root).Diagnostics))
 	case "draft":
 		if args.L3 {
 			text, err = draftL3Tool(design, root)

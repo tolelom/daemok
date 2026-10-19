@@ -26,14 +26,14 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	}
 	r := workspace.Check(designDir(*design, *root), *root)
 	if *format == "json" {
-		stdout.Write(workspace.ReportJSON(r.Diags))
+		stdout.Write(workspace.ReportJSON(r.Diagnostics))
 	} else {
-		printDiags(stdout, r.Diags)
+		printDiags(stdout, r.Diagnostics)
 	}
 	switch {
 	case r.Fatal:
 		return 2
-	case r.Diags.HasErrors() || (*strict && r.Diags.Count(model.Warning) > 0):
+	case r.Diagnostics.HasErrors() || (*strict && r.Diagnostics.Count(model.Warning) > 0):
 		return 1
 	}
 	return 0

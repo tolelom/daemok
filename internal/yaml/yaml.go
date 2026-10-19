@@ -6,12 +6,12 @@ import (
 )
 
 type Pos struct {
-	File string
-	Line int
-	Col  int
+	File   string
+	Line   int
+	Column int
 }
 
-func (p Pos) String() string { return fmt.Sprintf("%s:%d:%d", p.File, p.Line, p.Col) }
+func (p Pos) String() string { return fmt.Sprintf("%s:%d:%d", p.File, p.Line, p.Column) }
 
 func (p Pos) Less(q Pos) bool {
 	if p.File != q.File {
@@ -20,7 +20,7 @@ func (p Pos) Less(q Pos) bool {
 	if p.Line != q.Line {
 		return p.Line < q.Line
 	}
-	return p.Col < q.Col
+	return p.Column < q.Column
 }
 
 type Error struct {

@@ -148,7 +148,7 @@ func (s *Server) currentMode() string {
 
 func fill(st *state, r workspace.Result, root string) {
 	st.Model, st.Fatal = toView(r.Model), r.Fatal
-	st.Issues = toIssues(r.Model, root, r.Diags, r.Code)
+	st.Issues = toIssues(r.Model, root, r.Diagnostics, r.Code)
 	st.Files = toFiles(r.Model, r.Files)
 	st.Relations = toRelations(r.Model)
 }

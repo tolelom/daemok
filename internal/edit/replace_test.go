@@ -7,7 +7,7 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-func at(line, col int) yaml.Pos { return yaml.Pos{File: "d.yaml", Line: line, Col: col} }
+func at(line, col int) yaml.Pos { return yaml.Pos{File: "d.yaml", Line: line, Column: col} }
 
 func TestReplaceKeepsQuotes(t *testing.T) {
 	src := "types:\n  post: { fields: { a: \"[]*post\", b: post_status } }\nmodules:\n  web: { depends_on: [\"core\"] }\n"

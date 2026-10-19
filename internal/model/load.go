@@ -78,7 +78,7 @@ func (mg *merger) file(root *yaml.Node) {
 	}
 	d.allow(root, topKeys...)
 	if mg.first == nil {
-		p := yaml.Pos{File: root.Pos.File, Line: 1, Col: 1}
+		p := yaml.Pos{File: root.Pos.File, Line: 1, Column: 1}
 		mg.first = &p
 	}
 	mg.scalarOnce(root, "version", &mg.m.Version)

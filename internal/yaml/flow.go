@@ -81,7 +81,7 @@ func (f *flow) peek() byte { return f.cs[f.i].r }
 func (f *flow) pos() Pos {
 	if f.eof() {
 		last := f.cs[len(f.cs)-1].pos
-		last.Col++
+		last.Column++
 		return last
 	}
 	return f.cs[f.i].pos

@@ -110,11 +110,11 @@ func TestScanCPP(t *testing.T) {
 	}
 	for _, d := range ds {
 		if strings.HasSuffix(d.Message, "core → ui") {
-			if d.Pos.File != filepath.Join(root, "src", "Public", "Core", "Core.h") || d.Pos.Line != 2 || d.Pos.Col != 1 {
+			if d.Pos.File != filepath.Join(root, "src", "Public", "Core", "Core.h") || d.Pos.Line != 2 || d.Pos.Column != 1 {
 				t.Fatalf("위치: %v", d.Pos)
 			}
 		}
-		if strings.HasSuffix(d.Message, "ui → shared") && (d.Pos.Line != 3 || d.Pos.Col != 3) {
+		if strings.HasSuffix(d.Message, "ui → shared") && (d.Pos.Line != 3 || d.Pos.Column != 3) {
 			t.Fatalf("위치: %v", d.Pos)
 		}
 	}

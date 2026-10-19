@@ -36,7 +36,7 @@ func genFiles(t *testing.T, design, root string) map[string]int {
 	t.Helper()
 	r := workspace.Run(design, root)
 	if r.Fatal || r.Files == nil {
-		t.Fatalf("생성하지 못했다: %v", r.Diags)
+		t.Fatalf("생성하지 못했다: %v", r.Diagnostics)
 	}
 	out := map[string]int{}
 	for _, f := range r.Files {

@@ -92,7 +92,7 @@ func diffTool(design, base string) (string, error) {
 func genTool(design, root, path string) (string, error) {
 	r := workspace.Run(design, root)
 	if r.Plan == nil {
-		return "", fmt.Errorf("설계 검사 오류가 있어 생성할 수 없다:\n%s", strings.Join(diagLines(r.Diags), "\n"))
+		return "", fmt.Errorf("설계 검사 오류가 있어 생성할 수 없다:\n%s", strings.Join(diagLines(r.Diagnostics), "\n"))
 	}
 	if path != "" {
 		content, ok := workspace.Content(r, path)

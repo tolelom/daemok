@@ -21,7 +21,7 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 		}
 		return a.ID < b.ID
 	})
-	base := counts(workspace.RunSources(sources, designDir, root).Diags)
+	base := counts(workspace.RunSources(sources, designDir, root).Diagnostics)
 	key := draftKey(sources, designDir)
 	for round := 0; len(nodes) > 0; round++ {
 		if round == maxRounds {
@@ -36,7 +36,7 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 		lineOf := lineNodes(nodes)
 		bad := map[int]string{}
 		var outside []string
-		for _, d := range r.Diags {
+		for _, d := range r.Diagnostics {
 			if d.Level == model.Info {
 				continue
 			}

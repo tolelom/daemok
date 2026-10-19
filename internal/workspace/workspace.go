@@ -31,13 +31,13 @@ type Refusal struct {
 }
 
 type Result struct {
-	Model  *model.Model
-	Diags  model.Diagnostics
-	Fatal  bool
-	Plan   *Plan
-	Files  []golang.File
-	Others model.Diagnostics
-	Code   model.Diagnostics
+	Model       *model.Model
+	Diagnostics model.Diagnostics
+	Fatal       bool
+	Plan        *Plan
+	Files       []golang.File
+	Others      model.Diagnostics
+	Code        model.Diagnostics
 }
 
 func Run(designDir, root string) Result {
@@ -49,7 +49,7 @@ func Check(designDir, root string) Result {
 	if st, err := os.Stat(root); err != nil || !st.IsDir() {
 		var diags model.Diagnostics
 		diags.Errorf(yaml.Pos{File: root}, "코드 루트가 없다")
-		return Result{Diags: diags, Fatal: true}
+		return Result{Diagnostics: diags, Fatal: true}
 	}
 	return Run(designDir, root)
 }
@@ -62,24 +62,24 @@ func RunSources(files map[string][]byte, designDir, root string) Result {
 func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result {
 	if diags.HasErrors() {
 		diags.Sort()
-		return Result{Model: m, Diags: diags, Fatal: true}
+		return Result{Model: m, Diagnostics: diags, Fatal: true}
 	}
 	diags = append(diags, check.Run(m)...)
 	if diags.HasErrors() {
 		diags.Sort()
-		return Result{Model: m, Diags: diags}
+		return Result{Model: m, Diagnostics: diags}
 	}
 	files, err := golang.Generate(m)
 	if err != nil {
 		diags.Errorf(yaml.Pos{File: designDir}, "생성할 수 없다: %v", err)
 		diags.Sort()
-		return Result{Model: m, Diags: diags}
+		return Result{Model: m, Diagnostics: diags}
 	}
 	existing, err := ScanGenerated(root)
 	if err != nil {
 		diags.Errorf(yaml.Pos{File: root}, "코드 루트를 읽을 수 없다: %v", err)
 		diags.Sort()
-		return Result{Model: m, Diags: diags, Fatal: true}
+		return Result{Model: m, Diagnostics: diags, Fatal: true}
 	}
 	files = withTS(m, root, files, existing, &diags)
 	plan, fresh := planFiles(root, files, existing)
@@ -89,7 +89,7 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 	all := append(slices.Clone(diags), fresh...)
 	all.Sort()
 	code := append(slices.Clone(fresh), scanned...)
-	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags, Code: code}
+	return Result{Model: m, Diagnostics: all, Plan: plan, Files: files, Others: diags, Code: code}
 }
 
 func planFiles(root string, files []golang.File, existing map[string][]byte) (*Plan, model.Diagnostics) {

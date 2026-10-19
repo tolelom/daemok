@@ -178,7 +178,7 @@ func (s *scanner) cppScan(us []unit) {
 				if !ok {
 					continue
 				}
-				pos := yaml.Pos{File: p, Line: inc.line, Col: inc.col}
+				pos := yaml.Pos{File: p, Line: inc.line, Column: inc.col}
 				tid, managed := owner(target)
 				if !managed {
 					rel, _ := filepath.Rel(s.root, target)

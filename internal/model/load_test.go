@@ -59,7 +59,7 @@ func join(ds Diagnostics) string {
 	return b.String()
 }
 
-func pos(file string, line, col int) yaml.Pos { return yaml.Pos{File: file, Line: line, Col: col} }
+func pos(file string, line, col int) yaml.Pos { return yaml.Pos{File: file, Line: line, Column: col} }
 
 func TestNoDesignFiles(t *testing.T) {
 	_, ds := Load(t.TempDir())
@@ -85,7 +85,7 @@ func TestVersionMismatch(t *testing.T) {
 func TestUnknownTopKey(t *testing.T) {
 	_, ds := loadOne(t, "modulez: {}\n")
 	d := wantDiag(t, ds, Error, `알 수 없는 키 "modulez"`)
-	if d.Pos.Line != 2 || d.Pos.Col != 1 {
+	if d.Pos.Line != 2 || d.Pos.Column != 1 {
 		t.Fatalf("pos %v", d.Pos)
 	}
 }
@@ -590,7 +590,7 @@ func TestNeedPointsAtID(t *testing.T) {
 	var lines []int
 	for _, d := range ds {
 		if strings.Contains(d.Message, `필요한 키가 없다: "tier"`) {
-			lines = append(lines, d.Pos.Line*100+d.Pos.Col)
+			lines = append(lines, d.Pos.Line*100+d.Pos.Column)
 		}
 	}
 	if len(lines) != 2 || lines[0] != 303 || lines[1] != 503 {
@@ -768,7 +768,7 @@ func TestErrorGoKeys(t *testing.T) {
 func TestCPP(t *testing.T) {
 	m, ds := loadOne(t, "cpp:\n  include_dirs: [a/Public, a/Private]\n")
 	wantClean(t, ds)
-	if m.CPP == nil || len(m.CPP.IncludeDirs) != 2 || m.CPP.IncludeDirs[1].Name != "a/Private" || m.CPP.IncludeDirs[1].Pos.Col != 28 {
+	if m.CPP == nil || len(m.CPP.IncludeDirs) != 2 || m.CPP.IncludeDirs[1].Name != "a/Private" || m.CPP.IncludeDirs[1].Pos.Column != 28 {
 		t.Fatalf("%+v", m.CPP)
 	}
 	_, ds = loadOne(t, "cpp: { include_dirs: [a], extra: 1 }\n")

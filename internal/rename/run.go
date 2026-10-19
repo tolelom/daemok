@@ -348,7 +348,7 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	}
 	bg := workspace.RunSources(before, designDir, root)
 	if bg.Files == nil {
-		return nil, fmt.Errorf("바꾸기 전 설계로 생성하지 못해 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diags))
+		return nil, fmt.Errorf("바꾸기 전 설계로 생성하지 못해 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diagnostics))
 	}
 	bt, _ := ts.Generate(bm)
 	at, _ := ts.Generate(am)

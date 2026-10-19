@@ -80,7 +80,7 @@ func (s *scanner) goFiles(dir string) []*ast.File {
 
 func (s *scanner) pos(p token.Pos) yaml.Pos {
 	q := s.fset.Position(p)
-	return yaml.Pos{File: q.Filename, Line: q.Line, Col: q.Column}
+	return yaml.Pos{File: q.Filename, Line: q.Line, Column: q.Column}
 }
 
 func (s *scanner) scanUnit(u unit) {

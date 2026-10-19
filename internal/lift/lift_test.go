@@ -155,13 +155,13 @@ const Limit = 3
 	}
 	write(t, root, "design/l3.yaml", string(r.YAML))
 	res := workspace.Check(dir, root)
-	for _, d := range res.Diags {
+	for _, d := range res.Diagnostics {
 		if d.Level != model.Info {
 			t.Errorf("진단: %v", d)
 		}
 	}
 	if res.Fatal {
-		t.Fatalf("Fatal: %v", res.Diags)
+		t.Fatalf("Fatal: %v", res.Diagnostics)
 	}
 }
 

@@ -29,7 +29,7 @@ func parseErr(t *testing.T, src string) *Error {
 
 func wantErr(t *testing.T, e *Error, line, col int, substr string) {
 	t.Helper()
-	if e.Pos.Line != line || e.Pos.Col != col || !strings.Contains(e.Message, substr) {
+	if e.Pos.Line != line || e.Pos.Column != col || !strings.Contains(e.Message, substr) {
 		t.Fatalf("got %v, want %d:%d %q", e, line, col, substr)
 	}
 }
@@ -40,10 +40,10 @@ func TestBlockMapScalars(t *testing.T) {
 		t.Fatalf("kind %v entries %d", n.Kind, len(n.Entries))
 	}
 	e := n.Entries[1]
-	if e.Key != "ts_out" || e.Pos.Line != 2 || e.Pos.Col != 1 {
+	if e.Key != "ts_out" || e.Pos.Line != 2 || e.Pos.Column != 1 {
 		t.Fatalf("entry %+v", e)
 	}
-	if e.Value.Value != "web/gen.ts" || e.Value.Pos.Col != 9 {
+	if e.Value.Value != "web/gen.ts" || e.Value.Pos.Column != 9 {
 		t.Fatalf("value %+v", e.Value)
 	}
 }
@@ -51,7 +51,7 @@ func TestBlockMapScalars(t *testing.T) {
 func TestLeadingBOM(t *testing.T) {
 	n := parse(t, "\xef\xbb\xbfversion: 0.3\n")
 	e := n.Entries[0]
-	if e.Key != "version" || e.Pos.Line != 1 || e.Pos.Col != 1 {
+	if e.Key != "version" || e.Pos.Line != 1 || e.Pos.Column != 1 {
 		t.Fatalf("entry %+v", e)
 	}
 }
@@ -65,7 +65,7 @@ func TestNestedBlockMap(t *testing.T) {
 	if got := mods.Get("vm").Get("tier").Value; got != "execution" {
 		t.Fatalf("tier %q", got)
 	}
-	if mods.Get("vm").Pos.Line != 5 || mods.Get("vm").Pos.Col != 5 {
+	if mods.Get("vm").Pos.Line != 5 || mods.Get("vm").Pos.Column != 5 {
 		t.Fatalf("pos %v", mods.Get("vm").Pos)
 	}
 }
@@ -76,7 +76,7 @@ func TestBlockSeq(t *testing.T) {
 	if s.Kind != Seq || len(s.Items) != 2 || s.Items[1].Value != "domain" {
 		t.Fatalf("seq %+v", s)
 	}
-	if s.Items[1].Pos.Line != 3 || s.Items[1].Pos.Col != 5 {
+	if s.Items[1].Pos.Line != 3 || s.Items[1].Pos.Column != 5 {
 		t.Fatalf("pos %v", s.Items[1].Pos)
 	}
 }
@@ -98,8 +98,8 @@ func TestSeqOfInlineMaps(t *testing.T) {
 	if first.Kind != Map || len(first.Entries) != 2 || first.Get("reason").Value != "재사용" {
 		t.Fatalf("first %+v", first)
 	}
-	if first.Get("depends_on").Pos.Col != 17 {
-		t.Fatalf("value col %d", first.Get("depends_on").Pos.Col)
+	if first.Get("depends_on").Pos.Column != 17 {
+		t.Fatalf("value col %d", first.Get("depends_on").Pos.Column)
 	}
 }
 
@@ -236,7 +236,7 @@ func TestFlowMap(t *testing.T) {
 	if m.Kind != Map || len(m.Entries) != 3 {
 		t.Fatalf("%+v", m)
 	}
-	if m.Get("tier").Value != "domain" || m.Get("tier").Pos.Col != 12 {
+	if m.Get("tier").Value != "domain" || m.Get("tier").Pos.Column != 12 {
 		t.Fatalf("tier %+v", m.Get("tier"))
 	}
 	deps := m.Get("depends_on")
@@ -288,7 +288,7 @@ func TestFlowSeqOfMaps(t *testing.T) {
 	if v, _ := c.Items[1].Get("expect").Get("from").Int(); v != 7 {
 		t.Fatalf("expect %+v", c.Items[1].Get("expect"))
 	}
-	if c.Items[1].Pos.Line != 3 || c.Items[1].Pos.Col != 5 {
+	if c.Items[1].Pos.Line != 3 || c.Items[1].Pos.Column != 5 {
 		t.Fatalf("pos %v", c.Items[1].Pos)
 	}
 }
@@ -300,7 +300,7 @@ func TestFlowMultiLineSeq(t *testing.T) {
 	if len(v.Items) != 3 || v.Items[2].Value != "grant_reward" {
 		t.Fatalf("%+v", v)
 	}
-	if v.Items[2].Pos.Line != 4 || v.Items[2].Pos.Col != 10 {
+	if v.Items[2].Pos.Line != 4 || v.Items[2].Pos.Column != 10 {
 		t.Fatalf("pos %v", v.Items[2].Pos)
 	}
 	if n.Get("next").Value != "1" {

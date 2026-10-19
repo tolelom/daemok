@@ -517,7 +517,7 @@ func TestQAFixes(t *testing.T) {
 	want(t, run(t, replace(t, "{ id: unlock }", "{ id: ab_ }")), model.Error, `단계 ID는 소문자 snake_case여야 한다: "ab_"`)
 	want(t, run(t, replace(t, "{ id: commit, commit: true, fatal: true }", "{ id: commit, commit: true, fatal: true, undo: rollback }")), model.Error, "commit 단계에 undo가 있다: commit")
 	d := want(t, run(t, replace(t, "{ id: lock, undo: unlock }", "{ id: lock, undo: fatal }")), model.Error, "Fatal과 겹치는 단계 이름: fatal")
-	if d.Pos.Col < 20 {
+	if d.Pos.Column < 20 {
 		t.Fatalf("undo 위치여야 한다: %v", d.Pos)
 	}
 	want(t, run(t, replace(t, "    steps:\n      - { id: lock, undo: unlock }\n      - { id: load, calls: [store.get] }\n      - { id: commit, commit: true, fatal: true }\n      - { id: unlock }\n", "    steps: []\n")), model.Error, "단계가 없는 흐름: run_block")

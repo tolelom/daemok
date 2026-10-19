@@ -18,7 +18,7 @@ func runGen(args []string, stdout, stderr io.Writer) int {
 	}
 	r := workspace.Run(designDir(*design, *root), *root)
 	if r.Fatal || r.Plan == nil {
-		printDiags(stdout, r.Diags)
+		printDiags(stdout, r.Diagnostics)
 		return 2
 	}
 	p := r.Plan

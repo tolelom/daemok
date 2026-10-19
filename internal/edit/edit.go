@@ -59,8 +59,8 @@ func AddDep(src []byte, file, module, dep string) ([]byte, error) {
 			}
 			return splice(src, i, i, ", depends_on: ["+dep+"]"), nil
 		}
-		at := t.blockEnd(t.val.Pos.Line, t.val.Pos.Col-1)
-		return t.insertLine(at, spaces(t.val.Pos.Col-1)+"depends_on: ["+dep+"]"), nil
+		at := t.blockEnd(t.val.Pos.Line, t.val.Pos.Column-1)
+		return t.insertLine(at, spaces(t.val.Pos.Column-1)+"depends_on: ["+dep+"]"), nil
 	}
 	seq := e.Value
 	if seq.IsNull() {
@@ -156,7 +156,7 @@ func AddModule(src []byte, file, id, tier string) ([]byte, error) {
 	if t.mods.Get(id) != nil {
 		return nil, fmt.Errorf("이미 있는 모듈: %s", id)
 	}
-	indent := t.mods.Pos.Col - 1
+	indent := t.mods.Pos.Column - 1
 	at := t.blockEnd(t.mods.Pos.Line, indent)
 	return t.insertLine(at, spaces(indent)+id+": { tier: "+tier+" }"), nil
 }
@@ -176,7 +176,7 @@ func RemoveModule(src []byte, file, id string) ([]byte, error) {
 	if t.flow(t.mods) {
 		return nil, fmt.Errorf("modules가 플로우 맵이라 지울 수 없다: %s", file)
 	}
-	return splice(src, t.lineStart(e.Pos.Line), t.blockEnd(e.Pos.Line, e.Pos.Col), ""), nil
+	return splice(src, t.lineStart(e.Pos.Line), t.blockEnd(e.Pos.Line, e.Pos.Column), ""), nil
 }
 
 type text struct {
@@ -228,7 +228,7 @@ func entry(n *yaml.Node, key string) *yaml.Entry {
 	return nil
 }
 
-func (t *text) off(p yaml.Pos) int { return t.starts[p.Line-1] + p.Col - 1 }
+func (t *text) off(p yaml.Pos) int { return t.starts[p.Line-1] + p.Column - 1 }
 
 func (t *text) lineStart(line int) int { return t.starts[line-1] }
 

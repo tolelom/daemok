@@ -16,7 +16,7 @@ import (
 )
 
 type Row struct {
-	Pkg          string
+	Package      string
 	Decls        int
 	Matched      int
 	Funcs        int
@@ -48,7 +48,7 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 		}
 		rel, _ := filepath.Rel(root, p)
 		rel = filepath.ToSlash(rel)
-		row := Row{Pkg: rel}
+		row := Row{Package: rel}
 		for _, f := range files {
 			funcs := map[string]bool{}
 			for _, d := range f.Decls {
@@ -75,7 +75,7 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Pkg < rows[j].Pkg })
+	sort.Slice(rows, func(i, j int) bool { return rows[i].Package < rows[j].Package })
 	return rows, bad, nil
 }
 

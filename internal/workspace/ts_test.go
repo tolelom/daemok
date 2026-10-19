@@ -46,8 +46,8 @@ func TestTSOutsideRoot(t *testing.T) {
 	if err != nil || !strings.Contains(string(b), "export const LIMIT = 3;") {
 		t.Fatalf("%v %s", err, b)
 	}
-	if r := Run(dir, root); r.Diags.HasErrors() {
-		t.Fatalf("%v", r.Diags)
+	if r := Run(dir, root); r.Diagnostics.HasErrors() {
+		t.Fatalf("%v", r.Diagnostics)
 	}
 	write(t, tsPath, ts.Header+"\nexport const LIMIT = 4;\n")
 	wantDiag(t, Run(dir, root), "생성 파일이 설계와 다르다: ../web/kind.gen.ts")
@@ -63,13 +63,13 @@ func TestTSMissingDirWarns(t *testing.T) {
 	root, dir, tsPath := tsSetup(t, false)
 	r := Run(dir, root)
 	found := false
-	for _, d := range r.Diags {
+	for _, d := range r.Diagnostics {
 		if d.Level == model.Warning && strings.Contains(d.Message, "ts_out 디렉토리가 없어 TS 파일을 쓰지 않는다") {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("%v", r.Diags)
+		t.Fatalf("%v", r.Diagnostics)
 	}
 	Apply(root, r.Plan)
 	if _, err := os.Stat(filepath.Dir(tsPath)); !os.IsNotExist(err) {

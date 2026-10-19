@@ -41,12 +41,12 @@ func write(t *testing.T, p, content string) {
 
 func wantDiag(t *testing.T, r Result, substr string) {
 	t.Helper()
-	for _, d := range r.Diags {
+	for _, d := range r.Diagnostics {
 		if d.Level == model.Error && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
-	t.Fatalf("no error containing %q in %v", substr, r.Diags)
+	t.Fatalf("no error containing %q in %v", substr, r.Diagnostics)
 }
 
 func TestLoadErrorIsFatal(t *testing.T) {
@@ -59,7 +59,7 @@ func TestLoadErrorIsFatal(t *testing.T) {
 func TestCheckErrorHasNoPlan(t *testing.T) {
 	root, dir := setup(t, "version: 0.5\ntiers: [a, b]\nmodules:\n  low: { tier: a, depends_on: [high] }\n  high: { tier: b }\n")
 	r := Run(dir, root)
-	if r.Fatal || r.Plan != nil || !r.Diags.HasErrors() {
+	if r.Fatal || r.Plan != nil || !r.Diagnostics.HasErrors() {
 		t.Fatalf("%+v", r)
 	}
 }
@@ -75,8 +75,8 @@ func TestMissingThenFreshAfterApply(t *testing.T) {
 		t.Fatal(err)
 	}
 	r = Run(dir, root)
-	if len(r.Diags) != 0 || len(r.Plan.Write)+len(r.Plan.Delete)+len(r.Plan.Refuse) != 0 {
-		t.Fatalf("최신이어야 한다: %v %+v", r.Diags, r.Plan)
+	if len(r.Diagnostics) != 0 || len(r.Plan.Write)+len(r.Plan.Delete)+len(r.Plan.Refuse) != 0 {
+		t.Fatalf("최신이어야 한다: %v %+v", r.Diagnostics, r.Plan)
 	}
 }
 
@@ -87,8 +87,8 @@ func TestChangedAndCRLF(t *testing.T) {
 	src, _ := os.ReadFile(p)
 	// CRLF로 바꿔도 최신이다
 	write(t, p, strings.ReplaceAll(string(src), "\n", "\r\n"))
-	if r := Run(dir, root); len(r.Diags) != 0 {
-		t.Fatalf("CRLF: %v", r.Diags)
+	if r := Run(dir, root); len(r.Diagnostics) != 0 {
+		t.Fatalf("CRLF: %v", r.Diagnostics)
 	}
 	write(t, p, string(src)+"// 손댐\n")
 	wantDiag(t, Run(dir, root), "생성 파일이 설계와 다르다: core/kind.gen.go")
@@ -194,7 +194,7 @@ func TestFiberAPIServer(t *testing.T) {
 	}
 	r := Run(filepath.Join("testdata", "fiber", "design"), root)
 	var got []string
-	for _, d := range r.Diags {
+	for _, d := range r.Diagnostics {
 		got = append(got, d.Level.String()+": "+d.Message)
 	}
 	want := []string{

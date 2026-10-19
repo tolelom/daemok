@@ -54,7 +54,7 @@ func Pin(src []byte, file string, path []string, key, sub, value string) ([]byte
 	if len(target.Entries) == 0 {
 		return nil, fmt.Errorf("빈 블록 맵에는 더하지 않는다: %v", path)
 	}
-	indent := target.Entries[0].Pos.Col - 1
+	indent := target.Entries[0].Pos.Column - 1
 	at := t.blockEnd(target.Entries[0].Pos.Line, indent)
 	return t.insertLine(at, spaces(indent)+k+": "+v), nil
 }

@@ -53,8 +53,8 @@ func TestL3DraftAndSave(t *testing.T) {
 	if code, out := post(t, s, "/api/l3", "{}"); code != 200 || out["path"] != "design/l3-2.yaml" {
 		t.Fatalf("%d %v", code, out)
 	}
-	if r := workspace.Check(dir, root); r.Diags.Count(model.Error)+r.Diags.Count(model.Warning) != 0 {
-		t.Fatalf("저장 뒤 진단: %v", r.Diags)
+	if r := workspace.Check(dir, root); r.Diagnostics.Count(model.Error)+r.Diagnostics.Count(model.Warning) != 0 {
+		t.Fatalf("저장 뒤 진단: %v", r.Diagnostics)
 	}
 }
 

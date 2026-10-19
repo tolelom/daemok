@@ -38,7 +38,7 @@ func runCoverage(args []string, stdout, stderr io.Writer) int {
 		sum.Matched += r.Matched
 		sum.Funcs += r.Funcs
 		sum.FuncsMatched += r.FuncsMatched
-		fmt.Fprintf(stdout, "| `%s` | %d | %d | %s | %s |\n", r.Pkg, r.Decls, r.Matched, percent(r.Matched, r.Decls), percent(r.Matched-r.FuncsMatched, r.Decls-r.Funcs))
+		fmt.Fprintf(stdout, "| `%s` | %d | %d | %s | %s |\n", r.Package, r.Decls, r.Matched, percent(r.Matched, r.Decls), percent(r.Matched-r.FuncsMatched, r.Decls-r.Funcs))
 	}
 	fmt.Fprintf(stdout, "| 합계 | %d | %d | %s | %s |\n", sum.Decls, sum.Matched, percent(sum.Matched, sum.Decls), percent(sum.Matched-sum.FuncsMatched, sum.Decls-sum.Funcs))
 	fmt.Fprintf(stdout, "\n함수 제외: 선언 %d개 중 %d개. 함수 %d개 중 설계 대응 %d개\n", sum.Decls-sum.Funcs, sum.Matched-sum.FuncsMatched, sum.Funcs, sum.FuncsMatched)
