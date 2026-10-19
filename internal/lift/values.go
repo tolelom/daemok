@@ -11,7 +11,27 @@ import (
 )
 
 func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Ident) bool) (types, values map[string]bool) {
-	types, values = map[string]bool{}, map[string]bool{}
+	order, types := stringTypeSpecs(files, fresh)
+	consts, values := enumConsts(files, types)
+	for _, ts := range order {
+		id, fields, reason := enumNode(ts.Name.Name, consts[ts.Name.Name])
+		if reason != "" {
+			c.skip(ts.Name.Pos(), ts.Name.Name, reason)
+			continue
+		}
+		c.add("enums", module, id, ts.Name, fields...)
+	}
+	return types, values
+}
+
+type enumConst struct {
+	name *ast.Ident
+	lit  string
+	ok   bool
+}
+
+func stringTypeSpecs(files []*ast.File, fresh func(*ast.Ident) bool) ([]*ast.TypeSpec, map[string]bool) {
+	types := map[string]bool{}
 	var order []*ast.TypeSpec
 	for _, f := range files {
 		for _, d := range f.Decls {
@@ -28,12 +48,11 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 			}
 		}
 	}
-	type value struct {
-		name *ast.Ident
-		lit  string
-		ok   bool
-	}
-	consts := map[string][]value{}
+	return order, types
+}
+
+func enumConsts(files []*ast.File, types map[string]bool) (map[string][]enumConst, map[string]bool) {
+	consts, values := map[string][]enumConst{}, map[string]bool{}
 	for _, f := range files {
 		for _, d := range f.Decls {
 			g, ok := d.(*ast.GenDecl)
@@ -48,7 +67,7 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 				}
 				for i, n := range sp.Names {
 					values[n.Name] = true
-					v := value{name: n}
+					v := enumConst{name: n}
 					if len(sp.Values) == len(sp.Names) {
 						v.lit, v.ok = stringLit(sp.Values[i])
 					}
@@ -57,54 +76,45 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 			}
 		}
 	}
-	for _, ts := range order {
-		name := ts.Name.Name
-		vs := consts[name]
-		if len(vs) < 2 {
-			c.skip(ts.Name.Pos(), name, "string 타입이지만 값 상수가 2개 미만이다")
-			continue
-		}
-		prefix, lits, reason := "", []string{}, ""
-		for i, v := range vs {
-			if !v.ok || !enumValue.MatchString(v.lit) {
-				reason = "값 상수가 단순한 문자열 리터럴이 아니다: " + v.name.Name
-				break
-			}
-			suffix := model.GoName(v.lit)
-			p, found := strings.CutSuffix(v.name.Name, suffix)
-			if !found || (i > 0 && p != prefix) {
-				reason = "상수 이름이 같은 접두사 + 값 이름이 아니다: " + v.name.Name
-				break
-			}
-			prefix = p
-			lits = append(lits, v.lit)
-		}
-		if reason == "" && prefix == "" {
-			reason = "접두사 없는 enum 상수는 설계로 적을 수 없다"
-		}
-		if reason != "" {
-			c.skip(ts.Name.Pos(), name, reason)
-			continue
-		}
-		id, goType, ok := snakeID(name)
-		if !ok {
-			c.skip(ts.Name.Pos(), name, "snake_case ID로 바꿀 수 없다")
-			continue
-		}
-		var goOpts []string
-		if goType != "" {
-			goOpts = append(goOpts, "type: "+goType)
-		}
-		if prefix != name {
-			goOpts = append(goOpts, "prefix: "+prefix)
-		}
-		fields := []string{"values: [" + strings.Join(lits, ", ") + "]"}
-		if len(goOpts) > 0 {
-			fields = append(fields, "go: { "+strings.Join(goOpts, ", ")+" }")
-		}
-		c.add("enums", module, id, ts.Name, fields...)
+	return consts, values
+}
+
+func enumNode(name string, vs []enumConst) (id string, fields []string, reason string) {
+	if len(vs) < 2 {
+		return "", nil, "string 타입이지만 값 상수가 2개 미만이다"
 	}
-	return types, values
+	prefix, lits := "", []string{}
+	for i, v := range vs {
+		if !v.ok || !enumValue.MatchString(v.lit) {
+			return "", nil, "값 상수가 단순한 문자열 리터럴이 아니다: " + v.name.Name
+		}
+		suffix := model.GoName(v.lit)
+		p, found := strings.CutSuffix(v.name.Name, suffix)
+		if !found || (i > 0 && p != prefix) {
+			return "", nil, "상수 이름이 같은 접두사 + 값 이름이 아니다: " + v.name.Name
+		}
+		prefix = p
+		lits = append(lits, v.lit)
+	}
+	if prefix == "" {
+		return "", nil, "접두사 없는 enum 상수는 설계로 적을 수 없다"
+	}
+	id, goType, ok := snakeID(name)
+	if !ok {
+		return "", nil, "snake_case ID로 바꿀 수 없다"
+	}
+	var goOpts []string
+	if goType != "" {
+		goOpts = append(goOpts, "type: "+goType)
+	}
+	if prefix != name {
+		goOpts = append(goOpts, "prefix: "+prefix)
+	}
+	fields = []string{"values: [" + strings.Join(lits, ", ") + "]"}
+	if len(goOpts) > 0 {
+		fields = append(fields, "go: { "+strings.Join(goOpts, ", ")+" }")
+	}
+	return id, fields, ""
 }
 
 var enumValue = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
