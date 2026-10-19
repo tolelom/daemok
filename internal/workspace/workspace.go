@@ -82,11 +82,20 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 		return Result{Model: m, Diags: diags, Fatal: true}
 	}
 	files = withTS(m, root, files, existing, &diags)
+	plan, fresh := planFiles(root, files, existing)
+	scanned := codescan.Scan(m, root)
+	diags = append(diags, scanned...)
+	diags.Sort()
+	all := append(slices.Clone(diags), fresh...)
+	all.Sort()
+	code := append(slices.Clone(fresh), scanned...)
+	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags, Code: code}
+}
+
+func planFiles(root string, files []golang.File, existing map[string][]byte) (*Plan, model.Diagnostics) {
 	var fresh model.Diagnostics
 	plan := &Plan{}
-	out := map[string]bool{}
 	for _, f := range files {
-		out[f.Path] = true
 		pos := yaml.Pos{File: filepath.Join(root, filepath.FromSlash(f.Path))}
 		content, isGen := existing[f.Path]
 		if reason := blocked(root, f.Path); reason != "" {
@@ -110,6 +119,18 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 			fresh.Errorf(pos, "생성 파일이 설계와 다르다: %s (daemok gen)", f.Path)
 		}
 	}
+	for _, p := range staleFiles(files, existing) {
+		plan.Delete = append(plan.Delete, p)
+		fresh.Errorf(yaml.Pos{File: filepath.Join(root, filepath.FromSlash(p))}, "설계에 없는 생성 파일: %s (daemok gen)", p)
+	}
+	return plan, fresh
+}
+
+func staleFiles(files []golang.File, existing map[string][]byte) []string {
+	out := map[string]bool{}
+	for _, f := range files {
+		out[f.Path] = true
+	}
 	var stale []string
 	for p := range existing {
 		if !out[p] {
@@ -117,17 +138,7 @@ func run(m *model.Model, diags model.Diagnostics, designDir, root string) Result
 		}
 	}
 	sort.Strings(stale)
-	for _, p := range stale {
-		plan.Delete = append(plan.Delete, p)
-		fresh.Errorf(yaml.Pos{File: filepath.Join(root, filepath.FromSlash(p))}, "설계에 없는 생성 파일: %s (daemok gen)", p)
-	}
-	scanned := codescan.Scan(m, root)
-	diags = append(diags, scanned...)
-	diags.Sort()
-	all := append(slices.Clone(diags), fresh...)
-	all.Sort()
-	code := append(slices.Clone(fresh), scanned...)
-	return Result{Model: m, Diags: all, Plan: plan, Files: files, Others: diags, Code: code}
+	return stale
 }
 
 func withTS(m *model.Model, root string, files []golang.File, existing map[string][]byte, diags *model.Diagnostics) []golang.File {
