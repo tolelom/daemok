@@ -1,0 +1,804 @@
+{
+  "goModule": "example.com/basic",
+  "system": {
+    "id": "system",
+    "summary": ""
+  },
+  "tiers": [
+    "foundation",
+    "domain",
+    "execution",
+    "service"
+  ],
+  "reqs": [],
+  "actors": [],
+  "ifaces": [],
+  "exes": [
+    {
+      "id": "node",
+      "summary": "",
+      "exposes": [],
+      "composes": [
+        "core",
+        "vm",
+        "chain",
+        "tx_modules",
+        "events",
+        "store"
+      ]
+    }
+  ],
+  "mods": [
+    {
+      "id": "events",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "",
+      "path": "events",
+      "depends_on": [],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "store",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "",
+      "path": "store",
+      "role": "infra",
+      "depends_on": [],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "core",
+      "type": "mod",
+      "tier": "domain",
+      "summary": "",
+      "path": "core",
+      "depends_on": [
+        "events"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "vm",
+      "type": "mod",
+      "tier": "execution",
+      "summary": "",
+      "path": "vm",
+      "depends_on": [
+        "core"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "chain",
+      "type": "mod",
+      "tier": "service",
+      "summary": "",
+      "path": "chain",
+      "depends_on": [
+        "core",
+        "vm",
+        "events"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": [
+        {
+          "contract": "kv",
+          "target": "store",
+          "uses": [],
+          "why": ""
+        }
+      ]
+    }
+  ],
+  "groups": [
+    {
+      "id": "tx_modules",
+      "type": "grp",
+      "tier": "execution",
+      "summary": "",
+      "path": "vm/modules",
+      "kind": "tx_handler",
+      "depends_on": [
+        "core",
+        "vm",
+        "events"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [
+        "economy",
+        "asset"
+      ],
+      "needs": []
+    }
+  ],
+  "members": [
+    {
+      "id": "economy",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "",
+      "path": "vm/modules/economy",
+      "exceptions": [],
+      "handles": [
+        "transfer"
+      ],
+      "satisfies": [],
+      "needs": []
+    },
+    {
+      "id": "asset",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "",
+      "path": "vm/modules/asset",
+      "exceptions": [],
+      "handles": [
+        "mint_asset"
+      ],
+      "satisfies": [],
+      "needs": []
+    }
+  ],
+  "enums": [
+    {
+      "id": "tx_type",
+      "in": "core",
+      "values": [
+        "transfer",
+        "mint_asset"
+      ],
+      "go": {
+        "type": "TxType",
+        "prefix": "Tx"
+      },
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "status",
+      "in": "core",
+      "values": [
+        "draft",
+        "published"
+      ],
+      "go": {},
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "event_type",
+      "in": "events",
+      "values": [
+        "block_commit",
+        "asset_minted"
+      ],
+      "go": {
+        "type": "EventType",
+        "prefix": "Event"
+      },
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "mint_kind",
+      "in": "events",
+      "values": [
+        "normal",
+        "bonus"
+      ],
+      "go": {},
+      "export": [],
+      "satisfies": []
+    }
+  ],
+  "consts": [
+    {
+      "id": "max_block_txs",
+      "in": "core",
+      "type": "int",
+      "value": "500",
+      "go": {
+        "name": "DefaultMaxBlockTxs"
+      },
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "max_tx_age",
+      "in": "core",
+      "type": "duration",
+      "value": "1h",
+      "go": {},
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "chain_name",
+      "in": "core",
+      "type": "string",
+      "value": "basic",
+      "go": {},
+      "export": [],
+      "satisfies": []
+    }
+  ],
+  "errors": [
+    {
+      "id": "ErrNotFound",
+      "in": "core",
+      "message": "not found",
+      "http": 404,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrInsufficientBalance",
+      "in": "core",
+      "message": "insufficient balance",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    }
+  ],
+  "types": [
+    {
+      "id": "account",
+      "in": "core",
+      "fields": [
+        {
+          "name": "address",
+          "type": "address",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "balance",
+          "type": "uint64",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "status",
+          "type": "status",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "nick",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": true,
+          "max": "20",
+          "summary": "화면에 보이는 이름"
+        }
+      ],
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "block",
+      "in": "core",
+      "fields": [
+        {
+          "name": "height",
+          "type": "int64",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "txs",
+          "type": "",
+          "ref": "account",
+          "many": true,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "owner",
+          "type": "",
+          "ref": "account",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "by_status",
+          "type": "map[status][]*account",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "meta",
+          "type": "map[string]json.RawMessage",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "go": {},
+      "satisfies": []
+    }
+  ],
+  "contracts": [
+    {
+      "id": "ledger",
+      "in": "core",
+      "kind": "call",
+      "go": {},
+      "satisfies": [],
+      "methods": [
+        {
+          "name": "get",
+          "params": [
+            {
+              "name": "address",
+              "type": "address"
+            }
+          ],
+          "returns": [
+            "account"
+          ],
+          "errors": [
+            "ErrNotFound"
+          ],
+          "hasErrors": true
+        },
+        {
+          "name": "put",
+          "params": [
+            {
+              "name": "acc",
+              "type": "account"
+            }
+          ],
+          "returns": [],
+          "errors": [],
+          "hasErrors": true
+        }
+      ]
+    },
+    {
+      "id": "kv",
+      "in": "store",
+      "kind": "port",
+      "go": {},
+      "satisfies": [],
+      "methods": [
+        {
+          "name": "get",
+          "params": [
+            {
+              "name": "key",
+              "type": "string"
+            }
+          ],
+          "returns": [
+            "bytes"
+          ],
+          "errors": [],
+          "hasErrors": true
+        },
+        {
+          "name": "set",
+          "params": [
+            {
+              "name": "key",
+              "type": "string"
+            },
+            {
+              "name": "value",
+              "type": "bytes"
+            }
+          ],
+          "returns": [],
+          "errors": [],
+          "hasErrors": true
+        }
+      ]
+    }
+  ],
+  "hks": [
+    {
+      "id": "tx_handler",
+      "in": "vm",
+      "go": {
+        "name": "Handler",
+        "register": "Register"
+      },
+      "params": [
+        {
+          "name": "ctx",
+          "type": "*Context"
+        },
+        {
+          "name": "payload",
+          "type": "json.RawMessage"
+        }
+      ],
+      "returns": [
+        "error"
+      ],
+      "key": "tx_type"
+    }
+  ],
+  "funcs": [
+    {
+      "id": "handle_transfer",
+      "in": "economy",
+      "kind": "tx_handler",
+      "handles": "transfer",
+      "of": "",
+      "errors": [
+        "ErrInsufficientBalance"
+      ],
+      "satisfies": [],
+      "cases": [
+        {
+          "name": "잔액 부족",
+          "given": {
+            "amount": 10,
+            "balance": 5
+          },
+          "expect": null,
+          "error": "ErrInsufficientBalance"
+        },
+        {
+          "name": "금액 0",
+          "given": {
+            "amount": 0
+          },
+          "expect": null,
+          "error": "invalid"
+        },
+        {
+          "name": "정상",
+          "given": {
+            "amount": 3,
+            "balance": 10,
+            "memo": "hi",
+            "nested": {
+              "ok": true
+            }
+          },
+          "expect": {
+            "from": 7,
+            "to": 3
+          },
+          "error": ""
+        }
+      ]
+    }
+  ],
+  "eks": [
+    {
+      "id": "chain_event",
+      "in": "events",
+      "key": "event_type",
+      "encoding": "map",
+      "subscribers": [
+        "chain"
+      ],
+      "satisfies": []
+    }
+  ],
+  "events": [
+    {
+      "id": "block_commit",
+      "kind": "chain_event",
+      "in": "events",
+      "publishers": [
+        "chain"
+      ],
+      "subscribers": [],
+      "data": [
+        {
+          "name": "hash",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "txs",
+          "type": "int",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "block",
+          "type": "any",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "satisfies": []
+    },
+    {
+      "id": "asset_minted",
+      "kind": "chain_event",
+      "in": "events",
+      "publishers": [
+        "asset"
+      ],
+      "subscribers": [],
+      "data": [
+        {
+          "name": "asset_id",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "amount",
+          "type": "uint64",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "players",
+          "type": "string",
+          "ref": "",
+          "many": true,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "kind",
+          "type": "mint_kind",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "memo",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": true,
+          "max": "",
+          "summary": "발행자가 남긴 메모"
+        },
+        {
+          "name": "count",
+          "type": "int",
+          "ref": "",
+          "many": false,
+          "optional": true,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "tags",
+          "type": "string",
+          "ref": "",
+          "many": true,
+          "optional": true,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "satisfies": []
+    }
+  ],
+  "flows": [
+    {
+      "id": "produce_block",
+      "in": "chain",
+      "on": "",
+      "summary": "블록을 만들어 저장한다",
+      "steps": [
+        {
+          "id": "lock",
+          "undo": "unlock",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "snapshot",
+          "undo": "revert",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "buffer_events",
+          "undo": "discard_events",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "execute_txs",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "tx를 실행한다",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "add_block",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [
+            "kv.set"
+          ],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "commit_state",
+          "undo": "",
+          "commit": true,
+          "fatal": true,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": true
+        },
+        {
+          "id": "unlock",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "flush_events",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "emit_block_commit",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [
+            "block_commit"
+          ],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        }
+      ],
+      "satisfies": []
+    },
+    {
+      "id": "simple",
+      "in": "chain",
+      "on": "",
+      "summary": "",
+      "steps": [
+        {
+          "id": "first",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "second",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        }
+      ],
+      "satisfies": []
+    }
+  ]
+}

@@ -1,0 +1,1088 @@
+{
+  "goModule": "github.com/tolelom/tolchain",
+  "system": {
+    "id": "tolchain",
+    "summary": "게임 특화 PoA 프라이빗 블록체인"
+  },
+  "tiers": [
+    "foundation",
+    "domain",
+    "persistence",
+    "execution",
+    "service"
+  ],
+  "reqs": [
+    {
+      "id": "REQ-transfer",
+      "text": "사용자는 토큰을 다른 주소로 보낼 수 있다",
+      "status": "active"
+    },
+    {
+      "id": "REQ-reward",
+      "text": "게임 서버는 보상을 한 트랜잭션으로 모아 지급한다",
+      "status": "active"
+    },
+    {
+      "id": "REQ-delegation",
+      "text": "API 서버는 위임받은 범위 안에서 유저 대신 서명한다",
+      "status": "active"
+    },
+    {
+      "id": "REQ-random",
+      "text": "게임 난수는 commit-reveal로 조작을 막는다",
+      "status": "held"
+    }
+  ],
+  "actors": [
+    {
+      "id": "game_server",
+      "summary": "게임 결과를 서명된 트랜잭션으로 제출"
+    },
+    {
+      "id": "api_server",
+      "summary": "커스터디얼 지갑으로 유저 대신 서명"
+    },
+    {
+      "id": "peer_node",
+      "summary": "다른 tolchain 노드"
+    },
+    {
+      "id": "monitoring",
+      "summary": "Prometheus + Grafana"
+    }
+  ],
+  "ifaces": [
+    {
+      "id": "json_rpc",
+      "protocol": "jsonrpc2-http",
+      "port": 8545,
+      "path": null,
+      "spec": "",
+      "used_by": [
+        "game_server",
+        "api_server"
+      ]
+    },
+    {
+      "id": "events",
+      "protocol": "sse",
+      "port": null,
+      "path": "/events",
+      "spec": "",
+      "used_by": [
+        "game_server",
+        "api_server"
+      ]
+    },
+    {
+      "id": "p2p",
+      "protocol": "tcp-lpjson",
+      "port": 30303,
+      "path": null,
+      "spec": "",
+      "used_by": [
+        "peer_node"
+      ]
+    },
+    {
+      "id": "metrics",
+      "protocol": "prometheus",
+      "port": null,
+      "path": "/metrics",
+      "spec": "",
+      "used_by": [
+        "monitoring"
+      ]
+    }
+  ],
+  "exes": [
+    {
+      "id": "node",
+      "summary": "검증자 / 풀 노드",
+      "exposes": [
+        "json_rpc",
+        "events",
+        "p2p",
+        "metrics"
+      ],
+      "composes": [
+        "config",
+        "consensus",
+        "rpc",
+        "network",
+        "storage",
+        "indexer",
+        "wallet",
+        "certgen",
+        "vm",
+        "tx_modules"
+      ]
+    },
+    {
+      "id": "genkey",
+      "summary": "검증자 키 생성",
+      "exposes": [],
+      "composes": []
+    },
+    {
+      "id": "backup",
+      "summary": "LevelDB 백업",
+      "exposes": [],
+      "composes": [
+        "storage"
+      ]
+    }
+  ],
+  "mods": [
+    {
+      "id": "crypto",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "ed25519 서명, SHA-256",
+      "path": "crypto",
+      "depends_on": [],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "certgen",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "mTLS 인증서 생성",
+      "path": "crypto/certgen",
+      "depends_on": [],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "events",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "이벤트 pub/sub",
+      "path": "events",
+      "depends_on": [],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "metrics",
+      "type": "mod",
+      "tier": "foundation",
+      "summary": "Prometheus 지표",
+      "path": "metrics",
+      "depends_on": [],
+      "implements": [
+        "metrics"
+      ],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "core",
+      "type": "mod",
+      "tier": "domain",
+      "summary": "Transaction, Block, State, Mempool",
+      "path": "core",
+      "depends_on": [
+        "crypto",
+        "metrics"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "storage",
+      "type": "mod",
+      "tier": "persistence",
+      "summary": "LevelDB + 스냅샷/롤백",
+      "path": "storage",
+      "depends_on": [
+        "core",
+        "crypto"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "indexer",
+      "type": "mod",
+      "tier": "persistence",
+      "summary": "owner→assets 보조 인덱스",
+      "path": "indexer",
+      "depends_on": [
+        "core",
+        "events",
+        "storage"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "vm",
+      "type": "mod",
+      "tier": "execution",
+      "summary": "트랜잭션 실행 엔진",
+      "path": "vm",
+      "depends_on": [
+        "core",
+        "crypto",
+        "events"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "consensus",
+      "type": "mod",
+      "tier": "service",
+      "summary": "PoA 라운드로빈",
+      "path": "consensus",
+      "depends_on": [
+        "config",
+        "core",
+        "crypto",
+        "events",
+        "metrics",
+        "vm"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "network",
+      "type": "mod",
+      "tier": "service",
+      "summary": "TCP P2P",
+      "path": "network",
+      "depends_on": [
+        "core",
+        "events",
+        "metrics"
+      ],
+      "implements": [
+        "p2p"
+      ],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "rpc",
+      "type": "mod",
+      "tier": "service",
+      "summary": "JSON-RPC + SSE",
+      "path": "rpc",
+      "depends_on": [
+        "core",
+        "events",
+        "indexer",
+        "metrics"
+      ],
+      "implements": [
+        "json_rpc",
+        "events"
+      ],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "wallet",
+      "type": "mod",
+      "tier": "service",
+      "summary": "키스토어, Tx 빌더",
+      "path": "wallet",
+      "depends_on": [
+        "core",
+        "crypto"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    },
+    {
+      "id": "config",
+      "type": "mod",
+      "tier": "service",
+      "summary": "설정, 제네시스, TLS",
+      "path": "config",
+      "depends_on": [
+        "core"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [],
+      "needs": []
+    }
+  ],
+  "groups": [
+    {
+      "id": "tx_modules",
+      "type": "grp",
+      "tier": "execution",
+      "summary": "",
+      "path": "vm/modules",
+      "kind": "tx_handler",
+      "rule": "no_sibling_deps",
+      "depends_on": [
+        "core",
+        "crypto",
+        "events",
+        "vm"
+      ],
+      "implements": [],
+      "satisfies": [],
+      "members": [
+        "economy",
+        "asset",
+        "market",
+        "session",
+        "inventory",
+        "random",
+        "delegation",
+        "reward"
+      ],
+      "needs": []
+    }
+  ],
+  "members": [
+    {
+      "id": "economy",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "토큰 전송",
+      "path": "vm/modules/economy",
+      "exceptions": [],
+      "handles": [
+        "transfer"
+      ],
+      "satisfies": [
+        "REQ-transfer"
+      ],
+      "needs": []
+    },
+    {
+      "id": "asset",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "템플릿, 발행/소각/전송",
+      "path": "vm/modules/asset",
+      "exceptions": [],
+      "handles": [
+        "mint_asset",
+        "burn_asset",
+        "transfer_asset",
+        "register_template"
+      ],
+      "satisfies": [],
+      "needs": []
+    },
+    {
+      "id": "market",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "마켓 등록/구매/취소",
+      "path": "vm/modules/market",
+      "exceptions": [],
+      "handles": [
+        "list_market",
+        "buy_market",
+        "cancel_listing"
+      ],
+      "satisfies": [],
+      "needs": []
+    },
+    {
+      "id": "session",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "게임 세션",
+      "path": "vm/modules/session",
+      "exceptions": [],
+      "handles": [
+        "session_open",
+        "session_result",
+        "session_cancel"
+      ],
+      "satisfies": [],
+      "needs": []
+    },
+    {
+      "id": "inventory",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "장착 슬롯",
+      "path": "vm/modules/inventory",
+      "exceptions": [],
+      "handles": [
+        "equip_item",
+        "unequip_item"
+      ],
+      "satisfies": [],
+      "needs": []
+    },
+    {
+      "id": "random",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "commit-reveal 난수",
+      "path": "vm/modules/random",
+      "exceptions": [],
+      "handles": [
+        "random_commit",
+        "random_reveal"
+      ],
+      "satisfies": [
+        "REQ-random"
+      ],
+      "needs": []
+    },
+    {
+      "id": "delegation",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "서명 위임",
+      "path": "vm/modules/delegation",
+      "exceptions": [],
+      "handles": [
+        "grant_delegation",
+        "revoke_delegation"
+      ],
+      "satisfies": [
+        "REQ-delegation"
+      ],
+      "needs": []
+    },
+    {
+      "id": "reward",
+      "type": "mem",
+      "group": "tx_modules",
+      "summary": "배치 보상 (토큰 + 자산)",
+      "path": "vm/modules/reward",
+      "exceptions": [
+        {
+          "to": "asset",
+          "reason": "보상 지급 시 자산 스키마 검증 재사용"
+        }
+      ],
+      "handles": [
+        "grant_reward"
+      ],
+      "satisfies": [
+        "REQ-reward"
+      ],
+      "needs": []
+    }
+  ],
+  "enums": [
+    {
+      "id": "tx_type",
+      "in": "core",
+      "values": [
+        "transfer",
+        "mint_asset",
+        "burn_asset",
+        "transfer_asset",
+        "register_template",
+        "session_open",
+        "session_result",
+        "list_market",
+        "buy_market",
+        "cancel_listing",
+        "session_cancel",
+        "equip_item",
+        "unequip_item",
+        "grant_reward",
+        "random_commit",
+        "random_reveal",
+        "grant_delegation",
+        "revoke_delegation"
+      ],
+      "go": {
+        "type": "TxType",
+        "prefix": "Tx"
+      },
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "event_type",
+      "in": "events",
+      "values": [
+        "block_commit",
+        "asset_minted",
+        "session_open"
+      ],
+      "go": {
+        "type": "EventType",
+        "prefix": "Event"
+      },
+      "export": [],
+      "satisfies": []
+    }
+  ],
+  "consts": [
+    {
+      "id": "max_block_txs",
+      "in": "config",
+      "type": "int",
+      "value": "500",
+      "go": {
+        "name": "DefaultMaxBlockTxs"
+      },
+      "export": [],
+      "satisfies": []
+    },
+    {
+      "id": "max_tx_age",
+      "in": "config",
+      "type": "duration",
+      "value": "1h",
+      "go": {
+        "name": "MaxTxAge"
+      },
+      "export": [],
+      "satisfies": []
+    }
+  ],
+  "errors": [
+    {
+      "id": "ErrNotFound",
+      "in": "core",
+      "message": "not found",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrInsufficientBalance",
+      "in": "core",
+      "message": "insufficient balance",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrInvalidNonce",
+      "in": "core",
+      "message": "invalid nonce",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrBalanceOverflow",
+      "in": "core",
+      "message": "balance overflow",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrNonceOverflow",
+      "in": "core",
+      "message": "nonce overflow",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrAlreadyExists",
+      "in": "core",
+      "message": "already exists",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    },
+    {
+      "id": "ErrUnauthorized",
+      "in": "core",
+      "message": "unauthorized",
+      "http": null,
+      "go": {},
+      "satisfies": []
+    }
+  ],
+  "types": [
+    {
+      "id": "transfer_payload",
+      "in": "core",
+      "fields": [
+        {
+          "name": "to",
+          "type": "address",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "amount",
+          "type": "uint64",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "go": {},
+      "satisfies": []
+    }
+  ],
+  "contracts": [],
+  "hks": [
+    {
+      "id": "tx_handler",
+      "in": "vm",
+      "go": {
+        "name": "Handler",
+        "register": "Register"
+      },
+      "params": [
+        {
+          "name": "ctx",
+          "type": "*Context"
+        },
+        {
+          "name": "payload",
+          "type": "json.RawMessage"
+        }
+      ],
+      "returns": [
+        "error"
+      ],
+      "key": "tx_type"
+    }
+  ],
+  "funcs": [
+    {
+      "id": "handle_transfer",
+      "in": "economy",
+      "kind": "tx_handler",
+      "handles": "transfer",
+      "of": "",
+      "errors": [
+        "ErrInsufficientBalance",
+        "ErrUnauthorized",
+        "ErrBalanceOverflow"
+      ],
+      "satisfies": [
+        "REQ-transfer"
+      ],
+      "cases": [
+        {
+          "name": "금액 0",
+          "given": {
+            "amount": 0
+          },
+          "expect": null,
+          "error": "invalid"
+        },
+        {
+          "name": "잔액 부족",
+          "given": {
+            "amount": 10,
+            "balance": 5
+          },
+          "expect": null,
+          "error": "ErrInsufficientBalance"
+        },
+        {
+          "name": "위임 한도 초과",
+          "given": {
+            "amount": 10,
+            "delegated_max": 5
+          },
+          "expect": null,
+          "error": "ErrUnauthorized"
+        },
+        {
+          "name": "정상 이체",
+          "given": {
+            "amount": 3,
+            "balance": 10
+          },
+          "expect": {
+            "from": 7,
+            "to": 3
+          },
+          "error": ""
+        }
+      ]
+    }
+  ],
+  "eks": [
+    {
+      "id": "chain_event",
+      "in": "events",
+      "key": "event_type",
+      "encoding": "map",
+      "subscribers": [
+        "rpc"
+      ],
+      "satisfies": []
+    }
+  ],
+  "events": [
+    {
+      "id": "block_commit",
+      "kind": "chain_event",
+      "in": "events",
+      "publishers": [
+        "consensus"
+      ],
+      "subscribers": [],
+      "data": [
+        {
+          "name": "hash",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "txs",
+          "type": "int",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "block",
+          "type": "any",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "satisfies": []
+    },
+    {
+      "id": "asset_minted",
+      "kind": "chain_event",
+      "in": "events",
+      "publishers": [
+        "asset",
+        "reward"
+      ],
+      "subscribers": [
+        "indexer"
+      ],
+      "data": [
+        {
+          "name": "asset_id",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "template_id",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "satisfies": []
+    },
+    {
+      "id": "session_open",
+      "kind": "chain_event",
+      "in": "events",
+      "publishers": [
+        "session"
+      ],
+      "subscribers": [
+        "indexer"
+      ],
+      "data": [
+        {
+          "name": "session_id",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "game_id",
+          "type": "string",
+          "ref": "",
+          "many": false,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        },
+        {
+          "name": "players",
+          "type": "string",
+          "ref": "",
+          "many": true,
+          "optional": false,
+          "max": "",
+          "summary": ""
+        }
+      ],
+      "satisfies": []
+    }
+  ],
+  "flows": [
+    {
+      "id": "produce_block",
+      "in": "consensus",
+      "on": "",
+      "summary": "제안자가 블록을 만들어 저장하고 이벤트를 내보낸다",
+      "steps": [
+        {
+          "id": "check_proposer",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "select_txs",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "lock",
+          "undo": "unlock",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "snapshot",
+          "undo": "revert",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "buffer_events",
+          "undo": "discard_events",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "execute_txs",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "restore_emitter",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "compute_root",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "sign",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "validate",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "add_block",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [
+            "discard_events",
+            "revert",
+            "unlock"
+          ],
+          "onFailFatal": false
+        },
+        {
+          "id": "commit_state",
+          "undo": "",
+          "commit": true,
+          "fatal": true,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": true
+        },
+        {
+          "id": "unlock",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "flush_events",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "emit_block_commit",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [
+            "block_commit"
+          ],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        },
+        {
+          "id": "remove_from_mempool",
+          "undo": "",
+          "commit": false,
+          "fatal": false,
+          "calls": [],
+          "emits": [],
+          "summary": "",
+          "onFailUndo": [],
+          "onFailFatal": false
+        }
+      ],
+      "satisfies": []
+    }
+  ]
+}
