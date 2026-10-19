@@ -1,4 +1,3 @@
-// Package serve는 설계 지도를 로컬 웹 페이지로 보여준다. 계산은 서버가 하고 화면은 /api/state를 그린다.
 package serve
 
 import (
@@ -26,15 +25,14 @@ import (
 //go:embed web
 var webFS embed.FS
 
-// state는 /api/state의 본문이다.
 type state struct {
-	designSum string // 설계 파일 내용 요약. 내보내지 않는다.
+	designSum string
 
 	Version   int         `json:"version"`
 	Design    string      `json:"design"`
 	Root      string      `json:"root"`
-	Branch    string      `json:"branch"` // git 브랜치. 저장소가 아니거나 detached면 비어 있다
-	Repo      string      `json:"repo"`   // 주 worktree가 아닌 worktree면 주 worktree의 폴더 이름
+	Branch    string      `json:"branch"`
+	Repo      string      `json:"repo"`
 	Model     *vModel     `json:"model"`
 	Base      *vModel     `json:"base"`
 	HasBase   bool        `json:"hasBase"`
@@ -43,28 +41,25 @@ type state struct {
 	Files     []vFile     `json:"files"`
 	Fatal     bool        `json:"fatal"`
 	Updated   time.Time   `json:"updated"`
-	Mode      string      `json:"mode"` // check, analyze, none
+	Mode      string      `json:"mode"`
 	Draft     *vDraft     `json:"draft,omitempty"`
 	Problem   string      `json:"problem,omitempty"`
-	CanEdit   bool        `json:"canEdit"` // 루프백이고 대조 모드면 화면에서 L2를 고칠 수 있다
+	CanEdit   bool        `json:"canEdit"`
 }
 
-// vDraft는 분석 모드의 초안이다.
 type vDraft struct {
 	Path    string       `json:"path"`
 	YAML    string       `json:"yaml"`
 	Report  infer.Report `json:"report"`
 	Command string       `json:"command"`
-	Git     *vDraftGit   `json:"git,omitempty"` // 새 worktree에 저장할 수 있을 때만
+	Git     *vDraftGit   `json:"git,omitempty"`
 }
 
-// vDraftGit은 초안을 새 worktree에 저장할 때 보이는 정보다.
 type vDraftGit struct {
-	Branch string `json:"branch"` // 제안하는 브랜치 이름
-	Dirty  int    `json:"dirty"`  // 새 worktree에 들어가지 않는 커밋 안 된 변경 수
+	Branch string `json:"branch"`
+	Dirty  int    `json:"dirty"`
 }
 
-// Server는 설계 디렉토리 하나의 지도를 제공한다.
 type Server struct {
 	design, root string
 
@@ -74,28 +69,22 @@ type Server struct {
 	sig     string
 	subs    map[chan int]bool
 	opts    Options
-	mode    string // 마지막으로 낸 상태의 모드
+	mode    string
 	editMu  sync.Mutex
 
-	// 설계 파일 내용의 요약과, 그 내용이 처음 나간 상태 버전. 편집의 409 판정에 쓴다.
 	designSum   string
 	designSince int
 
-	// refreshMu는 상태 만들기를 한 번에 하나로 한다. 늦게 끝난 옛 상태가 새 버전 번호로 나가지 않게 한다.
 	refreshMu sync.Mutex
 }
 
 func New(design, root string) *Server {
-	// 화면이 프로젝트 이름을 보이도록 절대경로로 둔다. 실패하면 받은 그대로 쓴다.
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	// 첫 Poll이 반드시 상태를 만들도록 서명을 어떤 실제 서명과도 다른 값으로 둔다.
 	return &Server{design: design, root: root, subs: map[chan int]bool{}, sig: "\x00"}
 }
 
-// Refresh는 설계나 코드를 다시 읽고 상태를 새로 만든 뒤 구독자에게 알린다.
-// 설계 파일이 있으면 대조 모드, 없고 코드 루트가 Go 모듈이면 분석 모드다.
 func (s *Server) Refresh() {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
@@ -131,10 +120,8 @@ func (s *Server) refresh() {
 	s.publish(st)
 }
 
-// refreshBuilt는 상태를 다 만들고 내기 직전에 불린다. 테스트가 상태 만들기를 겹치게 하려고 바꾼다.
 var refreshBuilt = func() {}
 
-// designSum은 설계 디렉토리 *.yaml의 이름과 내용 요약이다.
 func designSum(design string) string {
 	h := sha256.New()
 	paths, _ := filepath.Glob(filepath.Join(design, "*.yaml"))
@@ -147,7 +134,6 @@ func designSum(design string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// designVersions는 지금 설계 내용이 처음 나간 버전과 마지막 버전이다.
 func (s *Server) designVersions() (since, now int) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -167,7 +153,6 @@ func fill(st *state, r workspace.Result, root string) {
 	st.Relations = toRelations(r.Model)
 }
 
-// shellQuote는 공백이 있는 경로를 큰따옴표로 감싼다.
 func shellQuote(p string) string {
 	if strings.ContainsAny(p, " \t") {
 		return `"` + p + `"`
@@ -181,8 +166,6 @@ func (s *Server) paths() (design, root string) {
 	return s.design, s.root
 }
 
-// publish는 상태에 버전을 붙여 저장하고 구독자에게 알린다.
-// 그사이 다른 프로젝트를 열었으면 버린다. 늦게 끝난 옛 프로젝트의 상태가 새 상태를 덮지 않게 한다.
 func (s *Server) publish(st state) {
 	s.mu.Lock()
 	if st.Design != s.design || st.Root != s.root {
@@ -214,15 +197,12 @@ func (s *Server) publish(st state) {
 	}
 }
 
-// Version은 마지막 상태의 번호다.
 func (s *Server) Version() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.version
 }
 
-// signature는 설계 디렉토리의 *.yaml과 코드 루트의 .go 파일의 이름·크기·수정 시각이다.
-// 파일 추가·삭제·수정을 잡는다. 코드 쪽은 생성 파일 범위와 같은 디렉토리만 본다.
 func signature(design, root string) string {
 	var b strings.Builder
 	paths, _ := filepath.Glob(filepath.Join(design, "*.yaml"))
@@ -253,7 +233,6 @@ func signature(design, root string) string {
 	return b.String()
 }
 
-// Poll은 설계나 코드가 바뀌었으면 Refresh하고 true를 준다. 도중에 프로젝트가 바뀌면 아무것도 하지 않는다.
 func (s *Server) Poll() bool {
 	s.refreshMu.Lock()
 	defer s.refreshMu.Unlock()
@@ -273,7 +252,6 @@ func (s *Server) Poll() bool {
 	return changed
 }
 
-// Watch는 ctx가 끝날 때까지 interval마다 Poll한다.
 func (s *Server) Watch(ctx context.Context, interval time.Duration) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
@@ -312,7 +290,6 @@ func (s *Server) Handler() http.Handler {
 	return s.guard(mux)
 }
 
-// events는 상태가 바뀔 때마다 버전 번호를 SSE로 보낸다.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {

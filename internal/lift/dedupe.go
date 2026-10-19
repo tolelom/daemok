@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// platformVariants는 한 모듈에 같은 Go 이름의 같은 종류 선언이 여러 번 있으면(build 조건이 다른 플랫폼 파일)
-// 내용이 모두 같을 때 하나만 남기고, 다르면 모두 뺀다. 한 플랫폼의 값을 설계에 적으면 다른 플랫폼에서 틀린다.
 func platformVariants(nodes []Node, res *Result) []Node {
 	key := func(n Node) string { return n.Kind + " " + n.Module + " " + n.Name }
 	body := func(n Node) string {
@@ -50,12 +48,8 @@ func platformVariants(nodes []Node, res *Result) []Node {
 	return out
 }
 
-// qualified는 필드 타입 문자열 안의 "모듈.Go이름"이다. 앞 글자가 이름의 일부면 맞추지 않는다.
 var qualified = regexp.MustCompile(`(^|[^A-Za-z0-9_.])([a-z][a-z0-9_]*)\.([A-Z][A-Za-z0-9_]*)`)
 
-// relink는 다른 모듈 패키지의 타입을 코드 이름(core.Block)으로 가리킨 곳을, 그 타입·enum이 같은 초안에
-// 남아 있으면 ID로 바꾼다. 수집할 때는 다른 모듈의 어떤 선언이 초안에 남을지 몰라 코드 이름으로 둔다.
-// 요약 문장, 에러 메시지, 상수 값처럼 글자 그대로인 항목은 바꾸지 않는다.
 func relink(nodes []Node) []Node {
 	ids := map[string]string{}
 	for _, n := range nodes {
@@ -88,9 +82,6 @@ func relink(nodes []Node) []Node {
 	return nodes
 }
 
-// dedupe는 초안 안에서 같은 종류의 ID가 겹치면(모듈마다 있는 Config, Service) 모듈 ID를 앞에 붙이고
-// go.name으로 Go 이름을 지킨다. 에러는 ID가 Go 이름이고 enum은 go 블록이 달라 바꾸지 않는다.
-// 그래도 겹치는 노드는 첫 것만 남긴다. 초안 YAML에 같은 키가 두 번 나오면 설계를 읽을 수 없다.
 func dedupe(nodes []Node, res *Result) []Node {
 	nodes = platformVariants(nodes, res)
 	seen := map[string]int{}
@@ -122,7 +113,6 @@ func dedupe(nodes []Node, res *Result) []Node {
 	return out
 }
 
-// literalField는 값이 타입이 아니라 글자 그대로인 항목이다.
 func literalField(f string) bool {
 	for _, k := range []string{"summary: ", "message: ", "value: "} {
 		if strings.HasPrefix(f, k) {

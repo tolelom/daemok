@@ -12,7 +12,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// unit은 모듈 하나의 패키지에서 설계에 없는 exported 선언을 옮긴다. known은 설계가 만드는 이름이다.
 func (c *collector) unit(module, dir string, known map[string]bool) {
 	files, perrs := gosrc.Files(c.fset, filepath.Join(c.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
 	for _, pe := range perrs {
@@ -33,9 +32,7 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 		c.docs[k] = v
 	}
 	enumTypes, enumValues := c.enums(module, hand, fresh)
-	// local은 이 패키지에서 설계 ID로 가리킬 수 있는 타입 이름이다. 설계에 있는 타입·enum과 이번에 함께 옮기는 것.
 	local := c.designTypes(module)
-	// 내장 타입 이름이 되는 ID는 설계 검사가 막으므로 가리키지 않는다.
 	refable := func(name string) {
 		if id, _, ok := snakeID(name); ok && model.Builtins[id] == "" {
 			local[name] = id
@@ -88,7 +85,6 @@ func (c *collector) unit(module, dir string, known map[string]bool) {
 	}
 }
 
-// docs는 선언 이름마다 문서 주석이다. 블록 안 선언은 자기 주석, 괄호 없는 단독 선언은 선언 주석이다.
 func docs(files []*ast.File) map[*ast.Ident]*ast.CommentGroup {
 	out := map[*ast.Ident]*ast.CommentGroup{}
 	for _, f := range files {
@@ -123,7 +119,6 @@ func specDoc(g *ast.GenDecl, doc *ast.CommentGroup) *ast.CommentGroup {
 	return doc
 }
 
-// summary는 문서 주석 첫 단락의 첫 문장이다. 160자가 넘으면 요약으로 보지 않는다.
 func summary(doc *ast.CommentGroup) string {
 	if doc == nil {
 		return ""

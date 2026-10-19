@@ -10,8 +10,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// runCoverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 비율과, 함수를 뺀 비율을 출력한다.
-// 설계를 읽지 못하거나 설계 검사 오류가 있으면 2, 파싱하지 못한 Go 파일이 있으면 표를 내고 1이다.
 func runCoverage(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("coverage", flag.ContinueOnError)
 	fs.SetOutput(stderr)

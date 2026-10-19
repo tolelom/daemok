@@ -10,7 +10,6 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-// ts는 export 대상, ts_out 형식, TS로 내보낼 수 없는 상수와 타입 필드, TS 파일 안의 이름 충돌을 본다.
 func (c *checker) ts() {
 	m := c.m
 	exports := func(id string, pos yaml.Pos, export []string) {

@@ -7,31 +7,27 @@ import (
 	"strings"
 )
 
-// Use는 모듈·실행 단위 하나가 같은 Go 모듈의 다른 모듈에서 가져다 쓰는 export 이름이다.
 type Use struct {
 	From  string `json:"from"`
 	To    string `json:"to"`
 	Names []Name `json:"names"`
 }
 
-// Name은 쓰인 이름과 그 선언의 종류(함수, 타입, 인터페이스, 상수, 에러, 변수)다.
 type Name struct {
 	Name string `json:"name"`
 	Kind string `json:"kind"`
 }
 
-// fileRef는 파일 하나의 같은 모듈 import와 그 파일에 나온 "식별자.이름" 선택자다.
 type fileRef struct {
 	imports []fileImport
-	sels    map[string]map[string]bool // 식별자 → 이름
+	sels    map[string]map[string]bool
 }
 
 type fileImport struct {
-	dep   string // 패키지 디렉토리
-	alias string // 없으면 ""
+	dep   string
+	alias string
 }
 
-// exportedDecls는 패키지의 export된 최상위 선언 이름과 종류다. 메서드는 넣지 않는다.
 func exportedDecls(files []*ast.File) map[string]string {
 	out := map[string]string{}
 	for _, f := range files {
@@ -73,8 +69,6 @@ func exportedDecls(files []*ast.File) map[string]string {
 	return out
 }
 
-// selectors는 파일에 나온 "식별자.이름" 쌍이다. 식별자가 지역 변수인지는 가리지 않고, 쓰는 쪽에서
-// 대상 패키지의 export 선언과 맞는 이름만 남긴다.
 func selectors(f *ast.File) map[string]map[string]bool {
 	out := map[string]map[string]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
@@ -93,8 +87,6 @@ func selectors(f *ast.File) map[string]map[string]bool {
 	return out
 }
 
-// uses는 ids(디렉토리 → 모듈·실행 단위 ID)에 있는 패키지끼리 쓰는 이름을 모은다. 이름 없이 import만
-// 하는 관계(빈 import 등)는 넣지 않는다.
 func uses(byDir map[string]*pkg, ids map[string]string, libIDs map[string]string) []Use {
 	var out []Use
 	for dir, from := range ids {
@@ -137,7 +129,6 @@ func uses(byDir map[string]*pkg, ids map[string]string, libIDs map[string]string
 	return out
 }
 
-// fileRefOf는 파일의 같은 모듈 import와 선택자를 모은다. "_"와 "." import는 이름으로 쓰이지 않아 뺀다.
 func fileRefOf(f *ast.File, module string) fileRef {
 	fr := fileRef{sels: selectors(f)}
 	for _, im := range f.Imports {

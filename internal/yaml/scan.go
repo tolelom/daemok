@@ -4,8 +4,8 @@ import "strings"
 
 type line struct {
 	num    int
-	indent int    // 앞 공백 수
-	text   string // 들여쓰기와 주석을 뺀 본문. 오른쪽 공백 제거
+	indent int
+	text   string
 }
 
 type parser struct {
@@ -42,7 +42,6 @@ func (p *parser) scan(src []byte) error {
 	return nil
 }
 
-// stripComment는 따옴표 밖에 있고 줄 처음이거나 앞이 공백인 '#'부터 자른다.
 func stripComment(s string) string {
 	inQuote := false
 	for i := 0; i < len(s); i++ {

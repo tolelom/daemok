@@ -6,7 +6,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// handlers는 핸들러 종류의 키 enum 값마다 처리하는 멤버가 정확히 하나인지 본다.
 func (c *checker) handlers() {
 	m := c.m
 	for _, hk := range m.HandlerKinds {

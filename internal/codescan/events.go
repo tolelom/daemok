@@ -8,11 +8,9 @@ import (
 	"strconv"
 )
 
-// collectRefs는 이벤트 종류 모듈의 이름을 쓴 식별자를 모은다.
-// 다른 패키지에서는 import 이름(별칭 포함)의 선택자, 이벤트 종류 모듈 안에서는 맨 식별자다.
 func (s *scanner) collectRefs(id string, f *ast.File) {
-	kindImports := map[string]bool{} // 이 파일에서 이벤트 종류 모듈을 가리키는 이름
-	inKindModule := false            // 이벤트 종류 모듈 안이거나 그 모듈을 도트 import하면 맨 식별자를 센다
+	kindImports := map[string]bool{}
+	inKindModule := false
 	for _, ek := range s.m.EventKinds {
 		ip := s.m.ImportPath(ek.In.Name)
 		if ek.In.Name == id {
@@ -46,7 +44,6 @@ func (s *scanner) collectRefs(id string, f *ast.File) {
 	})
 }
 
-// eventRefs는 발행자·구독자가 이벤트 상수를 쓰는지, 적히지 않은 모듈이 쓰는지 본다.
 func (s *scanner) eventRefs(us []unit) {
 	m := s.m
 	for _, ek := range m.EventKinds {

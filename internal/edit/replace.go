@@ -8,18 +8,13 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-// Replacement는 설계 파일 한 위치의 스칼라 토큰을 바꾸는 일이다. Old는 원문 토큰(따옴표면 안쪽)이다.
 type Replacement struct {
 	Pos      yaml.Pos
 	Old, New string
 }
 
-// plainStop은 평문 토큰 뒤에 올 수 있는 글자다. 블록 형식 평문에는 [ ]가 들어갈 수 있어 토큰 끝을
-// 원문에서 찾지 않고 Old 길이로 자른 뒤 다음 글자가 경계인지 본다.
 const plainStop = ",]}#:\r\n \t"
 
-// Replace는 위치마다 원문 토큰이 Old인지 확인하고 New로 바꾼다. 따옴표 스타일은 그대로 둔다.
-// 이스케이프가 든 따옴표 토큰은 원문과 값이 달라 바꾸지 않는다. 뒤의 위치부터 바꿔 앞의 교체가 뒤 위치를 밀지 않는다.
 func Replace(src []byte, file string, reps []Replacement) ([]byte, error) {
 	t, err := parse(src, file)
 	if err != nil {

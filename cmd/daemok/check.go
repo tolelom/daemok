@@ -39,8 +39,6 @@ func runCheck(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// printDiags는 진단을 한 줄씩 쓴다. 같은 수준·같은 설명("설명: 대상"의 설명)이 3개 이상이면
-// 머리 한 줄 아래에 위치와 대상만 들여 쓴다.
 func printDiags(w io.Writer, diags model.Diagnostics) {
 	type key struct {
 		lv    model.Level

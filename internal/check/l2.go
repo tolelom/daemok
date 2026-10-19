@@ -17,7 +17,6 @@ func (c *checker) l2() {
 	c.exceptions()
 }
 
-// tierDirection은 자기보다 위 tier에 의존하면 오류다. 같은 tier는 허용한다. query needs는 보지 않는다.
 func (c *checker) tierDirection() {
 	m := c.m
 	check := func(fromID, fromTier string, deps []model.Ref) {
@@ -48,8 +47,6 @@ func (c *checker) tierDirection() {
 	}
 }
 
-// selfDependency는 자기 자신을 가리키는 의존을 오류로 낸다. 멤버가 자기 그룹에 의존하는 것도 포함한다.
-// cycles는 그룹으로 접은 뒤 자기 간선을 버리므로 여기서 따로 잡는다.
 func (c *checker) selfDependency() {
 	report := func(id string, d model.Ref) {
 		c.errorf(d.Pos, "자기 자신에 의존: %s", id)
@@ -87,10 +84,6 @@ func (c *checker) selfDependency() {
 	}
 }
 
-// cycles는 모듈과 그룹의 의존 그래프에서 순환을 찾는다. 순환마다 한 번 보고한다.
-// 멤버는 그룹으로 접는다: 멤버를 가리키는 의존은 그 그룹으로, 멤버의 예외는 그룹의 의존으로 본다.
-// 그룹에 의존하면 멤버에도 의존할 수 있으므로 멤버 예외를 거치는 순환도 여기서 잡힌다.
-// 형제 멤버 사이의 순환은 siblingCycles가 잡는다.
 func (c *checker) cycles() {
 	m := c.m
 	var ids []string
@@ -106,7 +99,6 @@ func (c *checker) cycles() {
 		}
 		return id
 	}
-	// 형제 멤버로 가는 예외는 그룹 자신으로 접히므로 뺀다.
 	edges := func(id string) []string {
 		var out []string
 		add := func(d string) {
@@ -132,7 +124,6 @@ func (c *checker) cycles() {
 	c.findCycles(ids, edges)
 }
 
-// siblingCycles는 그룹마다 형제 멤버를 가리키는 예외만으로 순환을 찾는다.
 func (c *checker) siblingCycles() {
 	for _, g := range c.m.Groups {
 		var ids []string
@@ -160,7 +151,6 @@ func (c *checker) siblingCycles() {
 	}
 }
 
-// findCycles는 ids 안에서 edges를 따라 DFS로 순환을 찾아 순환마다 한 번 보고한다.
 func (c *checker) findCycles(ids []string, edges func(string) []string) {
 	const (
 		white = iota
@@ -195,7 +185,6 @@ func (c *checker) findCycles(ids []string, edges func(string) []string) {
 	}
 }
 
-// orphans는 어느 실행 단위에서도 닿지 않는 모듈·그룹을 경고한다. 실행 단위가 없으면 건너뛴다.
 func (c *checker) orphans() {
 	m := c.m
 	if len(m.Executables) == 0 {
@@ -219,7 +208,6 @@ func (c *checker) orphans() {
 	}
 }
 
-// exceptions는 멤버 예외를 정보로 남기고, 그룹이 이미 의존하는 대상이면 경고한다.
 func (c *checker) exceptions() {
 	for _, g := range c.m.Groups {
 		for _, mem := range g.Members {
@@ -238,11 +226,9 @@ func (c *checker) exceptions() {
 	}
 }
 
-// contractRoles는 port·external 계약이 알맞은 role의 모듈에 있는지 본다.
 func (c *checker) contractRoles() {
 	want := map[string]string{"port": "infra", "external": "adapter"}
 	for _, ct := range c.m.Contracts {
-		// query 구현은 <모듈 path>/query에 두므로 path가 이미 /query로 끝나면 query/query가 된다.
 		if o, ok := c.m.Owner(ct.In.Name); ct.Kind == "query" && ok && (o.Path == "query" || strings.HasSuffix(o.Path, "/query")) {
 			c.errorf(ct.Pos, "query 계약의 모듈 경로가 /query로 끝난다: %s(%s). 구현이 %s/query에 생긴다", ct.ID, o.Path, o.Path)
 		}

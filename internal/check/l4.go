@@ -2,7 +2,6 @@ package check
 
 import "strings"
 
-// l4는 함수 계약이 소속 멤버·계약과 맞고, 케이스의 에러가 errors와 맞는지 본다.
 func (c *checker) l4() {
 	m := c.m
 	for _, f := range m.Funcs {
@@ -35,7 +34,7 @@ func (c *checker) l4() {
 			}
 		}
 		for _, r := range f.Errors {
-			if f.Gen && !covered[r.Name] { // gen: false면 케이스 테스트를 만들지 않는다
+			if f.Gen && !covered[r.Name] {
 				c.warnf(r.Pos, "확인하는 케이스가 없는 에러: 함수 %s, 에러 %s", f.ID, r.Name)
 			}
 		}

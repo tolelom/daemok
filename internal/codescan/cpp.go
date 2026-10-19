@@ -16,15 +16,12 @@ var cppExts = map[string]bool{
 	".c": true, ".cc": true, ".cpp": true, ".cxx": true,
 }
 
-// include는 소스의 #include 한 줄이다. 열은 #의 바이트 위치다.
 type include struct {
 	line, col int
 	path      string
 	angle     bool
 }
 
-// includes는 주석을 걷어 낸 소스에서 줄 머리의 #include를 찾는다.
-// 문자열·문자 리터럴 안의 주석 표시는 주석으로 보지 않는다. 리터럴은 줄 끝에서 끝난다고 본다.
 func includes(src []byte) []include {
 	var out []include
 	for i, line := range strings.Split(string(stripComments(src)), "\n") {
@@ -54,7 +51,6 @@ func includes(src []byte) []include {
 	return out
 }
 
-// stripComments는 주석 글자를 공백으로 바꾼다. 줄바꿈은 남겨 줄·열이 그대로다.
 func stripComments(src []byte) []byte {
 	out := make([]byte, len(src))
 	copy(out, src)
@@ -79,7 +75,6 @@ func stripComments(src []byte) []byte {
 				out[i], out[i+1] = ' ', ' '
 				i++
 			case c == '\'' && i > 0 && isAlnum(out[i-1]):
-				// 영숫자 뒤의 '는 숫자 구분자(1'000)로 본다. u'x' 같은 접두사 붙은 문자 리터럴은 리터럴로 보지 않는다
 			case c == '"' || c == '\'':
 				state, quote = literal, c
 			}
@@ -109,8 +104,6 @@ func stripComments(src []byte) []byte {
 	return out
 }
 
-// cppScan은 모듈·멤버 폴더의 C++ 파일에서 include를 읽어 depends_on과 대조한다.
-// 모듈 path는 각 include 디렉토리 아래 폴더이고, 하위 폴더도 그 모듈이다. 겹치면 가장 깊은 폴더가 이긴다.
 func (s *scanner) cppScan(us []unit) {
 	var incDirs []string
 	for _, d := range s.m.CPP.IncludeDirs {
@@ -121,7 +114,7 @@ func (s *scanner) cppScan(us []unit) {
 		}
 		incDirs = append(incDirs, dir)
 	}
-	owners := map[string]string{} // 폴더 → 모듈·멤버 ID
+	owners := map[string]string{}
 	for _, u := range us {
 		for _, inc := range incDirs {
 			dir := filepath.Join(inc, filepath.FromSlash(u.dir))
@@ -209,7 +202,6 @@ func isAlnum(c byte) bool {
 	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c == '_'
 }
 
-// continued는 i의 줄바꿈 앞이 줄 잇기 \인지다.
 func continued(src []byte, i int) bool {
 	j := i - 1
 	if j >= 0 && src[j] == '\r' {

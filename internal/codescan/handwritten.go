@@ -12,9 +12,6 @@ func (s *scanner) dirExists(dir string) bool {
 	return err == nil && st.IsDir()
 }
 
-// handWritten은 gen: false 노드가 생성 코드 대신 둔다고 한 선언이 소유 모듈 패키지에 있는지 본다.
-// 손으로 쓴 코드에 생성 코드와 같은 이름이 있다고 볼 수 있는 노드만 본다. 이벤트 종류, 흐름, 함수는 보지 않는다.
-// enum은 타입과 값 상수만 보고 목록 함수는 보지 않는다. 코드 디렉토리가 없는 모듈은 보지 않는다.
 func (s *scanner) handWritten() {
 	m := s.m
 	need := func(o model.Owned, what string, names ...string) {
@@ -54,7 +51,7 @@ func (s *scanner) handWritten() {
 	for _, f := range m.Funcs {
 		if f.Free() {
 			o := f.Owned
-			o.Gen = false // 일반 함수의 본문은 gen과 관계없이 손으로 쓴다
+			o.Gen = false
 			need(o, "함수", f.GoName())
 		}
 	}

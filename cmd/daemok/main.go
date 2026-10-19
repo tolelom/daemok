@@ -1,4 +1,3 @@
-// daemok은 설계 파일을 읽어 검사하고 코드를 생성하는 CLI다.
 package main
 
 import (

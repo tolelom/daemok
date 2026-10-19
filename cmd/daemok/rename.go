@@ -10,14 +10,11 @@ import (
 	"github.com/tolelom/daemok/internal/rename"
 )
 
-// runRename은 설계 노드 하나의 ID와 그 참조를 바꾼다. 기본은 코드 이름을 고정 키로 유지한다.
-// 인자 오류는 2, 거부는 1이다.
 func runRename(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("rename", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	design, root := pathFlags(fs)
 	code := fs.Bool("code", false, "생성 코드 이름도 새 ID를 따른다(고정 키를 더하지 않는다)")
-	// flag는 첫 위치 인자에서 멈추므로 위치 인자를 하나씩 떼며 나머지 플래그를 계속 읽는다.
 	var pos []string
 	for {
 		if fs.Parse(args) != nil {

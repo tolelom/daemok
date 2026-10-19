@@ -61,7 +61,6 @@ func (mg *merger) cases(n *yaml.Node) []*Case {
 	return out
 }
 
-// caseMap은 given·expect가 스칼라 또는 맵만 값으로 갖는 맵인지 확인한다.
 func (mg *merger) caseMap(n *yaml.Node, what string) *yaml.Node {
 	d := mg.d
 	if n.Kind != yaml.Map {
@@ -101,7 +100,7 @@ func (mg *merger) steps(n *yaml.Node) []*Step {
 		d.diags.Errorf(n.Pos, "목록이어야 한다: %q", "steps")
 		return nil
 	}
-	out := []*Step{} // 빈 목록과 형식 오류(nil)를 구분한다
+	out := []*Step{}
 	for _, it := range n.Items {
 		if !d.mapping(it, "단계") {
 			continue

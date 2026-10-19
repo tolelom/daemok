@@ -10,8 +10,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// enums는 string 타입과 그 타입의 문자열 리터럴 상수를 enum 노드로 옮긴다.
-// 옮겼든 못 옮겼든 다룬 타입과 값 상수 이름을 돌려줘 다른 종류로 다시 알리지 않게 한다.
 func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Ident) bool) (types, values map[string]bool) {
 	types, values = map[string]bool{}, map[string]bool{}
 	var order []*ast.TypeSpec
@@ -82,7 +80,6 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 			lits = append(lits, v.lit)
 		}
 		if reason == "" && prefix == "" {
-			// go.prefix를 비우면 타입 이름이 접두사가 되므로 설계로 적을 수 없다.
 			reason = "접두사 없는 enum 상수는 설계로 적을 수 없다"
 		}
 		if reason != "" {
@@ -110,10 +107,8 @@ func (c *collector) enums(module string, files []*ast.File, fresh func(*ast.Iden
 	return types, values
 }
 
-// enumValue는 YAML 평문으로 그대로 쓸 수 있는 enum 값이다. 설계 검사의 값 문자 규칙보다 좁다.
 var enumValue = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
-// errorVar는 var ErrX = errors.New("문자열")를 에러 노드로 옮긴다.
 func (c *collector) errorVar(module string, n *ast.Ident, sp *ast.ValueSpec, i int) {
 	msg, ok := errorsNew(sp, i)
 	switch {
@@ -151,7 +146,6 @@ func errorsNew(sp *ast.ValueSpec, i int) (string, bool) {
 	return stringLit(call.Args[0])
 }
 
-// makesError는 var 값이 errors 패키지 함수나 fmt.Errorf 호출인지 본다.
 func makesError(sp *ast.ValueSpec, i int) bool {
 	if len(sp.Values) != len(sp.Names) {
 		return false
@@ -170,7 +164,6 @@ func makesError(sp *ast.ValueSpec, i int) bool {
 
 var durationUnits = map[string]string{"Millisecond": "ms", "Second": "s", "Minute": "m", "Hour": "h"}
 
-// constant는 정수·문자열 리터럴과 N * time.Unit 상수를 상수 노드로 옮긴다.
 func (c *collector) constant(module string, n *ast.Ident, sp *ast.ValueSpec, i int) {
 	typ, value, ok := constValue(sp, i)
 	if !ok {
@@ -205,7 +198,6 @@ func constValue(sp *ast.ValueSpec, i int) (typ, value string, ok bool) {
 	case *ast.BasicLit:
 		switch {
 		case v.Kind == token.INT && (declared == "" || declared == "int"):
-			// Go 리터럴 규칙(0x, 0o, 앞자리 0의 8진수, 밑줄)으로 읽어 10진수로 쓴다.
 			n, err := strconv.ParseInt(sign+v.Value, 0, 0)
 			if err != nil {
 				return "", "", false
@@ -244,7 +236,6 @@ func constValue(sp *ast.ValueSpec, i int) (typ, value string, ok bool) {
 	return "", "", false
 }
 
-// typeName은 타입 식이 이름이나 패키지.이름이면 그 글자를 준다.
 func typeName(e ast.Expr) string {
 	switch t := e.(type) {
 	case *ast.Ident:

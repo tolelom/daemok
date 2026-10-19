@@ -1,5 +1,3 @@
-// Package mcp는 표준 입출력으로 MCP(JSON-RPC 2.0, 한 줄에 메시지 하나)를 주고받아
-// AI가 설계를 읽고 검사를 돌리게 한다. edit 외의 도구는 읽기 전용이고, edit는 --allow-write일 때만 있다.
 package mcp
 
 import (
@@ -13,20 +11,16 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// defaultProtocol은 지원하는 MCP 프로토콜 중 최신이다. 클라이언트가 모르는 버전을 요청하면 이것으로 답한다.
 const defaultProtocol = "2025-06-18"
 
 var protocols = map[string]bool{"2025-06-18": true, "2025-03-26": true, "2024-11-05": true}
 
-// maxLine은 메시지 한 줄의 최대 바이트다. 넘는 줄은 그 줄만 거부한다.
 var maxLine = 16 << 20
 
-// Server는 기본 설계 디렉토리와 코드 루트를 가진다. 도구 인자로 바꿀 수 있다.
 type Server struct {
 	design, root string
 	Version      string
-	// AllowWrite면 설계 파일을 고치는 edit 도구를 낸다. 사용자가 서버를 등록할 때 --allow-write로 켠다.
-	AllowWrite bool
+	AllowWrite   bool
 }
 
 func New(design, root string) *Server { return &Server{design: design, root: root, Version: "dev"} }
@@ -50,7 +44,6 @@ type response struct {
 	Error   *rpcError       `json:"error,omitempty"`
 }
 
-// Serve는 r가 끝날 때까지 한 줄에 하나씩 요청을 읽고 w에 응답을 쓴다. 알림(id 없음)에는 응답하지 않는다.
 func (s *Server) Serve(r io.Reader, w io.Writer) error {
 	br := bufio.NewReader(r)
 	enc := json.NewEncoder(w)
@@ -95,7 +88,6 @@ func (s *Server) Serve(r io.Reader, w io.Writer) error {
 	}
 }
 
-// readLine은 줄바꿈까지 한 줄을 읽는다. maxLine을 넘으면 나머지를 버리고 tooLong을 준다.
 func readLine(br *bufio.Reader) (line []byte, tooLong bool, err error) {
 	for {
 		chunk, err := br.ReadSlice('\n')
@@ -137,7 +129,6 @@ func (s *Server) handle(req request) (any, *rpcError) {
 	return nil, &rpcError{-32601, fmt.Sprintf("지원하지 않는 메서드 %q", req.Method)}
 }
 
-// callTool은 tools/call 요청 하나를 처리한다. 도구 오류는 isError 결과로, 요청 형식 오류는 rpcError로 준다.
 func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 	var p struct {
 		Name      string          `json:"name"`
@@ -166,7 +157,6 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 		if !s.AllowWrite {
 			return nil, &rpcError{-32602, fmt.Sprintf("알 수 없는 도구 %q", p.Name)}
 		}
-		// 쓰기는 사용자가 등록한 서버의 설계 디렉토리에만 한다. 도구 인자로 경로를 바꾸지 못한다.
 		if args.Design != "" || args.Root != "" {
 			return toolResult("edit은 design·root 인자를 받지 않는다. 서버의 --design만 고친다", true), nil
 		}
@@ -206,8 +196,6 @@ func (s *Server) callTool(params json.RawMessage) (any, *rpcError) {
 	return toolResult(text, false), nil
 }
 
-// toolPaths는 도구 인자의 design·root로 쓸 설계 디렉토리와 코드 루트를 정한다.
-// root만 주면 설계는 그 root 아래 design이고, 둘 다 없으면 서버의 --design, --root다.
 func (s *Server) toolPaths(design, root string) (string, string) {
 	d, r := s.design, s.root
 	if root != "" {

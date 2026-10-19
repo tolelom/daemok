@@ -8,8 +8,6 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// runGen은 생성 파일을 쓰고 지운다. 설계를 읽지 못하거나 검사 오류가 있으면 2,
-// 생성 경로에 헤더 없는 파일이 있으면 아무것도 쓰지 않고 1이다.
 func runGen(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("gen", flag.ContinueOnError)
 	fs.SetOutput(stderr)

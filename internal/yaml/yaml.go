@@ -1,5 +1,3 @@
-// Package yaml은 daemok 설계 파일이 쓰는 YAML 부분집합을 파싱한다.
-// 모든 노드가 파일·줄·열 위치를 갖는다. 열은 바이트 기준 1-base다.
 package yaml
 
 import (
@@ -15,7 +13,6 @@ type Pos struct {
 
 func (p Pos) String() string { return fmt.Sprintf("%s:%d:%d", p.File, p.Line, p.Col) }
 
-// Less는 파일, 줄, 열 순으로 p가 q보다 앞인지다.
 func (p Pos) Less(q Pos) bool {
 	if p.File != q.File {
 		return p.File < q.File
@@ -44,15 +41,15 @@ const (
 type Node struct {
 	Kind    Kind
 	Pos     Pos
-	Value   string // Scalar. 따옴표 문자열은 이스케이프를 풀어 담는다.
-	Quoted  bool   // Scalar가 "..."였는지
+	Value   string
+	Quoted  bool
 	Entries []Entry
 	Items   []*Node
 }
 
 type Entry struct {
 	Key   string
-	Pos   Pos // 키 위치
+	Pos   Pos
 	Value *Node
 }
 

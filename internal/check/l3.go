@@ -12,7 +12,6 @@ func (c *checker) l3() {
 	c.contractErrors()
 }
 
-// typeDeps는 노드가 쓰는 enum·타입의 모듈에 그 노드의 모듈이 의존하는지 본다.
 func (c *checker) typeDeps() {
 	m := c.m
 	for _, t := range m.Types {
@@ -40,7 +39,6 @@ func (c *checker) typeDeps() {
 		}
 		c.useType(hk.In.Name, hk.Key)
 	}
-	// needs로 받은 계약의 시그니처 타입에도 받는 쪽이 의존해야 한다.
 	for _, id := range c.unitIDs() {
 		for _, n := range c.ownNeeds(id) {
 			ct := m.Contract(n.Contract.Name)
@@ -62,14 +60,12 @@ func (c *checker) typeDeps() {
 	}
 }
 
-// useNeededType은 받은 계약의 시그니처 타입에 받는 쪽이 의존하는지 본다. 위치는 받는 쪽의 needs 항목이다.
 func (c *checker) useNeededType(owner string, r model.Ref, n model.Need, contract string) {
 	if typeOwner, base := c.typeOwner(r); typeOwner != "" && !c.m.CanDepend(owner, typeOwner) {
 		c.errorf(n.Contract.Pos, "받는 계약의 타입이 속한 모듈에 의존하지 않는다: %s → %s.%s (계약 %s)", owner, typeOwner, base, contract)
 	}
 }
 
-// typeOwner는 r이 설계 enum·struct거나 "모듈.이름" 외부 타입이면 그 모듈과 이름을 준다. map은 값, 키 순으로 본다.
 func (c *checker) typeOwner(r model.Ref) (string, string) {
 	if r.Name == "" {
 		return "", ""
@@ -87,7 +83,6 @@ func (c *checker) typeOwner(r model.Ref) (string, string) {
 			}
 		}
 	case model.MapType:
-		// 값 타입이 먼저다. 키는 enum만 모듈에 속한다.
 		key, value, _ := model.MapParts(base)
 		if owner, name := c.typeOwner(model.Ref{Name: value}); owner != "" {
 			return owner, name
@@ -97,7 +92,6 @@ func (c *checker) typeOwner(r model.Ref) (string, string) {
 	return "", base
 }
 
-// useType은 owner가 r이 가리키는 enum·타입의 모듈에 의존하는지 본다.
 func (c *checker) useType(owner string, r model.Ref) {
 	if owner == "" {
 		return
@@ -118,7 +112,6 @@ var httpBySuffix = []struct {
 	{"Conflict", 409},
 }
 
-// errorHTTP는 에러 이름의 접미사가 뜻하는 HTTP 상태와 http 값이 다르면 경고한다.
 func (c *checker) errorHTTP() {
 	for _, e := range c.m.Errors {
 		if e.HTTP == 0 {

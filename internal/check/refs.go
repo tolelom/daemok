@@ -7,7 +7,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// refs는 모든 참조 필드가 존재하는, 받을 수 있는 종류의 대상을 가리키는지 본다.
 func (c *checker) refs() {
 	m := c.m
 	c.eachMeta(func(meta *model.Meta) {
@@ -167,7 +166,6 @@ func (c *checker) fieldRefs(fields []*model.Field) {
 	}
 }
 
-// pubSub은 발행자·구독자가 모듈이나 그룹 멤버인지 본다.
 func (c *checker) pubSub(r model.Ref, field string) {
 	if c.m.Group(r.Name) != nil {
 		c.errorf(r.Pos, "모듈이나 그룹 멤버가 아니다: %s %s", field, r.Name)
@@ -254,8 +252,6 @@ func (c *checker) errRef(r model.Ref) {
 	}
 }
 
-// handleValue는 handles 값이 핸들러 종류의 키 enum에 있는지 본다.
-// 핸들러 종류나 enum이 없으면 다른 곳에서 이미 오류이므로 조용히 넘긴다.
 func (c *checker) handleValue(kind model.Ref, r model.Ref) {
 	hk := c.m.HandlerKind(kind.Name)
 	if hk == nil {

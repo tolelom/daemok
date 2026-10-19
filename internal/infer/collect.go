@@ -1,5 +1,3 @@
-// Package infer는 Go 모듈의 코드에서 L2 설계 초안을 만든다.
-// 기존 프로젝트를 처음 가져올 때만 쓴다.
 package infer
 
 import (
@@ -20,20 +18,18 @@ import (
 
 var ErrNotModule = errors.New("Go 모듈이 아니다")
 
-// pkg는 Go 파일이 있는 디렉토리 하나다. 경로는 루트 기준 슬래시 경로이고 루트는 "."다.
 type pkg struct {
 	dir     string
 	main    bool
-	imports []string          // 같은 모듈 안의 패키지 디렉토리, 정렬
-	ext     []string          // 표준 라이브러리가 아닌 다른 모듈의 import 경로, 정렬
-	doc     string            // 패키지 doc 주석의 첫 문장
-	hints   []Hint            // Module은 build가 채운다
-	name    string            // package 절의 이름
-	decls   map[string]string // export된 최상위 선언 이름 → 종류
+	imports []string
+	ext     []string
+	doc     string
+	hints   []Hint
+	name    string
+	decls   map[string]string
 	refs    []fileRef
 }
 
-// Skip은 초안에 넣지 않은 디렉토리나 파일과 그 이유다.
 type Skip struct {
 	Path   string `json:"path"`
 	Reason string `json:"reason"`
@@ -44,7 +40,6 @@ func modulePath(root string) (string, error) {
 	return module, err
 }
 
-// readGoMod는 go.mod의 module 경로와 직접 require(// indirect가 아닌 것)를 준다.
 func readGoMod(root string) (module string, requires []string, err error) {
 	src, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
@@ -91,7 +86,6 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 			if p == root {
 				return err
 			}
-			// 하위 디렉토리 하나를 읽지 못해도 나머지는 분석한다.
 			skips = append(skips, Skip{rel(p), "읽을 수 없다: " + err.Error()})
 			if d != nil && d.IsDir() {
 				return filepath.SkipDir
@@ -111,7 +105,6 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 			}
 		}
 		files, errs := gosrc.Files(fset, p, parser.SkipObjectResolution)
-		// 본문만 깨진 파일(작업 중인 파일)은 import만 읽어 의존에 넣는다. 힌트는 읽은 파일에서만 낸다.
 		all := files
 		for _, e := range errs {
 			if f, err := gosrc.ImportsOnly(fset, e.Path); err == nil {
@@ -144,7 +137,6 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 				case strings.HasPrefix(ip, module+"/"):
 					dep = strings.TrimPrefix(ip, module+"/")
 				default:
-					// 첫 경로 요소에 점이 없으면 표준 라이브러리다.
 					if first, _, _ := strings.Cut(ip, "/"); strings.Contains(first, ".") && !seen["ext:"+ip] {
 						seen["ext:"+ip] = true
 						pk.ext = append(pk.ext, ip)

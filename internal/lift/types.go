@@ -9,7 +9,6 @@ import (
 	"strings"
 )
 
-// designTypes는 모듈에 속한 설계 타입·enum의 Go 이름에서 설계 ID로 가는 표다.
 func (c *collector) designTypes(module string) map[string]string {
 	out := map[string]string{}
 	for _, t := range c.m.Types {
@@ -25,7 +24,6 @@ func (c *collector) designTypes(module string) map[string]string {
 	return out
 }
 
-// unitOf는 import 경로가 설계 모듈·멤버 패키지면 그 ID를 준다.
 func (c *collector) unitOf(importPath string) (string, bool) {
 	rel, ok := strings.CutPrefix(importPath, c.m.GoModule+"/")
 	if !ok {
@@ -39,7 +37,6 @@ func (c *collector) unitOf(importPath string) (string, bool) {
 	return "", false
 }
 
-// structType은 struct를 타입 노드로 옮긴다. 필드를 모두 설계 타입 문자열로 바꿀 수 있어야 한다.
 func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, local map[string]string) {
 	name := ts.Name.Name
 	if iface, ok := ts.Type.(*ast.InterfaceType); ok && ts.TypeParams == nil {
@@ -93,7 +90,6 @@ func (c *collector) structType(module string, ts *ast.TypeSpec, f *ast.File, loc
 	c.add("types", module, id, ts.Name, out...)
 }
 
-// omitempty는 필드 태그의 json 옵션에 omitempty가 있는지 본다.
 func omitempty(tag *ast.BasicLit) bool {
 	if tag == nil {
 		return false
@@ -104,9 +100,6 @@ func omitempty(tag *ast.BasicLit) bool {
 	return slices.Contains(strings.Split(opts, ","), "omitempty")
 }
 
-// optionalField는 omitempty인 필드의 설계 타입 문자열을 optional 필드로 바꾼다. 생성 코드는 optional 필드에
-// omitempty를 붙이고, 포인터·슬라이스가 아니면 포인터로 감싼다. 그래서 *T는 T로, []T와 bytes는 그대로 쓴다.
-// 값 타입은 생성 코드가 포인터로 바꿔 모양이 달라지므로 그대로 둔다.
 func optionalField(typ string) string {
 	t := strings.Trim(typ, `"`)
 	switch {
@@ -122,7 +115,6 @@ func optionalField(typ string) string {
 	return "{ type: " + t + ", optional: true }"
 }
 
-// contract는 interface를 call 계약으로 옮긴다. 메서드는 반환 끝이 error여야 한다(생성 계약이 error를 붙인다).
 func (c *collector) contract(module string, ts *ast.TypeSpec, iface *ast.InterfaceType, f *ast.File, local map[string]string) {
 	name := ts.Name.Name
 	var methods []string
@@ -157,7 +149,6 @@ func (c *collector) contract(module string, ts *ast.TypeSpec, iface *ast.Interfa
 	c.add("contracts", module, id, ts.Name, fields...)
 }
 
-// method는 메서드 하나를 "이름: { params, returns, errors: [] }"로 쓴다. 이름 없는 파라미터는 arg1부터 붙인다.
 func (c *collector) method(name string, ft *ast.FuncType, f *ast.File, local map[string]string) (string, string) {
 	id, _, ok := snakeID(name)
 	if !ok {
@@ -223,8 +214,6 @@ var builtinGo = map[string]string{
 	"time.Duration": "duration", "time.Time": "time",
 }
 
-// fieldType은 필드의 Go 타입식을 설계 타입 문자열로 바꾼다. 바꿀 수 없으면 이유를 준다.
-// *, [가 들어가면 YAML 평문이 될 수 없어 따옴표로 감싼다.
 func (c *collector) fieldType(e ast.Expr, f *ast.File, local map[string]string) (string, string) {
 	t, reason := c.typeString(e, f, local)
 	if reason == "" && strings.ContainsAny(t, "*[") {
@@ -233,7 +222,6 @@ func (c *collector) fieldType(e ast.Expr, f *ast.File, local map[string]string) 
 	return t, reason
 }
 
-// typeString은 fieldType의 따옴표 없는 설계 타입 문자열이다.
 func (c *collector) typeString(e ast.Expr, f *ast.File, local map[string]string) (string, string) {
 	prefix := ""
 	for {
@@ -312,7 +300,6 @@ func (c *collector) typeString(e ast.Expr, f *ast.File, local map[string]string)
 	return prefix + base, ""
 }
 
-// importPath는 파일에서 패키지 이름이 가리키는 import 경로다. 별칭이 없으면 경로의 마지막 요소로 맞춘다.
 func importPath(f *ast.File, name string) string {
 	for _, im := range f.Imports {
 		p, _ := strconv.Unquote(im.Path.Value)

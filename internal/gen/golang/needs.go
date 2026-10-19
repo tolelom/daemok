@@ -8,8 +8,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// unitNeeds는 모듈과 멤버가 받는 계약이다. 멤버는 그룹의 needs를 먼저 받는다.
-// 같은 계약이 두 번 나오면 uses를 합치고, 한쪽이라도 uses가 비면 메서드 전부다.
 func (g *gen) unitNeeds() (ids []string, needs map[string][]model.Need) {
 	needs = map[string][]model.Need{}
 	add := func(id string, ns []model.Need) {
@@ -57,7 +55,6 @@ func usesMethod(n model.Need, name string) bool {
 	return false
 }
 
-// needs는 받는 쪽 패키지에 uses의 메서드만 담은 interface를 만든다.
 func (g *gen) needs() error {
 	ids, needs := g.unitNeeds()
 	for _, id := range ids {
@@ -82,8 +79,6 @@ func (g *gen) needs() error {
 	return nil
 }
 
-// executableContracts는 실행 단위가 조립하는 받는 쪽·주는 쪽 쌍마다
-// 구현 타입이 받는 쪽 interface를 만족하는지 확인하는 줄을 만든다. call 계약은 구현 타입이 정해져 있지 않아 뺀다.
 func (g *gen) executableContracts() error {
 	ids, needs := g.unitNeeds()
 	for _, e := range g.m.Executables {

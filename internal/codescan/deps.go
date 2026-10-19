@@ -8,7 +8,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// needsOf는 id가 받는 계약이다. 멤버는 그룹의 needs도 받는다.
 func (s *scanner) needsOf(id string) []model.Need {
 	if mem := s.m.Member(id); mem != nil {
 		return append(slices.Clone(mem.Group.Needs), mem.Needs...)
@@ -19,7 +18,6 @@ func (s *scanner) needsOf(id string) []model.Need {
 	return nil
 }
 
-// receivesFrom은 id가 target 모듈의 계약을 needs로 받는지다.
 func (s *scanner) receivesFrom(id, target string) bool {
 	for _, n := range s.needsOf(id) {
 		if ct := s.m.Contract(n.Contract.Name); ct != nil && ct.In.Name == target {
@@ -29,7 +27,6 @@ func (s *scanner) receivesFrom(id, target string) bool {
 	return false
 }
 
-// queryPackages는 query 계약을 가진 모듈의 query 패키지가 data 모듈 말고 다른 설계 모듈을 import하는지 본다.
 func (s *scanner) queryPackages() {
 	done := map[string]bool{}
 	for _, ct := range s.m.Contracts {
@@ -57,8 +54,6 @@ func (s *scanner) queryPackages() {
 	}
 }
 
-// unusedDeps는 모듈의 depends_on 대상을 import하지 않으면 정보로 알린다. 그룹 대상은 멤버 하나를 import하면 된다.
-// 코드 디렉토리가 없는 모듈은 보지 않는다. cpp가 있으면 include 디렉토리 아래 폴더도 코드 디렉토리다.
 func (s *scanner) unusedDeps(us []unit) {
 	for _, mod := range s.m.Modules {
 		if !s.hasCode(mod.Path) {

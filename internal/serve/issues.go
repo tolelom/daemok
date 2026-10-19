@@ -10,13 +10,11 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-// nodePos는 화면 키와 그 노드의 설계 파일 위치다.
 type nodePos struct {
 	key string
 	pos yaml.Pos
 }
 
-// nodePositions는 모든 노드의 키와 위치를 파일·줄·열 순으로 준다.
 func nodePositions(m *model.Model) []nodePos {
 	var out []nodePos
 	add := func(kind string, meta model.Meta) { out = append(out, nodePos{kind + ":" + meta.ID, meta.Pos}) }
@@ -78,8 +76,6 @@ func nodePositions(m *model.Model) []nodePos {
 	return out
 }
 
-// issueKey는 진단이 가리키는 화면 노드 키다.
-// 설계 파일 진단이면 같은 파일에서 진단 위치 이전의 마지막 노드, Go 파일 진단이면 경로 접두사가 가장 긴 모듈·멤버다.
 func issueKey(m *model.Model, nodes []nodePos, root string, d model.Diagnostic) (key, origin string) {
 	if strings.HasSuffix(d.Pos.File, ".go") {
 		rel, err := filepath.Rel(root, d.Pos.File)

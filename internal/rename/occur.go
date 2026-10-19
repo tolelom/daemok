@@ -18,7 +18,6 @@ func (c *collector) at(pos yaml.Pos, old, new string) {
 	c.reps = append(c.reps, edit.Replacement{Pos: pos, Old: old, New: new})
 }
 
-// ref는 이름이 옛 ID인 참조를 바꾼다.
 func (c *collector) ref(r model.Ref) {
 	if r.Name == c.old {
 		c.at(r.Pos, c.old, c.new)
@@ -31,7 +30,6 @@ func (c *collector) refs(rs []model.Ref) {
 	}
 }
 
-// typ은 타입 문자열 안의 옛 ID 토큰을 바꾼다.
 func (c *collector) typ(r model.Ref) {
 	if r.Name == "" {
 		return
@@ -41,14 +39,12 @@ func (c *collector) typ(r model.Ref) {
 	}
 }
 
-// method는 "계약.메서드" 참조의 계약 부분을 바꾼다.
 func (c *collector) method(r model.Ref) {
 	if ct, meth, ok := strings.Cut(r.Name, "."); ok && ct == c.old {
 		c.at(r.Pos, r.Name, c.new+"."+meth)
 	}
 }
 
-// retype은 타입 문자열에서 식별자 토큰이 정확히 old인 것만 new로 바꾼다. 경계는 [ ] * , 와 문자열 끝이다.
 func retype(s, old, new string) string {
 	var b strings.Builder
 	tok := 0
@@ -70,7 +66,6 @@ func retype(s, old, new string) string {
 	return b.String()
 }
 
-// definition은 kind의 id 노드의 ID 키 위치다.
 func definition(m *model.Model, kind, id string) (yaml.Pos, bool) {
 	if kind == "tiers" {
 		for _, t := range m.Tiers {
@@ -88,8 +83,6 @@ func definition(m *model.Model, kind, id string) (yaml.Pos, bool) {
 	return yaml.Pos{}, false
 }
 
-// Occurrences는 kind의 old 노드 정의 키와 그 노드를 가리키는 모든 참조 자리를 준다.
-// 참조의 종류는 check의 해석을 따른다.
 func Occurrences(m *model.Model, kind, old, new string) ([]edit.Replacement, error) {
 	def, ok := definition(m, kind, old)
 	if !ok {
@@ -182,7 +175,6 @@ func Occurrences(m *model.Model, kind, old, new string) ([]edit.Replacement, err
 			c.ref(e.Kind)
 		}
 	case "events":
-		// 이벤트 종류의 key enum 값은 이벤트 ID다.
 		for _, e := range m.Events {
 			if e.ID != old {
 				continue
@@ -203,7 +195,6 @@ func Occurrences(m *model.Model, kind, old, new string) ([]edit.Replacement, err
 	return c.reps, nil
 }
 
-// signatures는 enum·타입을 가리키는 타입 문자열과 ref, key다.
 func signatures(m *model.Model, c *collector, kind string) {
 	eachField(m, func(f *model.Field) {
 		c.typ(f.Type)
@@ -243,7 +234,6 @@ func needs(ns []model.Need, c *collector) {
 	}
 }
 
-// deps는 모듈·그룹·멤버를 함께 가리키는 참조다. 셋은 ID가 겹치지 않는다.
 func deps(m *model.Model, c *collector) {
 	for _, e := range m.Executables {
 		c.refs(e.Composes)

@@ -7,8 +7,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// ReportJSON은 진단을 CI와 도구가 읽는 JSON으로 만든다. group은 메시지의 "설명: 대상"에서 설명 부분이다.
-// check --format json과 MCP check 도구가 쓴다.
 func ReportJSON(diags model.Diagnostics) []byte {
 	type diag struct {
 		Level string `json:"level"`

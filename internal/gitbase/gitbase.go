@@ -1,4 +1,3 @@
-// Package gitbase는 git HEAD에 있는 설계 파일과 저장소의 worktree를 읽는다. 설계의 기준은 HEAD다.
 package gitbase
 
 import (
@@ -11,9 +10,6 @@ import (
 	"strings"
 )
 
-// Files는 designDir의 ref 시점 *.yaml 파일을 준다. 키는 "<ref>:<저장소 기준 경로>"다.
-// git 저장소가 아니거나 커밋이 없어 HEAD가 없으면 ok가 거짓이다. HEAD가 아닌 ref가 없으면 오류다.
-// ref 시점에 설계 디렉토리가 없으면 빈 목록이다.
 func Files(designDir, ref string) (files map[string][]byte, ok bool, err error) {
 	if ref == "" || strings.HasPrefix(ref, "-") {
 		return nil, false, fmt.Errorf("ref가 아니다: %q", ref)
@@ -27,7 +23,6 @@ func Files(designDir, ref string) (files map[string][]byte, ok bool, err error) 
 		}
 		return nil, false, fmt.Errorf("없는 ref: %s", ref)
 	}
-	// -z는 경로를 따옴표로 감싸지 않고 NUL로 구분한다. 비ASCII 경로도 그대로 받는다.
 	out, err := git(designDir, "ls-tree", "-z", "--full-name", "--name-only", ref, ".")
 	if err != nil {
 		return nil, false, err
@@ -46,14 +41,11 @@ func Files(designDir, ref string) (files map[string][]byte, ok bool, err error) 
 	return files, true, nil
 }
 
-// Worktree는 저장소의 작업 폴더 하나다. Branch는 짧은 브랜치 이름이고 detached면 비어 있다.
 type Worktree struct {
 	Path   string
 	Branch string
 }
 
-// Worktrees는 dir이 속한 저장소의 worktree를 git이 알려 주는 순서(주 worktree 먼저)로 준다.
-// git 저장소가 아니면 nil이다.
 func Worktrees(dir string) ([]Worktree, error) {
 	if _, err := git(dir, "rev-parse", "--is-inside-work-tree"); err != nil {
 		return nil, nil
@@ -74,7 +66,6 @@ func Worktrees(dir string) ([]Worktree, error) {
 	return wts, nil
 }
 
-// Branch는 dir의 현재 브랜치 이름이다. git 저장소가 아니거나 detached면 비어 있다.
 func Branch(dir string) string {
 	out, err := git(dir, "symbolic-ref", "--quiet", "--short", "HEAD")
 	if err != nil {
@@ -83,13 +74,11 @@ func Branch(dir string) string {
 	return strings.TrimSpace(string(out))
 }
 
-// HasHead는 dir이 커밋이 하나 이상 있는 git 저장소 안인지 본다.
 func HasHead(dir string) bool {
 	_, err := git(dir, "rev-parse", "--verify", "--quiet", "HEAD")
 	return err == nil
 }
 
-// Dirty는 dir 작업 폴더의 커밋 안 된 변경(추적 안 하는 파일 포함) 수다. 저장소가 아니면 0이다.
 func Dirty(dir string) int {
 	out, err := git(dir, "status", "--porcelain", "-z")
 	if err != nil {
@@ -103,7 +92,6 @@ func Dirty(dir string) int {
 			continue
 		}
 		n++
-		// 이름 바꾸기·복사는 원래 이름을 다음 칸에 하나 더 준다.
 		if f[0] == 'R' || f[0] == 'C' {
 			i++
 		}
@@ -111,9 +99,6 @@ func Dirty(dir string) int {
 	return n
 }
 
-// NewWorktree는 dir이 속한 저장소의 HEAD에서 branch를 새로 만들어 <주 worktree>/.worktrees/<branch의 /를 -로>에
-// worktree로 꺼내고 그 경로를 준다. .git/info/exclude에 /.worktrees/를 한 번 더해 주 worktree의 status에 보이지 않게 한다.
-// 브랜치나 경로가 이미 있으면 아무것도 하지 않고 오류를 준다.
 func NewWorktree(dir, branch string) (string, error) {
 	if branch == "" || strings.HasPrefix(branch, "-") {
 		return "", fmt.Errorf("브랜치 이름이 아니다: %q", branch)
@@ -144,7 +129,6 @@ func NewWorktree(dir, branch string) (string, error) {
 	return path, nil
 }
 
-// Prefix는 dir의 저장소 최상위 기준 상대 경로다. 최상위면 빈 문자열이다.
 func Prefix(dir string) (string, error) {
 	out, err := git(dir, "rev-parse", "--show-prefix")
 	if err != nil {
@@ -153,7 +137,6 @@ func Prefix(dir string) (string, error) {
 	return filepath.FromSlash(strings.TrimSuffix(strings.TrimSpace(string(out)), "/")), nil
 }
 
-// RemoveWorktree는 NewWorktree가 만든 worktree와 브랜치를 지운다. 만든 뒤 실패했을 때 되돌린다.
 func RemoveWorktree(dir, path, branch string) error {
 	if out, err := gitOut(dir, "worktree", "remove", "--force", path); err != nil {
 		return fmt.Errorf("git worktree remove: %s", strings.TrimSpace(out))
@@ -164,7 +147,6 @@ func RemoveWorktree(dir, path, branch string) error {
 	return nil
 }
 
-// excludeWorktrees는 저장소의 info/exclude에 /.worktrees/ 줄이 없으면 더한다.
 func excludeWorktrees(dir string) error {
 	out, err := git(dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
@@ -189,7 +171,6 @@ func excludeWorktrees(dir string) error {
 	return os.WriteFile(p, append(b, "/.worktrees/\n"...), 0o644)
 }
 
-// gitOut은 git을 돌려 표준 출력과 표준 오류를 함께 준다. 오류 메시지를 보이려고 쓴다.
 func gitOut(dir string, args ...string) (string, error) {
 	out, err := exec.Command("git", append([]string{"-C", dir}, args...)...).CombinedOutput()
 	return string(out), err

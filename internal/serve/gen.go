@@ -6,7 +6,6 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// genPreview는 daemok gen이 할 일을 파일마다 준다. 쓰지 않는다. 설계 대조를 다시 돌리므로 요청할 때만 만든다.
 func (s *Server) genPreview(w http.ResponseWriter, r *http.Request) {
 	res, ok := s.genRun(w)
 	if !ok {
@@ -16,7 +15,6 @@ func (s *Server) genPreview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"files": workspace.Preview(res, root)})
 }
 
-// genContent는 생성 파일 하나의 내용을 준다. 이번 생성 결과에 있는 경로만 받는다.
 func (s *Server) genContent(w http.ResponseWriter, r *http.Request) {
 	res, ok := s.genRun(w)
 	if !ok {

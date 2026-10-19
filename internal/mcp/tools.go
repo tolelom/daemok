@@ -144,7 +144,7 @@ func diagLines(ds model.Diagnostics) []string {
 
 type unit struct {
 	ID        string              `json:"id"`
-	Kind      string              `json:"kind"` // module, group, member
+	Kind      string              `json:"kind"`
 	Tier      string              `json:"tier"`
 	Path      string              `json:"path"`
 	Summary   string              `json:"summary"`
@@ -227,7 +227,6 @@ func unitInfo(m *model.Model, id string) (unit, bool) {
 	return u, true
 }
 
-// draftL3Tool은 L3 초안 YAML과, 옮기지 않은 선언·설계 에러를 반환하지 않는 함수 수의 JSON을 ---로 나눠 준다.
 func draftL3Tool(design, root string) (string, error) {
 	r, err := lift.Draft(design, root)
 	if err != nil {

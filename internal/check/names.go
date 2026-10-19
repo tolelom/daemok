@@ -19,7 +19,6 @@ var (
 	durationValue = regexp.MustCompile(`^\d+(ms|s|m|h)$`)
 )
 
-// names는 생성 코드가 컴파일되도록 Go 이름과 경로의 규칙을 본다.
 func (c *checker) names() {
 	c.goModule()
 	c.paths()
@@ -33,7 +32,6 @@ func (c *checker) names() {
 	c.packageNames()
 }
 
-// goModule은 생성 코드가 다른 패키지를 import할 수 있는 설계에 go_module이 있는지 본다.
 func (c *checker) goModule() {
 	m := c.m
 	if m.GoModule != "" {
@@ -81,7 +79,6 @@ func (c *checker) goModule() {
 	}
 }
 
-// cppDirs는 include 디렉토리가 있고 코드 루트 안의 상대 경로인지 본다.
 func (c *checker) cppDirs() {
 	if c.m.CPP == nil {
 		return
@@ -97,7 +94,6 @@ func (c *checker) cppDirs() {
 	}
 }
 
-// paths는 모듈·그룹 path와 멤버 ID가 Go 패키지 경로로 쓸 수 있고 생성 파일 범위 안인지 본다.
 func (c *checker) paths() {
 	check := func(p string, pos yaml.Pos) {
 		for _, el := range strings.Split(p, "/") {
@@ -122,7 +118,6 @@ func (c *checker) paths() {
 	}
 }
 
-// nodeIDs는 Go 이름과 파일 이름이 되는 ID가 소문자 snake_case인지, 타입·enum ID가 내장 타입 이름과 겹치지 않는지 본다.
 func (c *checker) nodeIDs() {
 	check := func(kind string, meta model.Meta) {
 		if !snakeName.MatchString(meta.ID) {
@@ -166,7 +161,6 @@ func (c *checker) nodeIDs() {
 	}
 }
 
-// enumValues는 enum 값이 Go 상수 이름이 되는지, enum 안에서 상수 이름이 겹치지 않는지 본다.
 func (c *checker) enumValues() {
 	for _, e := range c.m.Enums {
 		seen := map[string]string{}
@@ -185,7 +179,6 @@ func (c *checker) enumValues() {
 	}
 }
 
-// errorIDs는 에러의 Go 이름이 export되는 이름인지 본다. go.name이 없으면 ID가 Go 이름이다.
 func (c *checker) errorIDs() {
 	for _, e := range c.m.Errors {
 		switch {
@@ -197,7 +190,6 @@ func (c *checker) errorIDs() {
 	}
 }
 
-// funcNames는 일반 함수의 go.name이 export되는 이름인지 본다.
 func (c *checker) funcNames() {
 	for _, f := range c.m.Funcs {
 		if f.Go.Name != "" && !exportedIdent.MatchString(f.Go.Name) {
@@ -206,7 +198,6 @@ func (c *checker) funcNames() {
 	}
 }
 
-// fieldNames는 struct와 이벤트 data의 필드가 Go 필드 이름이 되고 겹치지 않는지 본다.
 func (c *checker) fieldNames() {
 	check := func(owner string, fields []*model.Field, event bool) {
 		seen := map[string]string{}
@@ -252,11 +243,10 @@ func (c *checker) durations() {
 	}
 }
 
-// packageNames는 같은 패키지(모듈·멤버)에 생성되는 최상위 이름이 겹치지 않는지 본다.
 func (c *checker) packageNames() {
 	m := c.m
 	type owner struct {
-		first map[string]string // 이름 → 처음 만든 노드
+		first map[string]string
 	}
 	byOwner := map[string]*owner{}
 	add := func(ownerID, name, source string, pos yaml.Pos) {
@@ -304,7 +294,7 @@ func (c *checker) packageNames() {
 	}
 	for _, id := range c.unitIDs() {
 		if m.Group(id) != nil {
-			continue // 그룹의 needs는 멤버 패키지에 생긴다
+			continue
 		}
 		for _, n := range c.needsOf(id) {
 			if ct := m.Contract(n.Contract.Name); ct != nil && ct.Gen {

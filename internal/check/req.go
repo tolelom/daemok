@@ -1,6 +1,5 @@
 package check
 
-// requirements는 active 요구사항에 충족 요소가 있는지, held·dropped 요구사항에 요소가 매달려 있지 않은지 본다.
 func (c *checker) requirements() {
 	for _, r := range c.m.Requirements {
 		sats := c.satisfiers[r.ID]

@@ -9,8 +9,6 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-// 화면용 모델. 필드 이름은 프로토타입의 normalize()와 같고, 노드 목록은 설계 순서를 지키려고 배열이다.
-
 type vSystem struct {
 	ID      string `json:"id"`
 	Summary string `json:"summary"`
@@ -205,19 +203,17 @@ type vEvent struct {
 }
 
 type vStep struct {
-	ID      string   `json:"id"`
-	Undo    string   `json:"undo"`
-	Commit  bool     `json:"commit"`
-	Fatal   bool     `json:"fatal"`
-	Calls   []string `json:"calls"`
-	Emits   []string `json:"emits"`
-	Summary string   `json:"summary"`
-	// OnFailUndo는 이 단계가 실패하면 부르는 되돌리기를 부르는 순서대로 담는다.
+	ID          string   `json:"id"`
+	Undo        string   `json:"undo"`
+	Commit      bool     `json:"commit"`
+	Fatal       bool     `json:"fatal"`
+	Calls       []string `json:"calls"`
+	Emits       []string `json:"emits"`
+	Summary     string   `json:"summary"`
 	OnFailUndo  []string `json:"onFailUndo"`
 	OnFailFatal bool     `json:"onFailFatal"`
 }
 
-// vRelation은 화면이 그리는 관계 하나다. 종류는 depends, exception, call, query, port, external, event, register.
 type vRelation struct {
 	From  string `json:"from"`
 	To    string `json:"to"`
@@ -264,11 +260,9 @@ type vIssue struct {
 	Key    string `json:"key"`
 	File   string `json:"file"`
 	Line   int    `json:"line"`
-	Origin string `json:"origin"` // design, code
-	// Group은 메시지의 "설명: 대상"에서 설명 부분이다. 화면이 같은 원인의 진단을 묶는다.
-	Group string `json:"group"`
-	// Abs는 에디터로 열 수 있는 File의 절대경로다.
-	Abs string `json:"abs"`
+	Origin string `json:"origin"`
+	Group  string `json:"group"`
+	Abs    string `json:"abs"`
 }
 
 type vFile struct {
@@ -325,7 +319,6 @@ func vNeeds(m *model.Model, ns []model.Need) []vNeed {
 	return out
 }
 
-// nodeValue는 cases의 given·expect 노드를 JSON 값으로 바꾼다.
 func nodeValue(n *yaml.Node) any {
 	if n == nil {
 		return nil
@@ -349,7 +342,6 @@ func nodeValue(n *yaml.Node) any {
 	return n.Value
 }
 
-// toView는 모델을 화면용 모델로 바꾼다. m이 nil이면 nil이다.
 func toView(m *model.Model) *vModel {
 	if m == nil {
 		return nil
@@ -450,8 +442,6 @@ func toView(m *model.Model) *vModel {
 	}
 	for _, f := range m.Flows {
 		vf := vFlow{ID: f.ID, In: f.In.Name, On: f.On.Name, Summary: f.Summary, Steps: []vStep{}, Satisfies: names(f.Satisfies)}
-		// 실패 경로는 생성되는 Run 함수와 같은 규칙이다. 커밋 전 실패는 쌓인 되돌리기를 역순으로,
-		// fatal 단계는 되돌리지 않고 Fatal, 커밋 뒤 실패는 아무것도 되돌리지 않는다.
 		var stack []string
 		committed := false
 		for _, s := range f.Steps {
@@ -485,7 +475,6 @@ func levelName(l model.Level) string {
 	return "info"
 }
 
-// toIssues는 진단을 화면용으로 바꾼다. code에 든 진단은 위치와 상관없이 코드 대조로 분류한다.
 func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIssue {
 	out := []vIssue{}
 	var nodes []nodePos
@@ -514,7 +503,6 @@ func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIss
 	return out
 }
 
-// fileSources는 생성 파일 경로마다 그 파일을 만든 노드 키다. 생성 규칙 표의 원본과 같다.
 func fileSources(m *model.Model) map[string][]string {
 	src := map[string][]string{}
 	add := func(p, key string) { src[p] = append(src[p], key) }
@@ -588,7 +576,6 @@ func toFiles(m *model.Model, files []golang.File) []vFile {
 	return out
 }
 
-// toRelations는 설계의 참조에서 관계 목록을 만든다. 화면은 이 목록을 그리기만 한다.
 func toRelations(m *model.Model) []vRelation {
 	out := []vRelation{}
 	if m == nil {

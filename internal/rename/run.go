@@ -20,13 +20,10 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// Options는 이름 바꾸기 방식이다. Code면 고정 키 없이 생성 코드 이름도 새 ID를 따른다.
-// Confined면 설계 디렉토리 밖을 가리키는 심볼릭 링크 파일을 고치지 않는다(MCP).
 type Options struct {
 	Code, Confined bool
 }
 
-// Result는 바꾼 결과다. Pinned는 더한 고정 키, Moves는 --code에서 옮겨야 할 디렉토리다.
 type Result struct {
 	Files  []string
 	Pinned string
@@ -34,11 +31,8 @@ type Result struct {
 	Notes  []string
 }
 
-// yamlID는 따옴표 없이 YAML에 쓸 수 있는 ID다. 종류별 형식 규칙은 설계 검사가 본다.
 var yamlID = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*$`)
 
-// yamlKeyword는 따옴표 없이 쓰면 YAML이 문자열이 아닌 값(null, 불리언)으로 읽는 이름이다.
-// 참조 자리에 쓰면 참조가 빈 값이 되어 검사도 잡지 못한다.
 func yamlKeyword(id string) bool {
 	switch strings.ToLower(id) {
 	case "null", "true", "false", "yes", "no", "on", "off":
@@ -47,7 +41,6 @@ func yamlKeyword(id string) bool {
 	return false
 }
 
-// fileNamed는 생성 파일 이름을 ID로 짓는 종류다.
 var fileNamed = map[string]bool{"enums": true, "handler_kinds": true, "event_kinds": true, "flows": true}
 
 var (
@@ -55,7 +48,6 @@ var (
 	knownArch = strings.Fields("386 amd64 amd64p32 arm armbe arm64 arm64be loong64 mips mipsle mips64 mips64le mips64p32 mips64p32le ppc ppc64 ppc64le riscv riscv64 s390 s390x sparc sparc64 wasm")
 )
 
-// buildSuffix는 id로 지은 파일 이름을 go/build가 GOOS·GOARCH 제약으로 읽는지다. 규칙은 go/build의 goodOSArchFile과 같다.
 func buildSuffix(id string) bool {
 	l := strings.Split(id, "_")
 	if n := len(l); n > 0 && l[n-1] == "test" {
@@ -68,11 +60,8 @@ func buildSuffix(id string) bool {
 	return n >= 2 && (slices.Contains(knownOS, l[n-1]) || slices.Contains(knownArch, l[n-1]))
 }
 
-// failAfter는 테스트에서 쓴 파일 수가 이 값이 되면 다음 쓰기를 실패로 본다. -1이면 끈다.
 var failAfter = -1
 
-// Run은 designDir의 설계에서 kind의 old 노드 ID와 그 참조를 new로 바꾼다.
-// 편집 전에 없던 읽기 오류, 늘어난 설계 검사 진단, 기본 모드에서 달라진 생성 결과가 있으면 쓰지 않는다.
 func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 	pin, ok := kinds[kind]
 	if !ok {
@@ -130,7 +119,6 @@ func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 		b, err := edit.Pin(out[def.File], def.File, pinPath(m, kind, old, new), pinKey, pinSub, pinValue)
 		switch {
 		case errors.Is(err, edit.ErrKeyExists):
-			// 경로를 ID와 같은 값으로 적어 둔 노드는 그 키가 이미 고정이다.
 		case err != nil:
 			return nil, err
 		default:
@@ -191,7 +179,6 @@ func firstError(ds model.Diagnostics) string {
 	return ""
 }
 
-// pinFor는 더할 고정 키다. 코드 이름 키가 이미 있거나 --code(gen: false 제외)면 비운다.
 func pinFor(m *model.Model, kind, old string, pin PinKind, opt Options, res *Result) (key, sub, value string) {
 	var goOpts *model.GoOpts
 	gen := true
@@ -209,7 +196,6 @@ func pinFor(m *model.Model, kind, old string, pin PinKind, opt Options, res *Res
 		x := m.Func(old)
 		goOpts, gen = &x.Go, x.Gen
 		if x.Kind.Name != "" || x.Of.Name != "" {
-			// go.name은 일반 함수에만 쓴다. 핸들러·계약 함수의 코드 이름은 생성 결과 비교가 지킨다.
 			return "", "", ""
 		}
 	case "errors":
@@ -267,7 +253,6 @@ func pinText(key, sub, value string) string {
 	return key + ": { " + sub + ": " + value + " }"
 }
 
-// pinPath는 바꾼 뒤 노드까지의 키 목록이다.
 func pinPath(m *model.Model, kind, old, new string) []string {
 	if kind == "members" {
 		return []string{"groups", m.Member(old).Group.ID, "members", new}
@@ -275,7 +260,6 @@ func pinPath(m *model.Model, kind, old, new string) []string {
 	return []string{kind, new}
 }
 
-// moves는 --code에서 경로가 ID에서 나오는 노드의 옮길 디렉토리다. 손으로 쓴 파일은 daemok이 옮기지 않는다.
 func moves(m *model.Model, kind, old, new string) []string {
 	switch kind {
 	case "executables":
@@ -295,8 +279,6 @@ func moves(m *model.Model, kind, old, new string) []string {
 	return nil
 }
 
-// verify는 바꾼 설계가 읽기 오류나 검사 진단을 늘리지 않는지, 기본 모드면 생성 코드가 같은지 본다.
-// 기본 모드에서 이름만 바뀌는 생성 파일 목록을 준다.
 func verify(before, after map[string][]byte, old, new, designDir, root string, code bool) ([]string, error) {
 	bm, bd := model.LoadSources(before)
 	am, ad := model.LoadSources(after)
@@ -328,7 +310,6 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	if bg.Files == nil {
 		return nil, fmt.Errorf("바꾸기 전 설계로 생성하지 못해 생성 코드가 그대로인지 확인할 수 없다: %s. 오류를 고치거나 --code를 쓴다", firstError(bg.Diags))
 	}
-	// TS 파일은 ts_out 디렉토리가 없으면 Files에 빠지므로 따로 비교한다. TS 이름은 고정 키가 아니라 ID에서 나온다.
 	bt, _ := ts.Generate(bm)
 	at, _ := ts.Generate(am)
 	if !bytes.Equal(bt, at) {
@@ -341,8 +322,6 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	return renamed, nil
 }
 
-// sameCode는 생성 파일이 패키지 디렉토리와 내용으로 같은지 본다. 파일 이름만 바뀐 것은 코드 이름에 영향이
-// 없어 받고(enum, 핸들러 종류 파일은 ID로 이름을 짓는다), 그 목록을 준다.
 func sameCode(before, after []golang.File) ([]string, error) {
 	key := func(f golang.File) string { return path.Dir(f.Path) + "\x00" + string(f.Content) }
 	left := map[string][]string{}
@@ -369,7 +348,6 @@ func sameCode(before, after []golang.File) ([]string, error) {
 	return renamed, nil
 }
 
-// replaceWord는 s에서 앞뒤가 식별자 글자가 아닌 old만 new로 바꾼다.
 func replaceWord(s, old, new string) string {
 	word := func(b byte) bool {
 		return b == '_' || b >= '0' && b <= '9' || b >= 'a' && b <= 'z' || b >= 'A' && b <= 'Z'
@@ -387,7 +365,6 @@ func replaceWord(s, old, new string) string {
 	return b.String()
 }
 
-// writeAll은 파일마다 원자적으로 쓰고, 실패하면 이미 쓴 파일을 원래 내용으로 되돌린다.
 func writeAll(paths []string, out, orig map[string][]byte) error {
 	for i, p := range paths {
 		var err error

@@ -5,7 +5,6 @@ import (
 	"strings"
 )
 
-// fc는 위치가 붙은 바이트다. 여러 줄 [ ]를 한 스트림으로 이어 읽기 위해 쓴다.
 type fc struct {
 	r   byte
 	pos Pos
@@ -50,7 +49,6 @@ func (p *parser) parseFlow(ln line, rest string, col int) (*Node, error) {
 	return n, nil
 }
 
-// flowDepth는 따옴표 밖의 괄호 깊이를 누적한다. 줄 끝에서 따옴표가 열려 있으면 오류다.
 func flowDepth(s string, depth int) (int, string) {
 	inQ := false
 	for i := 0; i < len(s); i++ {
@@ -132,7 +130,6 @@ func (f *flow) quoted() (*Node, error) {
 	return &Node{Kind: Scalar, Pos: pos, Value: s, Quoted: true}, nil
 }
 
-// plainText는 stops 중 하나 앞까지 읽고 오른쪽 공백을 뗀다.
 func (f *flow) plainText(stops string) string {
 	start := f.i
 	for !f.eof() && strings.IndexByte(stops, f.peek()) < 0 {
@@ -152,7 +149,6 @@ func (f *flow) plain() (*Node, error) {
 	if s == "" {
 		return nil, &Error{pos, "값이 없다"}
 	}
-	// 플로우 문맥의 평문 스칼라에는 ": "가 올 수 없다. 대개 쉼표가 빠진 것이다.
 	if i := strings.Index(s, ": "); i >= 0 || strings.HasSuffix(s, ":") {
 		if i < 0 {
 			i = len(s) - 1
@@ -165,7 +161,6 @@ func (f *flow) plain() (*Node, error) {
 	return &Node{Kind: Scalar, Pos: pos, Value: s}, nil
 }
 
-// afterItem은 항목 뒤의 ',' 또는 닫는 괄호를 처리한다. 닫혔으면 true.
 func (f *flow) afterItem(close byte) (bool, error) {
 	f.skipSpace()
 	if f.eof() {

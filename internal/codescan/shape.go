@@ -32,14 +32,10 @@ func collectTypeSpecs(f *ast.File, into map[string]typeSpec) {
 	}
 }
 
-// matchName은 설계 이름과 코드 이름을 대조하는 키다. 생성 이름은 AvatarUrl, 손으로 쓴 이름은 AvatarURL일 수 있다.
 func matchName(name string) string {
 	return strings.ToLower(strings.ReplaceAll(name, "_", ""))
 }
 
-// typeExpr는 코드의 타입식을 생성 코드와 같은 모양으로 쓴다. 설계 모듈 패키지는 import 경로의 마지막 요소로,
-// 그 밖의 패키지는 코드에 쓴 이름 그대로 한정한다.
-// 생성 코드에 나오지 않는 타입식(함수, 채널, 배열 길이, 가변 인자, 제네릭 등)이면 false다.
 func typeExpr(e ast.Expr, f *ast.File, module string) (string, bool) {
 	switch x := e.(type) {
 	case *ast.Ident:
@@ -73,9 +69,6 @@ func typeExpr(e ast.Expr, f *ast.File, module string) (string, bool) {
 	return "", false
 }
 
-// importBase는 파일에서 패키지를 가리키는 이름이 설계 모듈(go_module 안) 패키지나 생성기가 쓰는
-// 표준 라이브러리면 그 import 경로의 마지막 요소로 바꾼다. 생성기가 그 이름으로 한정하기 때문이다. 별칭 없는 import의 패키지 이름은
-// 경로의 마지막 요소로 본다. go_module 밖 패키지는 설계에 코드와 같은 이름으로 적으므로 그대로 둔다.
 func importBase(f *ast.File, name, module string) string {
 	for _, im := range f.Imports {
 		p, _ := strconv.Unquote(im.Path.Value)
@@ -93,7 +86,6 @@ func importBase(f *ast.File, name, module string) string {
 	return name
 }
 
-// fieldTypes는 파라미터·반환 목록을 타입 하나씩 편다. a, b int는 int 두 개다.
 func fieldTypes(fl *ast.FieldList, f *ast.File, module string) ([]string, bool) {
 	var out []string
 	if fl == nil {
@@ -119,8 +111,6 @@ func sameList(a, b []string) bool {
 	return strings.Join(a, "\x00") == strings.Join(b, "\x00") && len(a) == len(b)
 }
 
-// shapes는 gen: false인 call 계약과 타입의 코드 선언이 생성했다면 나왔을 모양과 같은지 본다.
-// 선언이 없는 경우는 handWritten이 알린다. 타입이 아닌 선언(함수, 변수, 상수)이면 오류다.
 func (s *scanner) shapes() {
 	for _, ct := range s.m.Contracts {
 		if ct.Gen || ct.Kind != "call" {
@@ -150,7 +140,6 @@ func (s *scanner) shapes() {
 	}
 }
 
-// jsonTag는 struct 필드 태그의 json 부분을 `json:"값"`으로 준다. 없으면 "태그 없음"이다.
 func jsonTag(tag *ast.BasicLit) string {
 	if tag != nil {
 		raw, _ := strconv.Unquote(tag.Value)
@@ -161,7 +150,6 @@ func jsonTag(tag *ast.BasicLit) string {
 	return "태그 없음"
 }
 
-// uncomparable은 타입 별칭과 제네릭 선언이면 정보로 알리고 true를 준다. 생성 코드에 없는 모양이다.
 func (s *scanner) uncomparable(ts typeSpec, what, id string, pos yaml.Pos) bool {
 	if ts.spec.Assign == 0 && ts.spec.TypeParams == nil {
 		return false
@@ -235,7 +223,7 @@ func (s *scanner) typeShape(t *model.Type, ts typeSpec) {
 		return
 	}
 	type field struct {
-		name, typ, json string // json은 태그의 json 값. 태그가 없으면 "태그 없음"
+		name, typ, json string
 		ok              bool
 	}
 	code := map[string]*field{}

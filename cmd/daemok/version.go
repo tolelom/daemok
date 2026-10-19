@@ -6,7 +6,6 @@ import (
 	"runtime/debug"
 )
 
-// runVersion은 모듈 버전과, 저장소에서 빌드했으면 커밋을 출력한다.
 func runVersion(stdout io.Writer) int {
 	fmt.Fprintln(stdout, versionString(debug.ReadBuildInfo()))
 	return 0

@@ -13,13 +13,11 @@ type NodeRef struct{ Kind, ID string }
 
 type Rename struct{ Kind, From, To string }
 
-// Modified는 바뀐 노드와 키 경로별 변경 줄이다.
 type Modified struct {
 	NodeRef
 	Lines []string
 }
 
-// Report는 기준 대비 작업 설계의 변경이다. 각 목록은 종류 순서, 같은 종류 안에서는 ID 순이다.
 type Report struct {
 	Settings []string
 	Added    []NodeRef
@@ -28,24 +26,19 @@ type Report struct {
 	Removed  []NodeRef
 }
 
-// Empty는 변경이 없는지다.
 func (r *Report) Empty() bool {
 	return len(r.Settings)+len(r.Added)+len(r.Renamed)+len(r.Modified)+len(r.Removed) == 0
 }
 
-// pairKeys는 맵 목록의 원소를 짝지을 키다. 키 경로의 마지막 이름으로 찾는다.
 var pairKeys = map[string]string{"steps": "id", "cases": "name"}
 
-// orderedMaps는 키 순서에 뜻이 있는 맵이다. 생성 struct 필드와 함수 파라미터 순서가 된다.
 var orderedMaps = map[string]bool{"fields": true, "params": true, "data": true}
 
-// pinKeys는 daemok rename이 종류마다 더하는 코드 이름 고정 키다.
 var pinKeys = map[string]string{
 	"modules": "path", "groups": "path", "enums": "go.type",
 	"types": "go.name", "contracts": "go.name", "handler_kinds": "go.name", "funcs": "go.name", "errors": "go.name", "consts": "go.name",
 }
 
-// pinValue는 daemok rename 기본 모드가 old 노드에 더하는 고정 값이다. 경로는 ID, 에러는 ID, 그 밖은 Go 이름이다.
 func pinValue(kind, old string) string {
 	switch kind {
 	case "modules", "groups", "errors":
@@ -54,8 +47,6 @@ func pinValue(kind, old string) string {
 	return model.GoName(old)
 }
 
-// Compare는 기준 설계 파일들과 작업 설계 파일들을 비교한다. 어느 파일이든 YAML로 읽지 못하거나
-// 같은 종류·ID가 두 곳에 있으면 오류다.
 func Compare(base, work map[string][]byte) (*Report, error) {
 	b, err := collect(base)
 	if err != nil {
@@ -86,7 +77,7 @@ func Compare(base, work map[string][]byte) (*Report, error) {
 		}
 		sort.Strings(added)
 		sort.Strings(removed)
-		renamed := map[string]string{} // 새 ID → 옛 ID
+		renamed := map[string]string{}
 		for _, p := range pairRenames(kind, bn, wn, removed, added) {
 			r.Renamed = append(r.Renamed, Rename{kind, p[0], p[1]})
 			renamed[p[1]] = p[0]
@@ -107,7 +98,6 @@ func Compare(base, work map[string][]byte) (*Report, error) {
 				r.Removed = append(r.Removed, NodeRef{kind, id})
 			}
 		}
-		// 이름 바뀜 짝도 값 차이(고정 키 추가, 코드 이름 변경)는 새 ID의 수정으로 보인다.
 		sort.Strings(common)
 		for _, id := range common {
 			old := id
@@ -126,9 +116,6 @@ func Compare(base, work map[string][]byte) (*Report, error) {
 	return r, nil
 }
 
-// pairRenames는 삭제·추가 노드 가운데 값이 같은 짝이 서로 하나뿐인 것을 [옛, 새]로 준다.
-// 새 노드에만 daemok rename이 더하는 고정 키가 옛 ID의 값으로 있으면 그 키는 빼고 비교한다.
-// 빈 노드는 무엇과도 같아 짝짓지 않는다.
 func pairRenames(kind string, bn, wn map[string]node, removed, added []string) [][2]string {
 	match := map[string][]string{}
 	back := map[string]int{}
@@ -153,7 +140,6 @@ func pairRenames(kind string, bn, wn map[string]node, removed, added []string) [
 	return out
 }
 
-// unpinned는 새 노드 값 nv에서, 옛 값 ov에 없던 고정 키가 old의 고정 값으로 있으면 그 키를 뺀다. 비게 된 go 맵도 뺀다.
 func unpinned(kind, old string, ov, nv *yaml.Node) *yaml.Node {
 	k, ok := pinKeys[kind]
 	if !ok || norm(nv) == nil {
@@ -184,7 +170,6 @@ func join(path, key string) string {
 	return path + "." + key
 }
 
-// norm은 디코더가 없는 것과 같게 읽는 값(null, 빈 목록, 빈 맵)을 nil로 바꾼다.
 func norm(n *yaml.Node) *yaml.Node {
 	switch {
 	case n == nil, n.IsNull():
@@ -195,7 +180,6 @@ func norm(n *yaml.Node) *yaml.Node {
 	return n
 }
 
-// typed는 따옴표 없이 쓰면 문자열이 아닌 값(정수, 불리언, null)으로 읽히는 글인지다.
 func typed(v string) bool {
 	if v == "" || v == "null" || v == "true" || v == "false" {
 		return true
@@ -204,12 +188,10 @@ func typed(v string) bool {
 	return err == nil
 }
 
-// sameScalar는 두 스칼라가 같은 값인지다. 따옴표는 따옴표를 떼면 문자열이 아닌 값이 될 때만 뜻이 있다.
 func sameScalar(a, b *yaml.Node) bool {
 	return a.Value == b.Value && (a.Quoted == b.Quoted || !typed(a.Value))
 }
 
-// diffValue는 path의 두 값의 차이를 줄로 준다. 같으면 nil이다. 노드 자체(path가 빈 값)는 "값"으로 적는다.
 func diffValue(path string, a, b *yaml.Node) []string {
 	a, b = norm(a), norm(b)
 	label := path
@@ -352,7 +334,6 @@ func allKind(ns []*yaml.Node, k yaml.Kind) bool {
 	return true
 }
 
-// keyed는 모든 원소가 key를 스칼라로 갖고 그 값이 겹치지 않는지다.
 func keyed(ns []*yaml.Node, key string) bool {
 	seen := map[string]bool{}
 	for _, n := range ns {
@@ -365,7 +346,6 @@ func keyed(ns []*yaml.Node, key string) bool {
 	return true
 }
 
-// render는 값을 한 줄로 쓴다. 따옴표가 뜻이 있거나 구분 글자·줄바꿈이 든 문자열은 이스케이프해 따옴표로 감싼다.
 func render(n *yaml.Node) string {
 	switch n.Kind {
 	case yaml.Map:

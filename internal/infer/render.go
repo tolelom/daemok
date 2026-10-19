@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// Render는 초안을 설계 파일 텍스트로 쓴다. 노드 하나를 한 줄 플로우 맵으로 쓴다.
 func Render(d *Draft) []byte {
 	var b bytes.Buffer
 	b.WriteString("# daemok init이 만든 초안이다. 코드의 패키지와 import에서 추정했다.\n")
@@ -52,7 +51,6 @@ func tierName(i int) string { return fmt.Sprintf("tier%d", i) }
 
 func list(xs []string) string { return "[" + strings.Join(xs, ", ") + "]" }
 
-// quote는 큰따옴표 문자열로 쓴다. 줄바꿈과 탭은 공백 하나로 바꾼다.
 func quote(s string) string {
 	s = strings.Join(strings.Fields(s), " ")
 	s = strings.ReplaceAll(s, `\`, `\\`)

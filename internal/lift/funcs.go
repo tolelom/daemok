@@ -9,19 +9,14 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// pendingFunc는 모든 모듈의 에러를 모은 뒤 판단할 함수다. 다른 모듈의 초안 에러를 가리킬 수 있다.
 type pendingFunc struct {
 	module string
 	decl   *ast.FuncDecl
 	file   *ast.File
 }
 
-// errorRef는 모듈과 Go 이름으로 가리킨 에러다.
 type errorRef struct{ module, name string }
 
-// funcs는 반환문에서 설계 에러나 초안 에러를 가리키는 함수를 일반 함수 노드로 옮기고, 나머지는 수만 센다.
-// 에러는 모듈과 Go 이름으로 들고 있다가 dedupe 뒤 resolveFuncErrors가 ID로 푼다.
-// 에러 ID는 모듈을 붙이지 않아, 미리 풀면 빠진 초안 에러 대신 같은 ID의 다른 모듈 에러를 가리킨다.
 func (c *collector) funcs() {
 	known := map[errorRef]bool{}
 	for _, e := range c.m.Errors {
@@ -59,9 +54,6 @@ func (c *collector) funcs() {
 	}
 }
 
-// resolveFuncErrors는 funcs 노드의 에러를 설계 에러와 dedupe에서 남은 초안 에러의 ID로 푼다.
-// 설계의 다른 에러와 ID가 겹치는 초안 에러는 검증에서 빠지므로 풀지 않는다.
-// 반환하는 에러를 하나라도 풀지 못하면 에러 계약이 모자라므로 함수를 뺀다.
 func resolveFuncErrors(nodes []Node, m *model.Model, res *Result) []Node {
 	ids := map[errorRef]string{}
 	designIDs := map[string]bool{}
@@ -105,8 +97,6 @@ func resolveFuncErrors(nodes []Node, m *model.Model, res *Result) []Node {
 	return out
 }
 
-// returnedRefs는 함수 본문의 반환식에 나오는 이름이다. 같은 패키지 이름과 설계 모듈 패키지를 한정한 이름을 준다.
-// 클로저 안의 return은 그 클로저의 반환이라 보지 않는다.
 func (c *collector) returnedRefs(p pendingFunc) []errorRef {
 	var out []errorRef
 	ast.Inspect(p.decl.Body, func(n ast.Node) bool {

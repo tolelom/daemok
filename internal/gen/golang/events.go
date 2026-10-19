@@ -8,10 +8,8 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// numberKinds는 JSON을 거친 값(float64)과 Go에서 직접 넣은 정수를 모두 받는 변환 도우미의 대상이다.
 var numberKinds = []string{"int", "int64", "uint", "uint64", "float64"}
 
-// eventHelpers는 모듈 디렉토리별로 쓰인 변환 도우미다.
 type eventHelpers map[string]map[string]bool
 
 func (g *gen) events() error {
@@ -61,7 +59,6 @@ func (g *gen) events() error {
 	return nil
 }
 
-// kindEvents는 이벤트 종류의 이벤트를 key enum 값 순서로 준다.
 func (g *gen) kindEvents(ek *model.EventKind) []*model.Event {
 	var out []*model.Event
 	en := g.m.Enum(ek.Key.Name)
@@ -76,13 +73,10 @@ func (g *gen) kindEvents(ek *model.EventKind) []*model.Event {
 	return out
 }
 
-// optionalValue는 optional 필드를 포인터로 두고 map에는 값으로 넣는지다.
 func (g *gen) optionalValue(fl *model.Field, dir string, f *goFile) bool {
 	return fl.Optional && fl.RefType.Name == "" && !fl.Many && !strings.HasPrefix(g.goType(fl.Type.Name, dir, f), "*")
 }
 
-// eventMap은 map 본문을 만드는 메서드다. optional 필드는 값이 있을 때만 역참조해서 넣어,
-// map에는 JSON을 거친 것과 같은 모양의 값만 들어간다.
 func (g *gen) eventMap(e *model.Event, name, dir string, f *goFile) string {
 	var pairs, opts []string
 	for _, fl := range e.Data {
@@ -92,7 +86,6 @@ func (g *gen) eventMap(e *model.Event, name, dir string, f *goFile) string {
 			continue
 		}
 		if fl.Optional {
-			// ref·many·포인터 타입의 optional은 nil이 아닐 때만 넣는다
 			opts = append(opts, fmt.Sprintf("\tif d.%s != nil {\n\t\tm[%q] = d.%s\n\t}", field, fl.Name, field))
 			continue
 		}
@@ -104,9 +97,6 @@ func (g *gen) eventMap(e *model.Event, name, dir string, f *goFile) string {
 	return fmt.Sprintf("// Map은 봉투의 map 본문으로 바꾼다. optional 필드는 값이 있을 때만 넣는다.\nfunc (d %s) Map() map[string]any {\n\tm := map[string]any{%s}\n%s\n\treturn m\n}", name, strings.Join(pairs, ", "), strings.Join(opts, "\n"))
 }
 
-// eventFrom은 map 본문에서 payload를 읽는 함수를 만든다. 키가 없거나 타입이 다르면 오류다.
-// optional 필드는 키가 없거나 nil이면 건너뛴다. 내장 숫자·문자열·bool, 문자열 목록, 설계 enum은
-// JSON을 거친 값도 받고, 그 밖의 타입은 타입 단언만 한다.
 func (g *gen) eventFrom(e *model.Event, name, dir string, f *goFile, helpers eventHelpers) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "// %sFrom은 봉투의 map 본문에서 %s를 읽는다.\nfunc %sFrom(m map[string]any) (%s, error) {\n\tvar d %s\n", name, name, name, name, name)
@@ -135,7 +125,6 @@ func indent(s string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// assign은 필드 하나를 target에 읽어 넣는 문장이다. 실패하면 d와 오류를 돌려준다.
 func (g *gen) assign(e *model.Event, fl *model.Field, target, dir string, f *goFile, helpers eventHelpers) string {
 	fmtPkg := f.use("fmt")
 	fail := fmt.Sprintf("return d, %s.Errorf(\"%%s: %%s: %%T\", %q, %q, m[%q])", fmtPkg, e.ID, fl.Name, fl.Name)
@@ -152,7 +141,6 @@ func (g *gen) assign(e *model.Event, fl *model.Field, target, dir string, f *goF
 			gt := g.qualify(en.In.Name, en.GoType(), dir, f)
 			fromString := fmt.Sprintf("\t\t%s = %s(v)", target, gt)
 			if en.Gen {
-				// 생성한 enum이면 Valid()로 설계에 없는 값을 거른다
 				fromString = fmt.Sprintf("\t\tif !%s(v).Valid() {\n\t\t\t%s\n\t\t}\n%s", gt, fail, fromString)
 			}
 			return fmt.Sprintf("\tswitch v := m[%q].(type) {\n\tcase %s:\n\t\t%s = v\n\tcase string:\n%s\n\tdefault:\n\t\t%s\n\t}\n", fl.Name, gt, target, fromString, fail)
@@ -165,7 +153,6 @@ func (g *gen) assign(e *model.Event, fl *model.Field, target, dir string, f *goF
 	return fmt.Sprintf("\tif v, ok := m[%q].(%s); ok {\n\t\t%s = v\n\t} else {\n\t\t%s\n\t}\n", fl.Name, gt, target, fail)
 }
 
-// helperKind는 필드가 변환 도우미를 쓰면 그 종류를 준다. optional 여부는 호출하는 쪽이 다룬다.
 func (g *gen) helperKind(fl *model.Field) string {
 	if fl.RefType.Name != "" {
 		return ""
@@ -218,8 +205,6 @@ func scalarHelper(kind string) string {
 }`, helperName(kind), kind, kind, zero)
 }
 
-// numberHelper는 JSON을 거친 float64와 Go에서 넣은 정수를 받는다.
-// 부호·범위를 넘거나 정수가 아닌 값은 오류다. float64를 거쳐 옮기지 않아 큰 정수도 그대로다.
 func numberHelper(kind string) string {
 	signed := kind == "int" || kind == "int64"
 	var cases []string

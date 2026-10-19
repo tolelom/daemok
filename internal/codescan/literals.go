@@ -9,7 +9,6 @@ import (
 	"github.com/tolelom/daemok/internal/yaml"
 )
 
-// adHocCall은 즉석 errors.New 호출 하나다. msg는 인자가 문자열 리터럴일 때만 있다.
 type adHocCall struct {
 	pos    yaml.Pos
 	module string
@@ -17,9 +16,6 @@ type adHocCall struct {
 	lit    bool
 }
 
-// adHocErrors는 쓸 수 있는 설계 에러가 있는 모듈의 함수 본문에서 errors.New를 부르면 정보로 알린다.
-// 상황마다 메시지가 다른 정당한 경우가 섞여 있어 경고(--strict 실패)로 두지 않는다.
-// 패키지 수준 var 선언(설계 에러를 손으로 둔 gen: false 선언)과 fmt.Errorf의 감싸기는 보지 않는다.
 func (s *scanner) adHocErrors(id string, f *ast.File) {
 	visible := false
 	for _, e := range s.m.Errors {
@@ -70,8 +66,6 @@ func (s *scanner) adHocErrors(id string, f *ast.File) {
 	}
 }
 
-// reportAdHoc은 즉석 errors.New를 메시지와 함께 알린다. 쓸 수 있는 설계 에러와 메시지가 같으면 그 에러를,
-// 같은 메시지가 여러 곳이면 그 수를 붙인다. 앞은 바로 바꿔 쓸 후보이고 뒤는 sentinel로 둘 후보다.
 func (s *scanner) reportAdHoc() {
 	same := map[string]int{}
 	for _, c := range s.adHoc {
@@ -98,11 +92,8 @@ func (s *scanner) reportAdHoc() {
 	}
 }
 
-// enumLiterals는 쓸 수 있는 설계 enum의 값과 같은 문자열 리터럴을 함수 본문의 비교(==, !=),
-// switch case, SQL 메서드의 자리표시자 값(placeholderArgs)에서 쓰면 정보로 알린다. enum 상수를 쓰면 값이 바뀔 때 컴파일러가 잡는다.
-// 로그 키나 외부 프로토콜 문자열처럼 다른 자리의 같은 문자열은 enum과 상관없을 때가 많아 보지 않는다.
 func (s *scanner) enumLiterals(id string, f *ast.File) {
-	consts := map[string]string{} // 값 → 상수 이름
+	consts := map[string]string{}
 	for _, en := range s.m.Enums {
 		if en.In.Name != id && !s.m.CanDepend(id, en.In.Name) {
 			continue
@@ -148,15 +139,12 @@ func (s *scanner) enumLiterals(id string, f *ast.File) {
 	}
 }
 
-// sqlMethods는 쿼리 문자열과 자리표시자 값을 함께 받는 GORM·database/sql 메서드다.
 var sqlMethods = map[string]bool{
 	"Where": true, "Or": true, "Not": true, "Having": true, "Joins": true, "Select": true, "Raw": true, "Exec": true,
 	"Find": true, "First": true, "Take": true, "Last": true, "Delete": true,
 	"Query": true, "QueryRow": true, "QueryContext": true, "QueryRowContext": true, "ExecContext": true,
 }
 
-// placeholderArgs는 SQL 메서드 호출에서 ?가 든 문자열 리터럴 인자 뒤의 인자다.
-// db.Where("status = ?", "published")의 값 자리다. IN ?에 넘긴 슬라이스 리터럴은 원소를 준다.
 func placeholderArgs(call *ast.CallExpr) []ast.Expr {
 	sel, ok := call.Fun.(*ast.SelectorExpr)
 	if !ok || !sqlMethods[sel.Sel.Name] {

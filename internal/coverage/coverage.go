@@ -1,5 +1,3 @@
-// Package coverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 수를 센다.
-// 이 비율은 설계 형식을 넓힐지 정하는 근거다.
 package coverage
 
 import (
@@ -17,9 +15,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// Row는 패키지 하나의 결과다. Pkg는 코드 루트 기준 슬래시 경로이고 루트는 "."다.
-// Funcs와 FuncsMatched는 Decls·Matched 중 메서드가 아닌 함수다. 설계는 에러 계약이 있는 함수만 두므로
-// 함수를 뺀 비율을 따로 볼 수 있게 한다.
 type Row struct {
 	Pkg          string
 	Decls        int
@@ -28,9 +23,6 @@ type Row struct {
 	FuncsMatched int
 }
 
-// Count는 root 아래 패키지마다 최상위 선언 수와 그중 설계가 만드는 이름의 수를 준다.
-// 설계가 만드는 이름은 모든 L3·L4 노드를 gen: true로 보고 생성한 코드에서 얻는다. 모델은 바꾸지 않는다.
-// 파싱하지 못한 Go 파일은 세지 않고 함께 돌려준다.
 func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 	expected, err := DesignNames(m)
 	if err != nil {
@@ -87,7 +79,6 @@ func Count(m *model.Model, root string) ([]Row, []gosrc.ParseError, error) {
 	return rows, bad, nil
 }
 
-// designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수와 일반 함수도 넣는다.
 func DesignNames(m *model.Model) (map[string]map[string]bool, error) {
 	var gens []*bool
 	for _, x := range m.Enums {
@@ -151,13 +142,12 @@ func DesignNames(m *model.Model) (map[string]map[string]bool, error) {
 			if out[o.Path] == nil {
 				out[o.Path] = map[string]bool{}
 			}
-			out[o.Path][fn.GoName()] = true // 일반 함수는 생성물이 없고 손으로 쓴 선언을 가리킨다
+			out[o.Path][fn.GoName()] = true
 		}
 	}
 	return out, nil
 }
 
-// handlerRefs는 등록 파일의 `_ 패키지.종류 = 함수` 줄이 가리키는 손으로 쓴 함수 이름이다.
 func handlerRefs(f *ast.File) []string {
 	var out []string
 	for _, d := range f.Decls {

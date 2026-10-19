@@ -43,7 +43,6 @@ func (g *gen) flows() error {
 	return nil
 }
 
-// flowInterface는 단계와 되돌리기 메서드를 처음 나온 순서로 중복 없이 담는다.
 func flowInterface(fl *model.Flow, name string) string {
 	var lines []string
 	seen := map[string]bool{}
@@ -70,8 +69,6 @@ func flowInterface(fl *model.Flow, name string) string {
 	return fmt.Sprintf("%s\ntype %sSteps interface {\n%s\n}", doc, name, strings.Join(lines, "\n"))
 }
 
-// flowRun은 단계를 순서대로 부르는 함수다.
-// 커밋 전 단계가 실패하면 쌓인 되돌리기를 역순으로 부르고, fatal 단계는 되돌리지 않고 Fatal을 부른다.
 func flowRun(fl *model.Flow, name string) string {
 	hasUndo, needFail := false, false
 	committed := false

@@ -15,20 +15,17 @@ var (
 	version   = regexp.MustCompile(`^v[0-9]+$`)
 )
 
-// Exe는 초안의 실행 단위다.
 type Exe struct {
 	ID, Dir, Summary string
 	Composes         []string
 }
 
-// Mod는 초안의 모듈이다. Path는 ID와 다를 때만 있다.
 type Mod struct {
 	ID, Path, Summary string
 	Tier              int
 	DependsOn         []string
 }
 
-// Draft는 코드에서 추정한 L2 설계다. tier 이름은 tier0부터 tier(Tiers-1)까지다.
 type Draft struct {
 	GoModule, System string
 	Exes             []Exe
@@ -36,53 +33,42 @@ type Draft struct {
 	Mods             []Mod
 }
 
-// FanIn은 모듈을 import하는 모듈·실행 단위의 수다.
 type FanIn struct {
 	ID    string `json:"id"`
 	Count int    `json:"count"`
 }
 
-// Report는 분석 모드 화면과 daemok init이 보여 주는 메모다.
 type Report struct {
-	Packages    int     `json:"packages"`
-	Modules     int     `json:"modules"`
-	Executables int     `json:"executables"`
-	Skipped     []Skip  `json:"skipped"`
-	FanIn       []FanIn `json:"fanIn"`
-	// Cycles는 서로 import하는 패키지 묶음의 모듈 ID다. 모든 플랫폼의 파일을 합쳐 보면 생길 수 있다.
-	Cycles [][]string `json:"cycles"`
-	// GroupCandidates는 그룹으로 묶을 만한 형제 패키지다. 그룹은 핸들러 종류(L3)가 있어야 해서 초안에 넣지 않고 제안만 한다.
+	Packages        int              `json:"packages"`
+	Modules         int              `json:"modules"`
+	Executables     int              `json:"executables"`
+	Skipped         []Skip           `json:"skipped"`
+	FanIn           []FanIn          `json:"fanIn"`
+	Cycles          [][]string       `json:"cycles"`
 	GroupCandidates []GroupCandidate `json:"groupCandidates"`
-	// External은 go.mod의 직접 require와 그 모듈을 import하는 모듈·실행 단위다.
-	External []External `json:"external"`
-	// Hints는 L3 노드(gen: false)로 올릴 만한 손으로 쓴 선언이다.
-	Hints []Hint `json:"hints"`
-	// Uses는 모듈·실행 단위가 다른 모듈에서 쓰는 export 이름이다.
-	Uses []Use `json:"uses,omitempty"`
+	External        []External       `json:"external"`
+	Hints           []Hint           `json:"hints"`
+	Uses            []Use            `json:"uses,omitempty"`
 }
 
-// External은 외부 모듈 하나와 그걸 쓰는 모듈·실행 단위 ID다.
 type External struct {
 	Module string   `json:"module"`
 	Users  []string `json:"users"`
 }
 
-// GroupCandidate는 같은 부모 디렉토리 아래 형제 모듈 3개 이상이 형제 밖의 모듈을 공통으로 쓰는 묶음이다.
 type GroupCandidate struct {
-	Path       string   `json:"path"`       // 부모 디렉토리
-	Members    []string `json:"members"`    // 모듈 ID
-	Common     []string `json:"common"`     // 모든 형제가 쓰는 형제 밖 모듈
-	Exceptions []string `json:"exceptions"` // 형제끼리의 의존 "a → b". 그룹 예외 후보
+	Path       string   `json:"path"`
+	Members    []string `json:"members"`
+	Common     []string `json:"common"`
+	Exceptions []string `json:"exceptions"`
 }
 
-// Analysis는 Analyze의 결과다.
 type Analysis struct {
 	Draft  *Draft
 	YAML   []byte
 	Report Report
 }
 
-// Analyze는 root의 go.mod와 Go 패키지에서 초안을 만든다. 파일을 쓰지 않는다.
 func Analyze(root string) (*Analysis, error) {
 	module, requires, err := readGoMod(root)
 	if err != nil {
@@ -157,7 +143,6 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		}
 		return out
 	})
-	// 순환 묶음의 패키지는 같은 tier다. 묶음 밖 의존의 층 중 가장 큰 값 + 1이다.
 	compTier := map[int]int{}
 	var level func(dir string) int
 	level = func(dir string) int {
@@ -269,9 +254,6 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 	return d, rep
 }
 
-// assignIDs는 디렉토리마다 ID를 정한다. 마지막 경로 요소부터 쓰고, 겹치면 겹친 것끼리
-// 경로 요소를 하나씩 앞으로 더 붙인다. 경로 전체로도 겹치면 디렉토리 순서대로 _2, _3을 붙인다.
-// 루트(".")는 rootID다.
 func assignIDs(dirs []string, rootID string) map[string]string {
 	dirs = append([]string(nil), dirs...)
 	sort.Strings(dirs)
@@ -325,8 +307,6 @@ func assignIDs(dirs []string, rootID string) map[string]string {
 	return ids
 }
 
-// snake는 이름을 소문자 snake_case로 바꾼다. 소문자나 숫자 뒤의 대문자 앞, 대문자 연속 뒤에
-// 소문자가 오면 그 연속의 마지막 대문자 앞에 _를 넣는다. -와 .은 _가 된다.
 func snake(s string) string {
 	var b strings.Builder
 	rs := []rune(s)
@@ -350,7 +330,6 @@ func snake(s string) string {
 	return strings.Trim(out, "_")
 }
 
-// components는 의존 그래프의 강한 연결 요소(Tarjan)다. comp는 노드마다 요소 번호, comps는 요소마다 노드다.
 func components(nodes []string, edges func(string) []string) (map[string]int, [][]string) {
 	index := map[string]int{}
 	low := map[string]int{}
@@ -395,8 +374,6 @@ func components(nodes []string, edges func(string) []string) (map[string]int, []
 	return comp, comps
 }
 
-// groupCandidates는 부모 디렉토리가 같은 형제 모듈 3개 이상이 형제 밖 모듈을 하나 이상 공통으로 쓰면 후보로 낸다.
-// 루트 바로 아래 디렉토리는 프로젝트의 큰 구조라 보지 않는다.
 func groupCandidates(libDirs []string, libIDs map[string]string, mods []Mod) []GroupCandidate {
 	deps := map[string][]string{}
 	for _, m := range mods {
@@ -446,8 +423,6 @@ func groupCandidates(libDirs []string, libIDs map[string]string, mods []Mod) []G
 	return out
 }
 
-// external은 require마다 그 모듈(또는 하위 패키지)을 import하는 초안 노드를 모은다.
-// require가 겹치면(a/b와 a/b/c) 가장 긴 것에 붙인다.
 func external(requires []string, pkgs []*pkg, d *Draft) []External {
 	if len(requires) == 0 {
 		return nil

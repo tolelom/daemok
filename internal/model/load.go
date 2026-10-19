@@ -15,8 +15,6 @@ var topKeys = []string{
 	"funcs", "flows",
 }
 
-// Load는 dir의 *.yaml을 이름순으로 읽어 한 모델로 합친다.
-// 오류가 있어도 읽은 만큼의 모델을 돌려준다.
 func Load(dir string) (*Model, Diagnostics) {
 	var diags Diagnostics
 	paths, _ := filepath.Glob(filepath.Join(dir, "*.yaml"))
@@ -37,7 +35,6 @@ func Load(dir string) (*Model, Diagnostics) {
 	return m, append(diags, more...)
 }
 
-// LoadSources는 이름과 내용의 설계 파일들을 이름순으로 한 모델로 합친다. 이름은 진단 위치에 쓰인다.
 func LoadSources(files map[string][]byte) (*Model, Diagnostics) {
 	var diags Diagnostics
 	paths := make([]string, 0, len(files))
@@ -69,9 +66,9 @@ func LoadSources(files map[string][]byte) (*Model, Diagnostics) {
 type merger struct {
 	m     *Model
 	d     *decoder
-	ids   map[string]map[string]yaml.Pos // 종류 → ID → 처음 위치
-	once  map[string]yaml.Pos            // 한 번만 나올 수 있는 최상위 키
-	first *yaml.Pos                      // 처음 읽은 파일의 위치. version 부재 오류에 쓴다
+	ids   map[string]map[string]yaml.Pos
+	once  map[string]yaml.Pos
+	first *yaml.Pos
 }
 
 func (mg *merger) file(root *yaml.Node) {
@@ -122,7 +119,6 @@ func (mg *merger) scalarOnce(root *yaml.Node, key string, dst *string) {
 	*dst = v.Value
 }
 
-// unique는 종류 안의 ID 중복을 잡는다. 처음 보는 ID면 true.
 func (mg *merger) unique(kind, id string, pos yaml.Pos) bool {
 	if mg.ids[kind] == nil {
 		mg.ids[kind] = map[string]yaml.Pos{}
@@ -135,7 +131,6 @@ func (mg *merger) unique(kind, id string, pos yaml.Pos) bool {
 	return true
 }
 
-// finish는 version이 있는지, 한 참조 필드가 받는 종류끼리 ID가 겹치는지 본다.
 func (mg *merger) finish() {
 	if _, ok := mg.once["version"]; !ok && mg.first != nil {
 		mg.d.diags.Errorf(*mg.first, "필요한 키가 없다: \"version\"")

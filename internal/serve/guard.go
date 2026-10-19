@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// guard는 루프백에서 들을 때 다른 사이트가 브라우저를 통해 보내는 요청을 막는다.
-// Host가 루프백이 아니면 DNS rebinding으로 보고, POST의 Origin이 Host와 다르면 CSRF로 본다.
 func (s *Server) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.options().Local {

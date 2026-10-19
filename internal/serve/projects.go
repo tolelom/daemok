@@ -17,16 +17,14 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// Options는 프로젝트 열기에 쓰는 설정이다.
 type Options struct {
-	Workspace string // 프로젝트를 찾을 작업 폴더. 비면 목록이 없다
-	ConfigDir string // recent.json을 둘 디렉토리. 비면 저장하지 않는다
-	Local     bool   // 루프백 주소에서 들을 때 참. 참일 때만 열기·저장을 허용하고 Host·Origin을 검사한다
+	Workspace string
+	ConfigDir string
+	Local     bool
 }
 
 const recentMax = 10
 
-// SetOptions는 설정을 바꾸고 상태를 다시 만든다. 상태의 canEdit이 설정을 따른다.
 func (s *Server) SetOptions(o Options) {
 	s.mu.Lock()
 	s.opts = o
@@ -40,8 +38,6 @@ func (s *Server) options() Options {
 	return s.opts
 }
 
-// Open은 path를 현재 프로젝트로 연다. 설계 디렉토리는 path/design이다.
-// 디렉토리가 아니거나 설계 파일과 go.mod가 모두 없으면 바꾸지 않고 오류를 준다.
 func (s *Server) Open(path string) error {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -69,7 +65,6 @@ func (s *Server) Open(path string) error {
 	return nil
 }
 
-// expandHome은 ~와 ~/로 시작하는 경로의 ~를 홈 디렉토리로 바꾼다.
 func expandHome(path string) string {
 	if path != "~" && !strings.HasPrefix(path, "~/") && !strings.HasPrefix(path, "~"+string(filepath.Separator)) {
 		return path
@@ -121,7 +116,6 @@ func (s *Server) remember(path string) {
 	}
 }
 
-// findModules는 dir 아래 깊이 maxDepth까지에서 go.mod가 있는 디렉토리를 찾는다. 모듈 아래로는 내려가지 않는다.
 func findModules(dir string, maxDepth int) []string {
 	var out []string
 	base := filepath.Clean(dir)
@@ -149,11 +143,10 @@ type vProject struct {
 	Path    string `json:"path"`
 	Exists  bool   `json:"exists"`
 	Branch  string `json:"branch"`
-	Mode    string `json:"mode"` // check(설계 있음), analyze(go.mod만), 없거나 열 수 없으면 빈 값
+	Mode    string `json:"mode"`
 	Current bool   `json:"current"`
 }
 
-// project는 경로 하나의 목록 항목이다. 브랜치를 모르면 branch를 git으로 읽는다.
 func project(path, branch, current string, branchKnown bool) vProject {
 	p := vProject{Path: path, Current: samePath(path, current)}
 	st, err := os.Stat(path)
@@ -175,8 +168,6 @@ func project(path, branch, current string, branchKnown bool) vProject {
 	return p
 }
 
-// repoName은 root가 주 worktree가 아닌 worktree면 주 worktree의 폴더 이름을 준다. worktree 폴더 이름은
-// 저장소를 알려 주지 못한다(.worktrees/daemok).
 func repoName(root string) string {
 	wts, _ := gitbase.Worktrees(root)
 	if len(wts) < 2 || samePath(wts[0].Path, root) {
@@ -185,7 +176,6 @@ func repoName(root string) string {
 	return filepath.Base(wts[0].Path)
 }
 
-// samePath는 심볼릭 링크를 푼 두 경로가 같은지 본다. git은 링크를 푼 경로를 준다.
 func samePath(a, b string) bool {
 	if a == b {
 		return true
@@ -210,7 +200,6 @@ func (s *Server) projects(w http.ResponseWriter, r *http.Request) {
 		Workspace []string   `json:"workspace"`
 		CanOpen   bool       `json:"canOpen"`
 	}{Current: root, Worktrees: []vProject{}, Recent: []vProject{}, Workspace: []string{}, CanOpen: o.Local}
-	// worktree가 하나뿐이면 지금 연 것뿐이라 보이지 않는다.
 	if wts, _ := gitbase.Worktrees(root); len(wts) > 1 {
 		for _, wt := range wts {
 			body.Worktrees = append(body.Worktrees, project(wt.Path, wt.Branch, root, true))
@@ -270,18 +259,14 @@ func (s *Server) initDraft(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.Poll()
-	// 화면 알림이 짧도록 코드 루트 기준 슬래시 경로로 준다.
 	if rel, err := filepath.Rel(root, p); err == nil {
 		p = filepath.ToSlash(rel)
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"path": p})
 }
 
-// draftBranch는 초안을 새 worktree에 저장할 때 제안하는 브랜치 이름이다.
 const draftBranch = "daemok/design"
 
-// initWorktree는 분석 모드의 초안을 지금 저장소 HEAD에서 만든 새 worktree의 design/에 저장하고 그 worktree를 연다.
-// 원래 작업 폴더에는 쓰지 않는다. 초안은 새 worktree의 코드(HEAD)로 다시 추정한다.
 func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
 	if !s.options().Local {
 		writeErr(w, http.StatusForbidden, "루프백 주소로 띄웠을 때만 저장할 수 있다")
@@ -310,7 +295,6 @@ func (s *Server) initWorktree(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	// 만든 뒤 실패하면 worktree와 브랜치를 지워 같은 이름으로 다시 할 수 있게 한다.
 	fail := func(code int, msg string) {
 		if err := gitbase.RemoveWorktree(root, top, branch); err != nil {
 			msg += fmt.Sprintf(". worktree를 지우지 못했다(%s): %v", top, err)

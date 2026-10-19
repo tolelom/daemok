@@ -1,5 +1,3 @@
-// Package rename은 설계 노드 하나의 ID와 그 참조를 설계 파일 전체에서 바꾼다.
-// 기본은 코드 이름을 고정 키로 유지하고, 생성 결과와 진단이 그대로인지 확인한 뒤 쓴다.
 package rename
 
 import (
@@ -8,15 +6,14 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// PinKind는 코드 이름을 옛 값으로 고정하는 방법이다.
 type PinKind int
 
 const (
-	PinNone       PinKind = iota // 코드와 무관
-	PinGoName                    // go: { name: ... }
-	PinGoType                    // go: { type: ... }
-	PinPath                      // path: ...
-	PinImpossible                // 형식에 코드 이름 키가 없음
+	PinNone PinKind = iota
+	PinGoName
+	PinGoType
+	PinPath
+	PinImpossible
 )
 
 var kinds = map[string]PinKind{
@@ -26,7 +23,6 @@ var kinds = map[string]PinKind{
 	"events": PinImpossible, "event_kinds": PinImpossible, "flows": PinImpossible, "executables": PinImpossible, "members": PinImpossible,
 }
 
-// Kinds는 이름을 바꿀 수 있는 종류 이름이다.
 func Kinds() []string {
 	var out []string
 	for k := range kinds {
@@ -36,7 +32,6 @@ func Kinds() []string {
 	return out
 }
 
-// namespace는 ID가 서로 겹칠 수 없는 종류 묶음이다. depends_on과 타입 문자열이 묶음을 함께 가리킨다.
 func namespace(kind string) []string {
 	switch kind {
 	case "modules", "groups", "members":
@@ -47,7 +42,6 @@ func namespace(kind string) []string {
 	return []string{kind}
 }
 
-// metas는 kind의 노드마다 Meta를 준다. tiers는 Meta가 없어 주지 않는다.
 func metas(m *model.Model, kind string) []*model.Meta {
 	var out []*model.Meta
 	switch kind {
@@ -129,7 +123,6 @@ func metas(m *model.Model, kind string) []*model.Meta {
 	return out
 }
 
-// exists는 kind에 id 노드가 있는지다.
 func exists(m *model.Model, kind, id string) bool {
 	_, ok := definition(m, kind, id)
 	return ok

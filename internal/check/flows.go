@@ -10,7 +10,6 @@ import (
 
 var snakeName = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)*$`)
 
-// flows는 단계 이름, commit 위치, 흐름의 모듈과 calls·emits·on의 관계를 본다.
 func (c *checker) flows() {
 	m := c.m
 	for _, f := range m.Flows {
@@ -19,7 +18,7 @@ func (c *checker) flows() {
 			c.errorf(f.Pos, "단계가 없는 흐름: %s", f.ID)
 		}
 		seen := map[string]bool{}
-		methods := map[string]string{} // Go 메서드 이름 → 처음 쓴 단계·undo 이름
+		methods := map[string]string{}
 		method := func(name string, pos yaml.Pos) {
 			if name == "" {
 				return
@@ -87,7 +86,6 @@ func (c *checker) flows() {
 	}
 }
 
-// usesMethod는 id가 받은 계약에서 메서드를 쓸 수 있는지다. uses를 생략한 needs가 하나라도 있으면 전부 쓸 수 있다.
 func (c *checker) usesMethod(id, contract, method string) bool {
 	for _, n := range c.needsOf(id) {
 		if n.Contract.Name == contract && (len(n.Uses) == 0 || has(n.Uses, method)) {
@@ -97,7 +95,6 @@ func (c *checker) usesMethod(id, contract, method string) bool {
 	return false
 }
 
-// receives는 id가 needs로 계약을 받는지다.
 func (c *checker) receives(id, contract string) bool {
 	for _, n := range c.needsOf(id) {
 		if n.Contract.Name == contract {

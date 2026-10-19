@@ -10,8 +10,6 @@ import (
 	"github.com/tolelom/daemok/internal/workspace"
 )
 
-// validate는 초안을 설계에 합쳐 돌리고, 초안 줄을 가리키는 오류·경고가 나온 노드를 빼고 다시 돌린다.
-// 초안 밖에 새 오류·경고가 생기면 어느 노드 탓인지 알 수 없어 오류로 끝낸다.
 func validate(sources map[string][]byte, designDir, root string, nodes []Node, res *Result) ([]Node, error) {
 	sort.SliceStable(nodes, func(i, j int) bool {
 		a, b := nodes[i], nodes[j]
@@ -25,8 +23,6 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 	})
 	base := counts(workspace.RunSources(sources, designDir, root).Diags)
 	key := draftKey(sources, designDir)
-	// 한 라운드는 진단이 난 노드를 모두 빼므로 라운드 수는 참조 연쇄의 깊이다. YAML 문법 오류처럼 첫 오류에서
-	// 멈추는 진단이면 노드를 하나씩만 빼게 되어 상한에서 끝낸다.
 	for round := 0; len(nodes) > 0; round++ {
 		if round == maxRounds {
 			return nil, fmt.Errorf("초안 검증이 %d번 안에 끝나지 않았다", maxRounds)
@@ -97,7 +93,6 @@ func added(base map[string]int, now []string) []string {
 
 const maxRounds = 20
 
-// header는 초안 파일 머리 주석의 줄 수와 내용이다. lineNodes가 줄 번호를 맞추는 데 쓴다.
 const header = "# daemok init --l3가 만든 L3 초안이다. 설계에 없는 손으로 쓴 선언을 gen: false 노드로 옮겼다.\n" +
 	"# 새 설계 파일로 저장하거나 기존 설계 파일에 옮겨 붙인다.\n"
 
@@ -115,7 +110,6 @@ func render(nodes []Node) []byte {
 	return b.Bytes()
 }
 
-// lineNodes는 render가 쓴 줄 번호(1부터)에서 노드 번호로 가는 표다.
 func lineNodes(nodes []Node) map[int]int {
 	out := map[int]int{}
 	line := strings.Count(header, "\n")

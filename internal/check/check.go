@@ -1,4 +1,3 @@
-// Package check는 모델만 보고 설계 검사를 한다. 코드는 읽지 않는다.
 package check
 
 import (
@@ -16,10 +15,9 @@ type satisfier struct {
 type checker struct {
 	m          *model.Model
 	diags      model.Diagnostics
-	satisfiers map[string][]satisfier // 요구사항 ID → 충족한다고 적은 요소
+	satisfiers map[string][]satisfier
 }
 
-// Run은 설계 검사 전부를 돌려 위치순으로 정렬한 진단을 준다.
 func Run(m *model.Model) model.Diagnostics {
 	c := &checker{m: m, satisfiers: map[string][]satisfier{}}
 	c.eachMeta(func(meta *model.Meta) {
@@ -54,7 +52,6 @@ func (c *checker) infof(pos yaml.Pos, format string, args ...any) {
 	c.diags.Infof(pos, format, args...)
 }
 
-// eachMeta는 satisfies를 가질 수 있는 모든 노드를 돈다.
 func (c *checker) eachMeta(fn func(*model.Meta)) {
 	m := c.m
 	if m.System != nil {
@@ -118,10 +115,8 @@ func has(rs []model.Ref, name string) bool {
 	return false
 }
 
-// depsOf는 id가 설계상 의존하는 ID 목록이다. 멤버는 그룹의 의존과 자기 예외를 따른다.
 func (c *checker) depsOf(id string) []string { return c.deps(id, c.needTargets) }
 
-// layerDepsOf는 depsOf에서 query needs를 뺀 것이다. 순환 검사가 쓴다.
 func (c *checker) layerDepsOf(id string) []string { return c.deps(id, c.layerTargets) }
 
 func (c *checker) deps(id string, targets func([]model.Need) []model.Ref) []string {
@@ -150,7 +145,6 @@ func (c *checker) deps(id string, targets func([]model.Need) []model.Ref) []stri
 	return out
 }
 
-// ownNeeds는 모듈·그룹·멤버가 자기 노드에 적은 needs다.
 func (c *checker) ownNeeds(id string) []model.Need {
 	m := c.m
 	switch {
@@ -164,7 +158,6 @@ func (c *checker) ownNeeds(id string) []model.Need {
 	return nil
 }
 
-// needsOf는 id가 받는 계약이다. 멤버는 그룹의 needs와 자기 needs를 받는다.
 func (c *checker) needsOf(id string) []model.Need {
 	if mem := c.m.Member(id); mem != nil {
 		return append(slices.Clone(mem.Group.Needs), mem.Needs...)
@@ -172,9 +165,6 @@ func (c *checker) needsOf(id string) []model.Need {
 	return c.ownNeeds(id)
 }
 
-// needTargets는 needs가 가리키는 계약의 모듈을 참조 위치와 함께 준다.
-// layerTargets는 tier 방향과 순환에 넣는 needs 대상이다. query 구현은 data 모듈만 import하는 끝 패키지라
-// 다시 부르는 쪽이 없으므로 query 계약은 뺀다.
 func (c *checker) layerTargets(ns []model.Need) []model.Ref {
 	var kept []model.Need
 	for _, n := range ns {
@@ -195,7 +185,6 @@ func (c *checker) needTargets(ns []model.Need) []model.Ref {
 	return out
 }
 
-// unitIDs는 모듈, 그룹, 멤버 ID 전부다.
 func (c *checker) unitIDs() []string {
 	var ids []string
 	for _, mod := range c.m.Modules {
@@ -214,7 +203,6 @@ func (c *checker) isUnit(id string) bool {
 	return c.m.Module(id) != nil || c.m.Group(id) != nil || c.m.Member(id) != nil
 }
 
-// unitPos는 모듈·그룹·멤버 ID의 정의 위치다.
 func (c *checker) unitPos(id string) yaml.Pos {
 	m := c.m
 	switch {

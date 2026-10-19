@@ -136,7 +136,6 @@ func (m *Model) Func(id string) *Func {
 	return nil
 }
 
-// TierIndex는 tiers 목록에서의 순서다. 작을수록 아래 tier. 없으면 -1.
 func (m *Model) TierIndex(name string) int {
 	for i, t := range m.Tiers {
 		if t.Name == name {
@@ -148,13 +147,12 @@ func (m *Model) TierIndex(name string) int {
 
 func (mem *Member) Path() string { return mem.Group.Path + "/" + mem.ID }
 
-// Owner는 L3·L4 노드가 속하는 모듈 또는 그룹 멤버다.
 type Owner struct {
 	ID     string
 	Path   string
 	Tier   string
-	Module *Module // 모듈이면 채워진다
-	Member *Member // 멤버면 채워진다
+	Module *Module
+	Member *Member
 }
 
 func (m *Model) Owner(id string) (Owner, bool) {
@@ -176,8 +174,6 @@ func hasRef(rs []Ref, name string) bool {
 	return false
 }
 
-// CanDepend는 설계상 from이 to를 import해도 되는지다. from·to는 모듈, 그룹, 멤버 ID.
-// 그룹에 의존하면 그 멤버에도 의존할 수 있다.
 func (m *Model) CanDepend(from, to string) bool {
 	if from == to {
 		return true
@@ -216,17 +212,15 @@ const (
 	EnumType
 	StructType
 	ExternalType
-	MapType // map[K]V. K는 내장 타입이나 enum, V는 설계 타입 문자열
+	MapType
 )
 
-// Builtins는 설계 타입 이름과 Go 타입의 대응이다.
 var Builtins = map[string]string{
 	"string": "string", "int": "int", "uint": "uint", "int64": "int64", "uint64": "uint64",
 	"bool": "bool", "float64": "float64", "duration": "time.Duration", "time": "time.Time",
 	"address": "string", "bytes": "[]byte", "error": "error", "any": "any",
 }
 
-// SplitType은 "*[]post"를 ("*[]", "post")로 나눈다.
 func SplitType(t string) (prefix, base string) {
 	base = t
 	for {
@@ -241,7 +235,6 @@ func SplitType(t string) (prefix, base string) {
 	}
 }
 
-// MapParts는 "map[K]V"를 K와 V로 나눈다. K 안의 대괄호 짝을 맞춘다.
 func MapParts(base string) (key, value string, ok bool) {
 	rest, found := strings.CutPrefix(base, "map[")
 	if !found {
@@ -263,8 +256,6 @@ func MapParts(base string) (key, value string, ok bool) {
 	return "", "", false
 }
 
-// ResolveType은 타입 이름의 종류와 접두사를 뗀 이름을 준다.
-// 대문자로 시작하거나 '.'이 있으면 외부 타입으로 본다.
 func (m *Model) ResolveType(t string) (TypeKind, string) {
 	_, base := SplitType(t)
 	if strings.HasPrefix(base, "map[") {
@@ -305,7 +296,6 @@ func (c *Contract) Method(name string) *Method {
 
 func (e *Enum) HasValue(name string) bool { return hasRef(e.Values, name) }
 
-// GoName은 snake_case ID를 CamelCase로 바꾼다. 약어 조각(id, url)과 그 복수(ids)는 ID, URL, IDs가 된다.
 func GoName(id string) string {
 	var b strings.Builder
 	for _, part := range strings.Split(id, "_") {
@@ -322,7 +312,6 @@ func GoName(id string) string {
 	return b.String()
 }
 
-// initialisms는 Go 이름에서 모두 대문자로 쓰는 약어다. staticcheck ST1003의 기본 목록이다.
 var initialisms = map[string]bool{}
 
 func init() {
@@ -358,7 +347,6 @@ func (m *Model) Flow(id string) *Flow {
 	return nil
 }
 
-// GoType은 enum의 Go 타입 이름이다.
 func (e *Enum) GoType() string {
 	if e.Go.Type != "" {
 		return e.Go.Type
@@ -366,7 +354,6 @@ func (e *Enum) GoType() string {
 	return GoName(e.ID)
 }
 
-// GoPrefix는 enum 상수 이름의 접두사다.
 func (e *Enum) GoPrefix() string {
 	if e.Go.Prefix != "" {
 		return e.Go.Prefix
@@ -374,10 +361,8 @@ func (e *Enum) GoPrefix() string {
 	return e.GoType()
 }
 
-// ConstName은 enum 값 하나의 Go 상수 이름이다.
 func (e *Enum) ConstName(value string) string { return e.GoPrefix() + GoName(value) }
 
-// ImportPath는 모듈·멤버의 Go import 경로다. 없는 ID면 빈 문자열이다.
 func (m *Model) ImportPath(ownerID string) string {
 	o, ok := m.Owner(ownerID)
 	if !ok {
@@ -386,7 +371,6 @@ func (m *Model) ImportPath(ownerID string) string {
 	return m.GoModule + "/" + o.Path
 }
 
-// GoName은 타입의 Go 이름이다.
 func (t *Type) GoName() string {
 	if t.Go.Name != "" {
 		return t.Go.Name
@@ -394,7 +378,6 @@ func (t *Type) GoName() string {
 	return GoName(t.ID)
 }
 
-// GoName은 계약 interface의 Go 이름이다.
 func (c *Contract) GoName() string {
 	if c.Go.Name != "" {
 		return c.Go.Name
@@ -402,7 +385,6 @@ func (c *Contract) GoName() string {
 	return GoName(c.ID)
 }
 
-// GoName은 핸들러 함수 타입의 Go 이름이다.
 func (hk *HandlerKind) GoName() string {
 	if hk.Go.Name != "" {
 		return hk.Go.Name
@@ -410,10 +392,8 @@ func (hk *HandlerKind) GoName() string {
 	return GoName(hk.ID)
 }
 
-// Free는 핸들러도 계약 메서드도 아닌 일반 함수인지 본다. 본문은 손으로 쓰고 설계는 에러 계약과 케이스만 둔다.
 func (f *Func) Free() bool { return f.Kind.Name == "" && f.Handles.Name == "" && f.Of.Name == "" }
 
-// GoName은 일반 함수의 Go 이름이다.
 func (f *Func) GoName() string {
 	if f.Go.Name != "" {
 		return f.Go.Name
@@ -421,7 +401,6 @@ func (f *Func) GoName() string {
 	return GoName(f.ID)
 }
 
-// GoName은 에러 sentinel의 Go 이름이다. go.name이 없으면 ID가 Go 이름이다.
 func (e *ErrorDef) GoName() string {
 	if e.Go.Name != "" {
 		return e.Go.Name
@@ -429,7 +408,6 @@ func (e *ErrorDef) GoName() string {
 	return e.ID
 }
 
-// GoName은 상수의 Go 이름이다.
 func (c *Const) GoName() string {
 	if c.Go.Name != "" {
 		return c.Go.Name

@@ -9,7 +9,6 @@ import (
 	"github.com/tolelom/daemok/internal/mcp"
 )
 
-// runMCP는 표준 입출력으로 MCP 서버를 돌린다. 입력이 끝나면 0이다.
 func runMCP(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
 	fs.SetOutput(stderr)

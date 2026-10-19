@@ -17,7 +17,6 @@ import (
 	"github.com/tolelom/daemok/internal/serve"
 )
 
-// runServe는 설계 지도를 로컬 웹 페이지로 띄운다. 인터럽트를 받으면 0으로 끝난다.
 func runServe(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
 	fs.SetOutput(stderr)

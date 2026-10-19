@@ -42,7 +42,6 @@ func (d *decoder) scalar(n *yaml.Node, key string) *yaml.Node {
 	return v
 }
 
-// oneOf는 key 값이 choices 중 하나인지 본다. 키가 없으면 def.
 func (d *decoder) oneOf(n *yaml.Node, key, def string, choices ...string) string {
 	v := d.scalar(n, key)
 	if v == nil || v.IsNull() {
@@ -62,7 +61,6 @@ func (d *decoder) str(n *yaml.Node, key string) string {
 	return ""
 }
 
-// need는 key가 있고 null이 아닌지 본다. 오류 위치는 노드의 ID 키(pos)다.
 func (d *decoder) need(pos yaml.Pos, n *yaml.Node, key string) bool {
 	if v := n.Get(key); v == nil || v.IsNull() {
 		d.diags.Errorf(pos, "필요한 키가 없다: %q", key)
@@ -144,7 +142,6 @@ func (d *decoder) owned(id string, pos yaml.Pos, n *yaml.Node) Owned {
 	return o
 }
 
-// goOpts는 go 블록을 읽는다. keys가 있으면 그 키만 받는다.
 func (d *decoder) goOpts(n *yaml.Node, keys ...string) GoOpts {
 	g := n.Get("go")
 	if g == nil || !d.mapping(g, "go") {
@@ -157,7 +154,6 @@ func (d *decoder) goOpts(n *yaml.Node, keys ...string) GoOpts {
 	return GoOpts{Type: d.str(g, "type"), Name: d.str(g, "name"), Prefix: d.str(g, "prefix"), Register: d.str(g, "register")}
 }
 
-// idMap은 ID를 키로 하는 맵을 돈다. 값이 맵이 아닌 항목은 오류로 남기고 건너뛴다.
 func (d *decoder) idMap(n *yaml.Node, what string, fn func(id string, pos yaml.Pos, v *yaml.Node)) {
 	if n == nil || n.IsNull() || !d.mapping(n, what) {
 		return

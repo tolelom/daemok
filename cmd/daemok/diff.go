@@ -8,7 +8,6 @@ import (
 	"github.com/tolelom/daemok/internal/designdiff"
 )
 
-// runDiff는 기준 ref 대비 설계 변경을 PR 설명용 마크다운으로 출력한다. 기준을 읽지 못하면 2다.
 func runDiff(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("diff", flag.ContinueOnError)
 	fs.SetOutput(stderr)

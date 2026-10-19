@@ -1,4 +1,3 @@
-// Package golang은 모델에서 Go 생성 파일을 만든다. 디스크는 읽거나 쓰지 않는다.
 package golang
 
 import (
@@ -13,7 +12,6 @@ import (
 	"github.com/tolelom/daemok/internal/model"
 )
 
-// Generate는 설계 검사를 통과한 모델에서 생성 파일을 경로순으로 만든다.
 func Generate(m *model.Model) ([]File, error) {
 	g := &gen{m: m, files: map[string]*goFile{}}
 	steps := []func() error{
@@ -41,7 +39,6 @@ func Generate(m *model.Model) ([]File, error) {
 	return out, nil
 }
 
-// byDir는 노드를 소속 디렉토리별로 처음 나온 순서를 지켜 묶는다.
 type byDir[T any] struct {
 	dirs  []string
 	nodes map[string][]T
@@ -104,7 +101,7 @@ func (g *gen) consts() error {
 				if err != nil {
 					return fmt.Errorf("%s: 정수가 아니다: 상수 %s %q", c.ValuePos, c.ID, c.Value)
 				}
-				val = strconv.Itoa(n) // 앞자리 0을 8진수로 읽지 않게 한다
+				val = strconv.Itoa(n)
 			case "string":
 				val = fmt.Sprintf("%q", c.Value)
 			case "duration":
@@ -166,7 +163,6 @@ func (g *gen) types() error {
 	return nil
 }
 
-// JSONTag는 설계 필드의 struct 태그다. optional이면 omitempty를 붙인다.
 func JSONTag(fl *model.Field) string {
 	tag := fl.Name
 	if fl.Optional {
@@ -175,7 +171,6 @@ func JSONTag(fl *model.Field) string {
 	return "json:" + strconv.Quote(tag)
 }
 
-// structFields는 설계 필드를 struct 필드 줄로 바꾼다.
 func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax bool) []string {
 	var lines []string
 	for _, fl := range fields {
@@ -192,7 +187,6 @@ func (g *gen) structFields(fields []*model.Field, dir string, f *goFile, withMax
 	return lines
 }
 
-// fieldType은 설계 필드의 Go 타입이다. ref는 포인터(many면 슬라이스), optional이면 포인터다.
 func (g *gen) fieldType(fl *model.Field, dir string, f *goFile) string {
 	if fl.RefType.Name != "" {
 		base := g.goType(fl.RefType.Name, dir, f)
@@ -219,7 +213,6 @@ func paramName(name string) string {
 	return n
 }
 
-// methodTypes는 계약 메서드의 파라미터와 반환 타입이다. 반환 끝에 error가 붙는다.
 func (g *gen) methodTypes(me *model.Method, dir string, f *goFile) (params, results []string) {
 	for _, p := range me.Params {
 		params = append(params, g.argType(p.Type.Name, dir, f))
@@ -230,7 +223,6 @@ func (g *gen) methodTypes(me *model.Method, dir string, f *goFile) (params, resu
 	return params, append(results, "error")
 }
 
-// methodSig는 계약 메서드의 시그니처 줄이다. 반환 끝에 error가 붙는다.
 func (g *gen) methodSig(me *model.Method, dir string, f *goFile) string {
 	pts, rs := g.methodTypes(me, dir, f)
 	var ps []string
@@ -246,7 +238,6 @@ func (g *gen) methodSig(me *model.Method, dir string, f *goFile) string {
 		var names []string
 		for _, r := range me.Errors {
 			if e := g.m.Error(r.Name); e != nil {
-				// 주석이라 import하지 않고 패키지 이름만 붙인다
 				name := e.GoName()
 				if owner := g.ownerPath(e.In.Name); owner != dir {
 					name = path.Base(owner) + "." + name
@@ -310,7 +301,6 @@ func (g *gen) handlerKinds() error {
 	return nil
 }
 
-// handlerFunc는 멤버가 값 v를 처리하는 함수 이름이다. L4 함수 노드가 있으면 그 ID를 쓴다.
 func (g *gen) handlerFunc(member, kind, v string) string {
 	for _, fn := range g.m.Funcs {
 		if fn.In.Name == member && fn.Kind.Name == kind && fn.Handles.Name == v {
@@ -320,7 +310,6 @@ func (g *gen) handlerFunc(member, kind, v string) string {
 	return "handle" + model.GoName(v)
 }
 
-// registrations는 그룹 멤버마다 핸들러 등록 파일을 만든다. 핸들러 종류가 gen: false여도 만든다.
 func (g *gen) registrations() error {
 	for _, grp := range g.m.Groups {
 		hk := g.m.HandlerKind(grp.Kind.Name)
@@ -356,8 +345,6 @@ func (g *gen) registrations() error {
 	return nil
 }
 
-// reachable은 실행 단위가 조립하는 모듈·그룹·멤버다. composes에서 depends_on, needs, 그룹 멤버를 따라간다.
-// 설계 검사의 도달 판정과 같은 규칙이다.
 func (g *gen) reachable(e *model.Executable) map[string]bool {
 	seen := map[string]bool{}
 	var visit func(id string)
@@ -399,7 +386,6 @@ func (g *gen) reachable(e *model.Executable) map[string]bool {
 	return seen
 }
 
-// executableModules는 실행 단위가 조립하는 그룹의 멤버를 blank import한다.
 func (g *gen) executableModules() error {
 	for _, e := range g.m.Executables {
 		units := g.reachable(e)
@@ -424,7 +410,6 @@ func (g *gen) executableModules() error {
 	return nil
 }
 
-// comment는 여러 줄 text의 줄마다 indent와 "// "를 붙인다.
 func comment(indent, text string) string {
 	lines := strings.Split(text, "\n")
 	for i, l := range lines {

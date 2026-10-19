@@ -2,7 +2,6 @@ package check
 
 import "github.com/tolelom/daemok/internal/model"
 
-// l0은 인터페이스마다 구현 모듈이 있고, 노출하는 실행 단위가 그 모듈을 조립하는지 본다.
 func (c *checker) l0() {
 	m := c.m
 	if m.System == nil {
@@ -31,7 +30,6 @@ func (c *checker) l0() {
 	}
 }
 
-// reachable은 composes에서 의존을 따라 닿는 모듈·그룹·멤버 ID 집합이다. 그룹은 멤버를 포함한다.
 func (c *checker) reachable(e *model.Executable) map[string]bool {
 	seen := map[string]bool{}
 	var visit func(id string)

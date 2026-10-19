@@ -2,10 +2,9 @@ package check
 
 import "github.com/tolelom/daemok/internal/model"
 
-// events는 key enum 값마다 이벤트가 있는지, 발행자·구독자가 이벤트 종류의 모듈에 의존하는지 본다.
 func (c *checker) events() {
 	m := c.m
-	usedBy := map[string]string{} // key enum → 처음 쓴 이벤트 종류
+	usedBy := map[string]string{}
 	for _, ek := range m.EventKinds {
 		if first, ok := usedBy[ek.Key.Name]; ok && ek.Key.Name != "" {
 			c.errorf(ek.Key.Pos, "여러 이벤트 종류가 쓰는 enum: %s (%s, %s)", ek.Key.Name, first, ek.ID)
@@ -47,8 +46,6 @@ func (c *checker) events() {
 	}
 }
 
-// dependsOnKind는 발행자·구독자가 이벤트 종류의 모듈에 의존하는지 본다.
-// 없는 모듈은 참조 검사가 이미 잡으므로 넘긴다.
 func (c *checker) dependsOnKind(r model.Ref, kindModule string) {
 	if kindModule == "" || !c.isUnit(r.Name) {
 		return

@@ -1,4 +1,3 @@
-// Package codescan은 코드의 import와 이벤트 상수 참조를 설계와 대조한다.
 package codescan
 
 import (
@@ -16,29 +15,22 @@ import (
 )
 
 type scanner struct {
-	m     *model.Model
-	root  string
-	fset  *token.FileSet
-	diags model.Diagnostics
-	units map[string]string // import 경로 → 모듈·멤버 ID
-	// 모듈·멤버 ID → 그 패키지가 import한 설계 단위
-	imports map[string]map[string]bool
-	// 모듈·멤버 ID → 쓴 이벤트 상수와 목록 함수의 이름
-	refs map[string]map[string]bool
-	// 모듈·멤버 ID → 패키지 최상위 선언 이름
-	decls map[string]map[string]bool
-	// 모듈·멤버 ID → 타입 이름 → 선언과 그 파일
+	m         *model.Model
+	root      string
+	fset      *token.FileSet
+	diags     model.Diagnostics
+	units     map[string]string
+	imports   map[string]map[string]bool
+	refs      map[string]map[string]bool
+	decls     map[string]map[string]bool
 	typeSpecs map[string]map[string]typeSpec
-	// 즉석 errors.New 호출. 모두 모은 뒤 같은 메시지 수를 붙여 알린다.
-	adHoc []adHocCall
+	adHoc     []adHocCall
 }
 
-// unit은 코드 디렉토리를 가진 모듈이나 그룹 멤버다.
 type unit struct {
 	id, dir string
 }
 
-// Scan은 설계 검사를 통과한 모델의 모듈·멤버 코드를 읽어 진단을 준다.
 func Scan(m *model.Model, root string) model.Diagnostics {
 	s := &scanner{
 		m: m, root: root, fset: token.NewFileSet(),
@@ -78,7 +70,6 @@ func (s *scanner) unitList() []unit {
 	return out
 }
 
-// goFiles는 모듈·멤버 디렉토리의 Go 파일이다. 파일 선택은 gosrc.Files를 따른다.
 func (s *scanner) goFiles(dir string) []*ast.File {
 	files, errs := gosrc.Files(s.fset, filepath.Join(s.root, filepath.FromSlash(dir)), parser.SkipObjectResolution)
 	for _, e := range errs {
@@ -129,7 +120,6 @@ func (s *scanner) scanUnit(u unit) {
 	}
 }
 
-// depend는 id가 target을 쓴 것을 기록하고 설계가 허용하지 않으면 알린다. verb는 import나 include다.
 func (s *scanner) depend(id, target string, pos yaml.Pos, verb string) {
 	s.imports[id][target] = true
 	if s.m.CanDepend(id, target) {

@@ -11,9 +11,6 @@ import (
 	"github.com/tolelom/daemok/internal/lift"
 )
 
-// runInit은 설계 파일이 없는 Go 모듈의 코드에서 초안을 만들어 설계 디렉토리에 쓴다.
-// 이미 설계 파일이 있으면 쓰지 않고 1, Go 모듈이 아니거나 쓰지 못하면 2다. --dry-run은 쓰지 않고 출력만 한다.
-// --l3는 설계가 있는 저장소에서 L3 초안을 stdout에, 옮기지 않은 선언을 stderr에 낸다. 쓰지 않는다.
 func runInit(args []string, stdout, stderr io.Writer) int {
 	fs := flag.NewFlagSet("init", flag.ContinueOnError)
 	fs.SetOutput(stderr)
