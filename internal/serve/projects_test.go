@@ -160,6 +160,16 @@ func gitRun(t *testing.T, dir string, args ...string) {
 	}
 }
 
+// realPath는 심볼릭 링크를 푼 경로다. git은 링크를 푼 경로를 주는데 macOS의 t.TempDir()는 /var 링크 아래다.
+func realPath(t *testing.T, p string) string {
+	t.Helper()
+	r, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
 // worktreeRepo는 설계가 없는 주 worktree와 설계가 있는 feat/daemok worktree를 만든다.
 func worktreeRepo(t *testing.T) (main, wt string) {
 	t.Helper()
@@ -225,7 +235,10 @@ func TestProjectsWorktrees(t *testing.T) {
 	post(t, s, "/api/open", string(body))
 	wts, recent := getProjects(t, s)
 	want := []projectItem{{main, true, "main", "analyze", true}, {wt, true, "feat/daemok", "check", false}}
-	if len(wts) != 2 || wts[0] != want[0] || wts[1] != want[1] {
+	// worktree 목록은 git이 준 경로, 최근 목록은 연 경로 그대로다.
+	wantWts := []projectItem{want[0], want[1]}
+	wantWts[0].Path, wantWts[1].Path = realPath(t, main), realPath(t, wt)
+	if len(wts) != 2 || wts[0] != wantWts[0] || wts[1] != wantWts[1] {
 		t.Fatalf("worktrees %+v", wts)
 	}
 	if len(recent) != 2 || recent[0] != want[0] || recent[1] != want[1] {
@@ -280,7 +293,7 @@ func TestInitWorktree(t *testing.T) {
 		t.Fatalf("초안의 git 정보: %v", st["draft"].(map[string]any)["git"])
 	}
 	code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`)
-	wt := filepath.Join(root, ".worktrees", "daemok-design")
+	wt := filepath.Join(realPath(t, root), ".worktrees", "daemok-design")
 	if code != 200 || out["root"] != wt || out["path"] != "design/demo.yaml" {
 		t.Fatalf("%d %v", code, out)
 	}
@@ -335,7 +348,7 @@ func TestInitWorktreeSubdirModule(t *testing.T) {
 	s.Poll()
 	local(t, s)
 	code, out := post(t, s, "/api/init-worktree", `{"branch":"daemok/design"}`)
-	want := filepath.Join(top, ".worktrees", "daemok-design", "svc")
+	want := filepath.Join(realPath(t, top), ".worktrees", "daemok-design", "svc")
 	if code != 200 || out["root"] != want {
 		t.Fatalf("%d %v", code, out)
 	}

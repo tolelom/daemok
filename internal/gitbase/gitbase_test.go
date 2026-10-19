@@ -17,6 +17,16 @@ func run(t *testing.T, dir string, args ...string) {
 	}
 }
 
+// realPath는 심볼릭 링크를 푼 경로다. git은 링크를 푼 경로를 주는데 macOS의 t.TempDir()는 /var 링크 아래다.
+func realPath(t *testing.T, p string) string {
+	t.Helper()
+	r, err := filepath.EvalSymlinks(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return r
+}
+
 func TestFiles(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git이 없다")
@@ -89,7 +99,7 @@ func TestWorktrees(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Worktree{{repo, "main"}, {wt, "feat/x"}, {det, ""}}
+	want := []Worktree{{realPath(t, repo), "main"}, {realPath(t, wt), "feat/x"}, {realPath(t, det), ""}}
 	if len(wts) != len(want) {
 		t.Fatalf("%+v", wts)
 	}
@@ -138,7 +148,7 @@ func TestNewWorktree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if p != filepath.Join(repo, ".worktrees", "daemok-design") || Branch(p) != "daemok/design" {
+	if p != filepath.Join(realPath(t, repo), ".worktrees", "daemok-design") || Branch(p) != "daemok/design" {
 		t.Fatalf("%s %s", p, Branch(p))
 	}
 	if b, _ := os.ReadFile(filepath.Join(p, "a.txt")); string(b) != "a" {
@@ -146,7 +156,7 @@ func TestNewWorktree(t *testing.T) {
 	}
 	// 다른 worktree 안에서 불러도 주 worktree 아래에 만든다.
 	p2, err := NewWorktree(p, "other")
-	if err != nil || p2 != filepath.Join(repo, ".worktrees", "other") {
+	if err != nil || p2 != filepath.Join(realPath(t, repo), ".worktrees", "other") {
 		t.Fatalf("%s %v", p2, err)
 	}
 	ex, _ := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude"))
