@@ -8,6 +8,22 @@ import (
 )
 
 func (c *checker) refs() {
+	c.satisfiesRefs()
+	c.interfaceUserRefs()
+	c.executableRefs()
+	c.moduleRefs()
+	c.groupRefs()
+	c.valueDeclRefs()
+	c.typeDeclRefs()
+	c.contractRefs()
+	c.handlerKindRefs()
+	c.funcRefs()
+	c.eventKindRefs()
+	c.eventDeclRefs()
+	c.flowRefs()
+}
+
+func (c *checker) satisfiesRefs() {
 	m := c.m
 	c.eachMeta(func(meta *model.Meta) {
 		for _, r := range meta.Satisfies {
@@ -16,16 +32,24 @@ func (c *checker) refs() {
 			}
 		}
 	})
-	if m.System != nil {
-		for _, it := range m.System.Interfaces {
-			for _, r := range it.UsedBy {
-				if m.Actor(r.Name) == nil {
-					c.errorf(r.Pos, "없는 액터 %q", r.Name)
-				}
+}
+
+func (c *checker) interfaceUserRefs() {
+	m := c.m
+	if m.System == nil {
+		return
+	}
+	for _, it := range m.System.Interfaces {
+		for _, r := range it.UsedBy {
+			if m.Actor(r.Name) == nil {
+				c.errorf(r.Pos, "없는 액터 %q", r.Name)
 			}
 		}
 	}
-	for _, e := range m.Executables {
+}
+
+func (c *checker) executableRefs() {
+	for _, e := range c.m.Executables {
 		for _, r := range e.Exposes {
 			c.iface(r)
 		}
@@ -33,7 +57,10 @@ func (c *checker) refs() {
 			c.dep(r)
 		}
 	}
-	for _, mod := range m.Modules {
+}
+
+func (c *checker) moduleRefs() {
+	for _, mod := range c.m.Modules {
 		c.tier(mod.Tier)
 		for _, r := range mod.DependsOn {
 			c.dep(r)
@@ -43,6 +70,10 @@ func (c *checker) refs() {
 		}
 		c.needRefs(mod.ID, mod.Needs)
 	}
+}
+
+func (c *checker) groupRefs() {
+	m := c.m
 	for _, g := range m.Groups {
 		c.tier(g.Tier)
 		if g.Kind.Name != "" && m.HandlerKind(g.Kind.Name) == nil {
@@ -62,6 +93,10 @@ func (c *checker) refs() {
 			}
 		}
 	}
+}
+
+func (c *checker) valueDeclRefs() {
+	m := c.m
 	for _, x := range m.Enums {
 		c.in(x.In)
 	}
@@ -71,11 +106,17 @@ func (c *checker) refs() {
 	for _, x := range m.Errors {
 		c.in(x.In)
 	}
-	for _, t := range m.Types {
+}
+
+func (c *checker) typeDeclRefs() {
+	for _, t := range c.m.Types {
 		c.in(t.In)
 		c.fieldRefs(t.Fields)
 	}
-	for _, ct := range m.Contracts {
+}
+
+func (c *checker) contractRefs() {
+	for _, ct := range c.m.Contracts {
 		c.in(ct.In)
 		for _, me := range ct.Methods {
 			c.sig(me.Params, me.Returns)
@@ -84,6 +125,10 @@ func (c *checker) refs() {
 			}
 		}
 	}
+}
+
+func (c *checker) handlerKindRefs() {
+	m := c.m
 	for _, hk := range m.HandlerKinds {
 		c.in(hk.In)
 		c.sig(hk.Params, hk.Returns)
@@ -91,6 +136,10 @@ func (c *checker) refs() {
 			c.errorf(hk.Key.Pos, "없는 enum %q", hk.Key.Name)
 		}
 	}
+}
+
+func (c *checker) funcRefs() {
+	m := c.m
 	for _, f := range m.Funcs {
 		c.in(f.In)
 		if f.Kind.Name != "" {
@@ -112,6 +161,10 @@ func (c *checker) refs() {
 			}
 		}
 	}
+}
+
+func (c *checker) eventKindRefs() {
+	m := c.m
 	for _, ek := range m.EventKinds {
 		c.in(ek.In)
 		if ek.Key.Name != "" && m.Enum(ek.Key.Name) == nil {
@@ -121,6 +174,10 @@ func (c *checker) refs() {
 			c.pubSub(r, "subscribers")
 		}
 	}
+}
+
+func (c *checker) eventDeclRefs() {
+	m := c.m
 	for _, e := range m.Events {
 		if e.Kind.Name != "" && m.EventKind(e.Kind.Name) == nil {
 			c.errorf(e.Kind.Pos, "없는 이벤트 종류 %q", e.Kind.Name)
@@ -133,7 +190,10 @@ func (c *checker) refs() {
 		}
 		c.fieldRefs(e.Data)
 	}
-	for _, f := range m.Flows {
+}
+
+func (c *checker) flowRefs() {
+	for _, f := range c.m.Flows {
 		c.in(f.In)
 		if f.On.Name != "" {
 			c.eventRef(f.On)
