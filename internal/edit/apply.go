@@ -33,7 +33,7 @@ func Do(op string, src []byte, file, id, value string) ([]byte, error) {
 	return nil, errors.New("알 수 없는 작업: " + op)
 }
 
-var Ops = []string{"tier", "add_dep", "remove_dep", "add_module", "remove_module"}
+var Operations = []string{"tier", "add_dep", "remove_dep", "add_module", "remove_module"}
 
 var ErrOutsideDir = errors.New("설계 파일이 설계 디렉토리 밖을 가리킨다")
 
