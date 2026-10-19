@@ -63,21 +63,9 @@ func buildSuffix(id string) bool {
 var failAfter = -1
 
 func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
-	pin, ok := kinds[kind]
-	if !ok {
-		return nil, fmt.Errorf("알 수 없는 종류 %q (가능: %s)", kind, strings.Join(Kinds(), ", "))
-	}
-	if pin == PinImpossible && !opt.Code {
-		return nil, fmt.Errorf("%s는 코드 이름을 고정할 키가 없다. 생성 코드 이름까지 바꾸려면 --code를 쓴다", kind)
-	}
-	if old == new {
-		return nil, fmt.Errorf("옛 ID와 새 ID가 같다: %s", old)
-	}
-	if !yamlID.MatchString(new) || yamlKeyword(new) {
-		return nil, fmt.Errorf("ID로 쓸 수 없는 이름: %q", new)
-	}
-	if fileNamed[kind] && buildSuffix(new) {
-		return nil, fmt.Errorf("새 ID가 Go 빌드 제약 접미사(_windows, _arm64 등)로 끝나 생성 파일이 다른 플랫폼에서만 빌드된다: %s", new)
+	pin, err := checkRequest(kind, old, new, opt)
+	if err != nil {
+		return nil, err
 	}
 	files, err := readDesign(designDir)
 	if err != nil {
@@ -91,17 +79,67 @@ func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, k := range namespace(kind) {
-		if exists(m, k, new) {
-			return nil, fmt.Errorf("이미 있는 ID: %s %q", k, new)
-		}
+	if err := checkFree(m, kind, new); err != nil {
+		return nil, err
 	}
 	res := &Result{}
 	pinKey, pinSub, pinValue := pinFor(m, kind, old, pin, opt, res)
 	if opt.Code {
 		res.Moves = moves(m, kind, old, new)
 	}
+	out, err := replaceAll(files, reps)
+	if err != nil {
+		return nil, err
+	}
+	if pinKey != "" {
+		if err := pinDefinition(m, kind, old, new, out, pinKey, pinSub, pinValue, res); err != nil {
+			return nil, err
+		}
+	}
+	renamed, err := verify(files, merged(files, out), old, new, designDir, root, opt.Code)
+	if err != nil {
+		return nil, err
+	}
+	res.Notes = append(res.Notes, renamed...)
+	if res.Files, err = changedFiles(out, designDir, opt.Confined); err != nil {
+		return nil, err
+	}
+	if err := writeAll(res.Files, out, files); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
 
+func checkRequest(kind, old, new string, opt Options) (PinKind, error) {
+	pin, ok := kinds[kind]
+	if !ok {
+		return pin, fmt.Errorf("알 수 없는 종류 %q (가능: %s)", kind, strings.Join(Kinds(), ", "))
+	}
+	if pin == PinImpossible && !opt.Code {
+		return pin, fmt.Errorf("%s는 코드 이름을 고정할 키가 없다. 생성 코드 이름까지 바꾸려면 --code를 쓴다", kind)
+	}
+	if old == new {
+		return pin, fmt.Errorf("옛 ID와 새 ID가 같다: %s", old)
+	}
+	if !yamlID.MatchString(new) || yamlKeyword(new) {
+		return pin, fmt.Errorf("ID로 쓸 수 없는 이름: %q", new)
+	}
+	if fileNamed[kind] && buildSuffix(new) {
+		return pin, fmt.Errorf("새 ID가 Go 빌드 제약 접미사(_windows, _arm64 등)로 끝나 생성 파일이 다른 플랫폼에서만 빌드된다: %s", new)
+	}
+	return pin, nil
+}
+
+func checkFree(m *model.Model, kind, new string) error {
+	for _, k := range namespace(kind) {
+		if exists(m, k, new) {
+			return fmt.Errorf("이미 있는 ID: %s %q", k, new)
+		}
+	}
+	return nil
+}
+
+func replaceAll(files map[string][]byte, reps []edit.Replacement) (map[string][]byte, error) {
 	byFile := map[string][]edit.Replacement{}
 	for _, r := range reps {
 		byFile[r.Pos.File] = append(byFile[r.Pos.File], r)
@@ -114,19 +152,24 @@ func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 		}
 		out[f] = b
 	}
-	if pinKey != "" {
-		def, _ := definition(m, kind, old)
-		b, err := edit.Pin(out[def.File], def.File, pinPath(m, kind, old, new), pinKey, pinSub, pinValue)
-		switch {
-		case errors.Is(err, edit.ErrKeyExists):
-		case err != nil:
-			return nil, err
-		default:
-			out[def.File] = b
-			res.Pinned = pinText(pinKey, pinSub, pinValue)
-		}
-	}
+	return out, nil
+}
 
+func pinDefinition(m *model.Model, kind, old, new string, out map[string][]byte, pinKey, pinSub, pinValue string, res *Result) error {
+	def, _ := definition(m, kind, old)
+	b, err := edit.Pin(out[def.File], def.File, pinPath(m, kind, old, new), pinKey, pinSub, pinValue)
+	switch {
+	case errors.Is(err, edit.ErrKeyExists):
+	case err != nil:
+		return err
+	default:
+		out[def.File] = b
+		res.Pinned = pinText(pinKey, pinSub, pinValue)
+	}
+	return nil
+}
+
+func merged(files, out map[string][]byte) map[string][]byte {
 	after := map[string][]byte{}
 	for f, b := range files {
 		after[f] = b
@@ -134,24 +177,21 @@ func Run(designDir, root, kind, old, new string, opt Options) (*Result, error) {
 	for f, b := range out {
 		after[f] = b
 	}
-	renamed, err := verify(files, after, old, new, designDir, root, opt.Code)
-	if err != nil {
-		return nil, err
-	}
-	res.Notes = append(res.Notes, renamed...)
+	return after
+}
+
+func changedFiles(out map[string][]byte, designDir string, confined bool) ([]string, error) {
+	var paths []string
 	for f := range out {
-		if opt.Confined {
+		if confined {
 			if err := edit.Inside(designDir, f); err != nil {
 				return nil, err
 			}
 		}
-		res.Files = append(res.Files, f)
+		paths = append(paths, f)
 	}
-	sort.Strings(res.Files)
-	if err := writeAll(res.Files, out, files); err != nil {
-		return nil, err
-	}
-	return res, nil
+	sort.Strings(paths)
+	return paths, nil
 }
 
 func readDesign(dir string) (map[string][]byte, error) {
