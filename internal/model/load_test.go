@@ -27,7 +27,7 @@ func loadOne(t *testing.T, src string) (*Model, Diagnostics) {
 
 func find(ds Diagnostics, level Level, substr string) *Diagnostic {
 	for i := range ds {
-		if ds[i].Level == level && strings.Contains(ds[i].Msg, substr) {
+		if ds[i].Level == level && strings.Contains(ds[i].Message, substr) {
 			return &ds[i]
 		}
 	}
@@ -118,7 +118,7 @@ func TestDuplicateIDAcrossFiles(t *testing.T) {
 		"b.yaml": "version: 0.5\nrequirements:\n  REQ-a: { text: B }\n",
 	})
 	d := wantDiag(t, ds, Error, `중복 ID 요구사항 "REQ-a"`)
-	if !strings.Contains(d.Msg, "a.yaml:3:3") || !strings.HasSuffix(d.Pos.File, "b.yaml") {
+	if !strings.Contains(d.Message, "a.yaml:3:3") || !strings.HasSuffix(d.Pos.File, "b.yaml") {
 		t.Fatalf("%v", d)
 	}
 }
@@ -561,7 +561,7 @@ funcs:
 	}
 	if n := 0; true {
 		for _, d := range ds {
-			if strings.Contains(d.Msg, `필요한 키가 없다: "tier"`) {
+			if strings.Contains(d.Message, `필요한 키가 없다: "tier"`) {
 				n++
 			}
 		}
@@ -589,7 +589,7 @@ func TestNeedPointsAtID(t *testing.T) {
 	_, ds := loadOne(t, "modules:\n  core:\n    summary: no tier\n  vm: {}\n")
 	var lines []int
 	for _, d := range ds {
-		if strings.Contains(d.Msg, `필요한 키가 없다: "tier"`) {
+		if strings.Contains(d.Message, `필요한 키가 없다: "tier"`) {
 			lines = append(lines, d.Pos.Line*100+d.Pos.Col)
 		}
 	}

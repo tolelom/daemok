@@ -53,7 +53,7 @@ func LoadSources(files map[string][]byte) (*Model, Diagnostics) {
 		root, perr := yaml.Parse(p, src)
 		if perr != nil {
 			e := perr.(*yaml.Error)
-			diags.Add(e.Pos, Error, "%s", e.Msg)
+			diags.Add(e.Pos, Error, "%s", e.Message)
 			continue
 		}
 		mg.file(root)

@@ -23,7 +23,7 @@ func TestScan(t *testing.T) {
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		got = append(got, d.Level.String()+": "+d.Msg)
+		got = append(got, d.Level.String()+": "+d.Message)
 	}
 	sort.Strings(got)
 	want := []string{
@@ -50,7 +50,7 @@ func TestScanPositionsAreGoFiles(t *testing.T) {
 	root := filepath.Join("testdata", "scan")
 	m, _ := model.Load(filepath.Join(root, "design"))
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "직접 import한다: feed → post") {
+		if strings.Contains(d.Message, "직접 import한다: feed → post") {
 			if !strings.HasSuffix(d.Pos.File, filepath.Join("feed", "feed.go")) || d.Pos.Line != 6 {
 				t.Fatalf("위치: %v", d.Pos)
 			}
@@ -97,7 +97,7 @@ events:
 	}
 	var msgs []string
 	for _, d := range Scan(m, root) {
-		msgs = append(msgs, d.Msg)
+		msgs = append(msgs, d.Message)
 	}
 	joined := strings.Join(msgs, "\n")
 	for _, want := range []string{
@@ -153,7 +153,7 @@ events:
 	}
 	var msgs []string
 	for _, d := range Scan(m, root) {
-		msgs = append(msgs, d.Level.String()+": "+d.Msg)
+		msgs = append(msgs, d.Level.String()+": "+d.Message)
 	}
 	joined := strings.Join(msgs, "\n")
 	if strings.Contains(joined, "모듈 dot") {
@@ -197,8 +197,8 @@ errors:
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "즉석") {
-			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
+		if strings.Contains(d.Message, "즉석") {
+			got = append(got, d.Level.String()+": "+d.Message+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
 		}
 	}
 	sort.Strings(got)
@@ -243,8 +243,8 @@ enums:
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "리터럴") {
-			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
+		if strings.Contains(d.Message, "리터럴") {
+			got = append(got, d.Level.String()+": "+d.Message+" @"+filepath.Base(d.Pos.File)+":"+strconv.Itoa(d.Pos.Line))
 		}
 	}
 	want := []string{
@@ -322,8 +322,8 @@ handler_kinds:
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "손으로 쓴") {
-			got = append(got, d.Level.String()+": "+d.Msg+" @"+filepath.Base(d.Pos.File))
+		if strings.Contains(d.Message, "손으로 쓴") {
+			got = append(got, d.Level.String()+": "+d.Message+" @"+filepath.Base(d.Pos.File))
 		}
 	}
 	sort.Strings(got)
@@ -382,10 +382,10 @@ contracts:
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "관리하지 않는") {
+		if strings.Contains(d.Message, "관리하지 않는") {
 			continue
 		}
-		got = append(got, d.Level.String()+": "+d.Msg)
+		got = append(got, d.Level.String()+": "+d.Message)
 	}
 	sort.Strings(got)
 	want := []string{
@@ -422,8 +422,8 @@ func scanShapes(t *testing.T, files map[string]string) []string {
 	}
 	var got []string
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "손으로 쓴") || strings.Contains(d.Msg, "대조할 수 없는") {
-			got = append(got, d.Level.String()+": "+d.Msg)
+		if strings.Contains(d.Message, "손으로 쓴") || strings.Contains(d.Message, "대조할 수 없는") {
+			got = append(got, d.Level.String()+": "+d.Message)
 		}
 	}
 	sort.Strings(got)

@@ -15,7 +15,7 @@ type parser struct {
 }
 
 func (p *parser) errAt(num, col int, msg string) error {
-	return &Error{Pos: Pos{p.file, num, col}, Msg: msg}
+	return &Error{Pos: Pos{p.file, num, col}, Message: msg}
 }
 
 func (p *parser) scan(src []byte) error {

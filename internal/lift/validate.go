@@ -43,7 +43,7 @@ func validate(sources map[string][]byte, designDir, root string, nodes []Node, r
 			if d.Pos.File == key {
 				if i, ok := lineOf[d.Pos.Line]; ok {
 					if _, seen := bad[i]; !seen {
-						bad[i] = d.Msg
+						bad[i] = d.Message
 					}
 					continue
 				}

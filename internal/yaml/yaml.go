@@ -24,11 +24,11 @@ func (p Pos) Less(q Pos) bool {
 }
 
 type Error struct {
-	Pos Pos
-	Msg string
+	Pos     Pos
+	Message string
 }
 
-func (e *Error) Error() string { return e.Pos.String() + ": " + e.Msg }
+func (e *Error) Error() string { return e.Pos.String() + ": " + e.Message }
 
 type Kind int
 

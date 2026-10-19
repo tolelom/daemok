@@ -42,7 +42,7 @@ func write(t *testing.T, p, content string) {
 func wantDiag(t *testing.T, r Result, substr string) {
 	t.Helper()
 	for _, d := range r.Diags {
-		if d.Level == model.Error && strings.Contains(d.Msg, substr) {
+		if d.Level == model.Error && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -195,7 +195,7 @@ func TestFiberAPIServer(t *testing.T) {
 	r := Run(filepath.Join("testdata", "fiber", "design"), root)
 	var got []string
 	for _, d := range r.Diags {
-		got = append(got, d.Level.String()+": "+d.Msg)
+		got = append(got, d.Level.String()+": "+d.Message)
 	}
 	want := []string{
 		"오류: needs로만 이어진 모듈을 직접 import한다: feed → post",

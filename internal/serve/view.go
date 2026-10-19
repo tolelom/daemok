@@ -594,12 +594,12 @@ func toIssues(m *model.Model, root string, diags, code model.Diagnostics) []vIss
 		if fromCode[d] {
 			origin = "code"
 		}
-		group, _, _ := strings.Cut(d.Msg, ": ")
+		group, _, _ := strings.Cut(d.Message, ": ")
 		abs := d.Pos.File
 		if a, err := filepath.Abs(abs); err == nil && abs != "" {
 			abs = a
 		}
-		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Msg, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin, Group: group, Abs: abs})
+		out = append(out, vIssue{Lv: levelName(d.Level), Msg: d.Message, Key: key, File: d.Pos.File, Line: d.Pos.Line, Origin: origin, Group: group, Abs: abs})
 	}
 	return out
 }

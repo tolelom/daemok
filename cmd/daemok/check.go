@@ -45,7 +45,7 @@ func printDiags(w io.Writer, diags model.Diagnostics) {
 		group string
 	}
 	keyOf := func(d model.Diagnostic) key {
-		g, _, _ := strings.Cut(d.Msg, ": ")
+		g, _, _ := strings.Cut(d.Message, ": ")
 		return key{d.Level, g}
 	}
 	count := map[key]int{}
@@ -66,7 +66,7 @@ func printDiags(w io.Writer, diags model.Diagnostics) {
 		fmt.Fprintf(w, "%s: %s %d개\n", k.lv, k.group, count[k])
 		for _, x := range diags {
 			if keyOf(x) == k {
-				_, target, _ := strings.Cut(x.Msg, ": ")
+				_, target, _ := strings.Cut(x.Message, ": ")
 				fmt.Fprintf(w, "  %s: %s\n", where(x.Pos), target)
 			}
 		}

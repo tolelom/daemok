@@ -29,7 +29,7 @@ func parseErr(t *testing.T, src string) *Error {
 
 func wantErr(t *testing.T, e *Error, line, col int, substr string) {
 	t.Helper()
-	if e.Pos.Line != line || e.Pos.Col != col || !strings.Contains(e.Msg, substr) {
+	if e.Pos.Line != line || e.Pos.Col != col || !strings.Contains(e.Message, substr) {
 		t.Fatalf("got %v, want %d:%d %q", e, line, col, substr)
 	}
 }
@@ -135,8 +135,8 @@ func TestErrMultiDoc(t *testing.T) {
 func TestErrDuplicateKey(t *testing.T) {
 	e := parseErr(t, "a: 1\nb: 2\na: 3\n")
 	wantErr(t, e, 3, 1, "중복 키")
-	if !strings.Contains(e.Msg, "d.yaml:1:1") {
-		t.Fatalf("first position missing: %q", e.Msg)
+	if !strings.Contains(e.Message, "d.yaml:1:1") {
+		t.Fatalf("first position missing: %q", e.Message)
 	}
 }
 

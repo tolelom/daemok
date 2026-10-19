@@ -26,22 +26,22 @@ func (l Level) String() string {
 }
 
 type Diagnostic struct {
-	Pos   yaml.Pos
-	Level Level
-	Msg   string
+	Pos     yaml.Pos
+	Level   Level
+	Message string
 }
 
 func (d Diagnostic) String() string {
 	if d.Pos.Line == 0 {
-		return fmt.Sprintf("%s: %s: %s", d.Pos.File, d.Level, d.Msg)
+		return fmt.Sprintf("%s: %s: %s", d.Pos.File, d.Level, d.Message)
 	}
-	return fmt.Sprintf("%s: %s: %s", d.Pos, d.Level, d.Msg)
+	return fmt.Sprintf("%s: %s: %s", d.Pos, d.Level, d.Message)
 }
 
 type Diagnostics []Diagnostic
 
 func (ds *Diagnostics) Add(pos yaml.Pos, level Level, format string, args ...any) {
-	*ds = append(*ds, Diagnostic{Pos: pos, Level: level, Msg: fmt.Sprintf(format, args...)})
+	*ds = append(*ds, Diagnostic{Pos: pos, Level: level, Message: fmt.Sprintf(format, args...)})
 }
 
 func (ds *Diagnostics) Errorf(pos yaml.Pos, format string, args ...any) {

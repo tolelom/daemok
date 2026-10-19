@@ -64,7 +64,7 @@ func TestTSMissingDirWarns(t *testing.T) {
 	r := Run(dir, root)
 	found := false
 	for _, d := range r.Diags {
-		if d.Level == model.Warning && strings.Contains(d.Msg, "ts_out 디렉토리가 없어 TS 파일을 쓰지 않는다") {
+		if d.Level == model.Warning && strings.Contains(d.Message, "ts_out 디렉토리가 없어 TS 파일을 쓰지 않는다") {
 			found = true
 		}
 	}

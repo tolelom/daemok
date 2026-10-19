@@ -35,7 +35,7 @@ func join(ds model.Diagnostics) string {
 func want(t *testing.T, ds model.Diagnostics, level model.Level, substr string) model.Diagnostic {
 	t.Helper()
 	for _, d := range ds {
-		if d.Level == level && strings.Contains(d.Msg, substr) {
+		if d.Level == level && strings.Contains(d.Message, substr) {
 			return d
 		}
 	}
@@ -423,7 +423,7 @@ func TestContractRole(t *testing.T) {
 	want(t, ds, model.Error, "external 계약의 모듈은 role이 adapter여야 한다: 계약 mailer, 모듈 crypto")
 	ds = run(t, strings.Replace(src, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, role: infra }", 1))
 	for _, d := range ds {
-		if strings.Contains(d.Msg, "role이 infra") {
+		if strings.Contains(d.Message, "role이 infra") {
 			t.Fatalf("unexpected %s", d)
 		}
 	}
@@ -440,7 +440,7 @@ func TestNeedsTypeDependency(t *testing.T) {
 	src := strings.Replace(base, "contracts:\n", "contracts:\n  keys: { in: core, methods: { plain: { returns: [int] }, typed: { returns: [payload] } } }\n", 1)
 	ds = run(t, strings.Replace(src, "crypto:  { tier: foundation }", "crypto:  { tier: foundation, needs: [{ contract: keys, uses: [plain] }] }", 1))
 	for _, d := range ds {
-		if strings.Contains(d.Msg, "모듈에 의존하지 않는다") || strings.Contains(d.Msg, "의존하지 않는 모듈의 타입") {
+		if strings.Contains(d.Message, "모듈에 의존하지 않는다") || strings.Contains(d.Message, "의존하지 않는 모듈의 타입") {
 			t.Fatalf("unexpected %s", d)
 		}
 	}
@@ -673,7 +673,7 @@ func TestDurationRange(t *testing.T) {
 	ds = Run(m)
 	want(t, ds, model.Error, `duration이 time.Duration 범위를 넘는다: 상수 big "9999999999h"`)
 	for _, d := range ds {
-		if strings.Contains(d.Msg, "상수 ok ") {
+		if strings.Contains(d.Message, "상수 ok ") {
 			t.Fatalf("범위 안 값에 진단: %v", d)
 		}
 	}
@@ -687,7 +687,7 @@ func TestCPPIncludeDirs(t *testing.T) {
 	want(t, ds, model.Error, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: ../up")
 	want(t, ds, model.Error, "코드 루트 기준 상대 경로가 아닌 include 디렉토리: a/../../b")
 	for _, d := range ds {
-		if strings.Contains(d.Msg, "ok/Public") {
+		if strings.Contains(d.Message, "ok/Public") {
 			t.Fatalf("%v", d)
 		}
 	}

@@ -22,8 +22,8 @@ func ReportJSON(diags model.Diagnostics) []byte {
 		Counts      map[string]int `json:"counts"`
 	}{Diagnostics: []diag{}, Counts: map[string]int{}}
 	for _, d := range diags {
-		group, _, _ := strings.Cut(d.Msg, ": ")
-		out.Diagnostics = append(out.Diagnostics, diag{level[d.Level], d.Msg, d.Pos.File, d.Pos.Line, d.Pos.Col, group})
+		group, _, _ := strings.Cut(d.Message, ": ")
+		out.Diagnostics = append(out.Diagnostics, diag{level[d.Level], d.Message, d.Pos.File, d.Pos.Line, d.Pos.Col, group})
 	}
 	for lv, name := range level {
 		out.Counts[name] = diags.Count(lv)

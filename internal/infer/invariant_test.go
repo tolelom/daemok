@@ -24,8 +24,8 @@ func draftErrors(t *testing.T, root string) (errs []string, cycle bool) {
 	r := workspace.RunSources(map[string][]byte{filepath.Join(design, a.Draft.System+".yaml"): a.YAML}, design, root)
 	for _, d := range r.Diags {
 		switch {
-		case d.Level != model.Error, strings.Contains(d.Msg, "Go 파일을 읽을 수 없다"):
-		case strings.Contains(d.Msg, "의존 순환"):
+		case d.Level != model.Error, strings.Contains(d.Message, "Go 파일을 읽을 수 없다"):
+		case strings.Contains(d.Message, "의존 순환"):
 			cycle = true
 		default:
 			errs = append(errs, d.String())

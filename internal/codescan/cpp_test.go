@@ -92,7 +92,7 @@ func TestScanCPP(t *testing.T) {
 	})
 	var got []string
 	for _, d := range ds {
-		got = append(got, d.Level.String()+": "+d.Msg)
+		got = append(got, d.Level.String()+": "+d.Message)
 	}
 	sort.Strings(got)
 	want := []string{
@@ -109,12 +109,12 @@ func TestScanCPP(t *testing.T) {
 		t.Fatalf("진단:\n%s", strings.Join(got, "\n"))
 	}
 	for _, d := range ds {
-		if strings.HasSuffix(d.Msg, "core → ui") {
+		if strings.HasSuffix(d.Message, "core → ui") {
 			if d.Pos.File != filepath.Join(root, "src", "Public", "Core", "Core.h") || d.Pos.Line != 2 || d.Pos.Col != 1 {
 				t.Fatalf("위치: %v", d.Pos)
 			}
 		}
-		if strings.HasSuffix(d.Msg, "ui → shared") && (d.Pos.Line != 3 || d.Pos.Col != 3) {
+		if strings.HasSuffix(d.Message, "ui → shared") && (d.Pos.Line != 3 || d.Pos.Col != 3) {
 			t.Fatalf("위치: %v", d.Pos)
 		}
 	}
@@ -138,7 +138,7 @@ func TestScanCPPMissingIncludeDir(t *testing.T) {
 func want(t *testing.T, ds model.Diagnostics, level model.Level, substr string) {
 	t.Helper()
 	for _, d := range ds {
-		if d.Level == level && strings.Contains(d.Msg, substr) {
+		if d.Level == level && strings.Contains(d.Message, substr) {
 			return
 		}
 	}
@@ -180,7 +180,7 @@ func TestScanCPPSymlinkTargetIsExternal(t *testing.T) {
 	}
 	m, _ := model.Load(filepath.Join(root, "design"))
 	for _, d := range Scan(m, root) {
-		if strings.Contains(d.Msg, "core → ui") {
+		if strings.Contains(d.Message, "core → ui") {
 			t.Fatalf("링크 대상은 외부로 봐야 한다: %v", d)
 		}
 	}

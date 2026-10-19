@@ -100,7 +100,7 @@ func loadErrors(files map[string][]byte) map[string]int {
 	out := map[string]int{}
 	for _, d := range diags {
 		if d.Level == model.Error {
-			out[d.Msg]++
+			out[d.Message]++
 		}
 	}
 	return out

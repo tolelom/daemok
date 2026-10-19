@@ -213,7 +213,7 @@ func readDesign(dir string) (map[string][]byte, error) {
 func firstError(ds model.Diagnostics) string {
 	for _, d := range ds {
 		if d.Level == model.Error {
-			return d.Pos.String() + ": " + d.Msg
+			return d.Pos.String() + ": " + d.Message
 		}
 	}
 	return ""
@@ -329,13 +329,13 @@ func verify(before, after map[string][]byte, old, new, designDir, root string, c
 	ad = append(ad, check.Run(am)...)
 	count := map[string]int{}
 	for _, d := range bd {
-		count[d.Level.String()+" "+replaceWord(d.Msg, old, new)]++
+		count[d.Level.String()+" "+replaceWord(d.Message, old, new)]++
 	}
 	var added []string
 	for _, d := range ad {
-		k := d.Level.String() + " " + d.Msg
+		k := d.Level.String() + " " + d.Message
 		if count[k] == 0 {
-			added = append(added, d.Pos.String()+": "+d.Msg)
+			added = append(added, d.Pos.String()+": "+d.Message)
 		}
 		count[k]--
 	}
