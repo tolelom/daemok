@@ -116,6 +116,35 @@ func representable(dir string) bool {
 
 func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 	d := &Draft{GoModule: module, System: systemID(module)}
+	byDir, libDirs, exeDirs, skips := classifyPackages(pkgs, skips)
+	libIDs := assignIDs(libDirs, d.System)
+	exeIDs := assignIDs(exeDirs, d.System)
+	comp, comps := components(libDirs, func(dir string) []string {
+		var out []string
+		for _, dep := range byDir[dir].imports {
+			if _, ok := libIDs[dep]; ok {
+				out = append(out, dep)
+			}
+		}
+		return out
+	})
+	d.Mods = modules(libDirs, byDir, libIDs, componentTiers(libDirs, byDir, libIDs, comp, comps))
+	d.Tiers = tierCount(d.Mods)
+	d.Exes, skips = executables(exeDirs, byDir, exeIDs, libIDs, skips)
+	sortDraft(d)
+
+	rep := Report{Packages: len(pkgs), Modules: len(d.Mods), Executables: len(d.Exes)}
+	rep.Cycles = cycles(comps, libIDs)
+	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Mods)
+	rep.Hints = moduleHints(libDirs, byDir, libIDs)
+	sort.Slice(skips, func(i, j int) bool { return skips[i].Path < skips[j].Path })
+	rep.Skipped = skips
+	rep.FanIn = topFanIn(d, 5)
+	rep.Uses = uses(byDir, draftIDs(d), libIDs)
+	return d, rep
+}
+
+func classifyPackages(pkgs []*pkg, skips []Skip) (map[string]*pkg, []string, []string, []Skip) {
 	var libDirs, exeDirs []string
 	byDir := map[string]*pkg{}
 	for _, p := range pkgs {
@@ -131,18 +160,10 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 			libDirs = append(libDirs, p.dir)
 		}
 	}
-	libIDs := assignIDs(libDirs, d.System)
-	exeIDs := assignIDs(exeDirs, d.System)
+	return byDir, libDirs, exeDirs, skips
+}
 
-	comp, comps := components(libDirs, func(dir string) []string {
-		var out []string
-		for _, dep := range byDir[dir].imports {
-			if _, ok := libIDs[dep]; ok {
-				out = append(out, dep)
-			}
-		}
-		return out
-	})
+func componentTiers(libDirs []string, byDir map[string]*pkg, libIDs map[string]string, comp map[string]int, comps [][]string) map[string]int {
 	compTier := map[int]int{}
 	var level func(dir string) int
 	level = func(dir string) int {
@@ -163,31 +184,49 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		compTier[c] = t
 		return t
 	}
-	internalDeps := func(p *pkg) []string {
-		var out []string
-		for _, dep := range p.imports {
-			if id, ok := libIDs[dep]; ok {
-				out = append(out, id)
-			}
-		}
-		sort.Strings(out)
-		return out
+	tiers := map[string]int{}
+	for _, dir := range libDirs {
+		tiers[dir] = level(dir)
 	}
-	fan := map[string]int{}
+	return tiers
+}
+
+func internalDeps(p *pkg, libIDs map[string]string) []string {
+	var out []string
+	for _, dep := range p.imports {
+		if id, ok := libIDs[dep]; ok {
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func modules(libDirs []string, byDir map[string]*pkg, libIDs map[string]string, tiers map[string]int) []Mod {
+	var mods []Mod
 	for _, dir := range libDirs {
 		p := byDir[dir]
-		m := Mod{ID: libIDs[dir], Summary: p.doc, Tier: level(dir), DependsOn: internalDeps(p)}
+		m := Mod{ID: libIDs[dir], Summary: p.doc, Tier: tiers[dir], DependsOn: internalDeps(p, libIDs)}
 		if m.ID != dir {
 			m.Path = dir
 		}
-		for _, dep := range m.DependsOn {
-			fan[dep]++
-		}
-		if m.Tier+1 > d.Tiers {
-			d.Tiers = m.Tier + 1
-		}
-		d.Mods = append(d.Mods, m)
+		mods = append(mods, m)
 	}
+	return mods
+}
+
+func tierCount(mods []Mod) int {
+	n := 0
+	for _, m := range mods {
+		if m.Tier+1 > n {
+			n = m.Tier + 1
+		}
+	}
+	return n
+}
+
+func executables(exeDirs []string, byDir map[string]*pkg, exeIDs, libIDs map[string]string, skips []Skip) ([]Exe, []Skip) {
+	var exes []Exe
 	for _, dir := range exeDirs {
 		id := exeIDs[dir]
 		if !snakeName.MatchString(id) {
@@ -195,12 +234,12 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 			continue
 		}
 		p := byDir[dir]
-		e := Exe{ID: id, Dir: dir, Summary: p.doc, Composes: internalDeps(p)}
-		for _, dep := range e.Composes {
-			fan[dep]++
-		}
-		d.Exes = append(d.Exes, e)
+		exes = append(exes, Exe{ID: id, Dir: dir, Summary: p.doc, Composes: internalDeps(p, libIDs)})
 	}
+	return exes, skips
+}
+
+func sortDraft(d *Draft) {
 	sort.Slice(d.Mods, func(i, j int) bool {
 		if d.Mods[i].Tier != d.Mods[j].Tier {
 			return d.Mods[i].Tier < d.Mods[j].Tier
@@ -208,8 +247,10 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		return d.Mods[i].ID < d.Mods[j].ID
 	})
 	sort.Slice(d.Exes, func(i, j int) bool { return d.Exes[i].ID < d.Exes[j].ID })
+}
 
-	rep := Report{Packages: len(pkgs), Modules: len(d.Mods), Executables: len(d.Exes)}
+func cycles(comps [][]string, libIDs map[string]string) [][]string {
+	var out [][]string
 	for _, members := range comps {
 		if len(members) < 2 {
 			continue
@@ -219,27 +260,52 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 			ids = append(ids, libIDs[dir])
 		}
 		sort.Strings(ids)
-		rep.Cycles = append(rep.Cycles, ids)
+		out = append(out, ids)
 	}
-	sort.Slice(rep.Cycles, func(i, j int) bool { return rep.Cycles[i][0] < rep.Cycles[j][0] })
-	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Mods)
+	sort.Slice(out, func(i, j int) bool { return out[i][0] < out[j][0] })
+	return out
+}
+
+func moduleHints(libDirs []string, byDir map[string]*pkg, libIDs map[string]string) []Hint {
+	var out []Hint
 	for _, dir := range libDirs {
 		for _, h := range byDir[dir].hints {
 			h.Module = libIDs[dir]
-			rep.Hints = append(rep.Hints, h)
+			out = append(out, h)
 		}
 	}
-	sort.Slice(skips, func(i, j int) bool { return skips[i].Path < skips[j].Path })
-	rep.Skipped = skips
+	return out
+}
+
+func topFanIn(d *Draft, limit int) []FanIn {
+	fan := map[string]int{}
+	for _, m := range d.Mods {
+		for _, dep := range m.DependsOn {
+			fan[dep]++
+		}
+	}
+	for _, e := range d.Exes {
+		for _, dep := range e.Composes {
+			fan[dep]++
+		}
+	}
+	var out []FanIn
 	for id, n := range fan {
-		rep.FanIn = append(rep.FanIn, FanIn{id, n})
+		out = append(out, FanIn{id, n})
 	}
-	sort.Slice(rep.FanIn, func(i, j int) bool {
-		if rep.FanIn[i].Count != rep.FanIn[j].Count {
-			return rep.FanIn[i].Count > rep.FanIn[j].Count
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
 		}
-		return rep.FanIn[i].ID < rep.FanIn[j].ID
+		return out[i].ID < out[j].ID
 	})
+	if len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+func draftIDs(d *Draft) map[string]string {
 	ids := map[string]string{}
 	for _, m := range d.Mods {
 		ids[dirOfMod(m)] = m.ID
@@ -247,11 +313,7 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 	for _, e := range d.Exes {
 		ids[e.Dir] = e.ID
 	}
-	rep.Uses = uses(byDir, ids, libIDs)
-	if len(rep.FanIn) > 5 {
-		rep.FanIn = rep.FanIn[:5]
-	}
-	return d, rep
+	return ids
 }
 
 func assignIDs(dirs []string, rootID string) map[string]string {
