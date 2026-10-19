@@ -346,79 +346,161 @@ func toView(m *model.Model) *vModel {
 	if m == nil {
 		return nil
 	}
-	v := &vModel{GoModule: m.GoModule, Tiers: names(m.Tiers), Reqs: []vReq{}, Actors: []vActor{}, Ifaces: []vIface{}, Exes: []vExe{},
-		Mods: []vUnit{}, Groups: []vUnit{}, Members: []vMember{}, Enums: []vEnum{}, Consts: []vConst{}, Errors: []vError{}, Types: []vType{},
-		Contracts: []vContract{}, HKs: []vHK{}, Funcs: []vFunc{}, EKs: []vEK{}, Events: []vEvent{}, Flows: []vFlow{}}
-	v.System = vSystem{ID: "system"}
-	if m.System != nil {
-		v.System = vSystem{ID: m.System.ID, Summary: m.System.Summary}
-		for _, a := range m.System.Actors {
-			v.Actors = append(v.Actors, vActor{a.ID, a.Summary})
-		}
-		for _, i := range m.System.Interfaces {
-			it := vIface{ID: i.ID, Protocol: i.Protocol, Spec: i.Spec, UsedBy: names(i.UsedBy)}
-			if i.Port != 0 {
-				port := i.Port
-				it.Port = &port
-			}
-			if i.Path != "" {
-				p := i.Path
-				it.Path = &p
-			}
-			v.Ifaces = append(v.Ifaces, it)
-		}
+	v := &vModel{GoModule: m.GoModule, Tiers: names(m.Tiers)}
+	v.System, v.Actors, v.Ifaces = viewSystem(m.System)
+	v.Reqs = viewRequirements(m)
+	v.Exes = viewExecutables(m)
+	v.Mods = viewModules(m)
+	v.Groups = viewGroups(m)
+	v.Members = viewMembers(m)
+	v.Enums = viewEnums(m)
+	v.Consts = viewConsts(m)
+	v.Errors = viewErrors(m)
+	v.Types = viewTypes(m)
+	v.Contracts = viewContracts(m)
+	v.HKs = viewHandlerKinds(m)
+	v.Funcs = viewFuncs(m)
+	v.EKs = viewEventKinds(m)
+	v.Events = viewEvents(m)
+	v.Flows = viewFlows(m)
+	return v
+}
+
+func viewSystem(sys *model.System) (vSystem, []vActor, []vIface) {
+	actors, ifaces := []vActor{}, []vIface{}
+	if sys == nil {
+		return vSystem{ID: "system"}, actors, ifaces
 	}
+	for _, a := range sys.Actors {
+		actors = append(actors, vActor{a.ID, a.Summary})
+	}
+	for _, i := range sys.Interfaces {
+		it := vIface{ID: i.ID, Protocol: i.Protocol, Spec: i.Spec, UsedBy: names(i.UsedBy)}
+		if i.Port != 0 {
+			port := i.Port
+			it.Port = &port
+		}
+		if i.Path != "" {
+			p := i.Path
+			it.Path = &p
+		}
+		ifaces = append(ifaces, it)
+	}
+	return vSystem{ID: sys.ID, Summary: sys.Summary}, actors, ifaces
+}
+
+func viewRequirements(m *model.Model) []vReq {
+	out := []vReq{}
 	for _, r := range m.Requirements {
-		v.Reqs = append(v.Reqs, vReq{r.ID, r.Text, r.Status})
+		out = append(out, vReq{r.ID, r.Text, r.Status})
 	}
+	return out
+}
+
+func viewExecutables(m *model.Model) []vExe {
+	out := []vExe{}
 	for _, e := range m.Executables {
-		v.Exes = append(v.Exes, vExe{e.ID, e.Summary, names(e.Exposes), names(e.Composes)})
+		out = append(out, vExe{e.ID, e.Summary, names(e.Exposes), names(e.Composes)})
 	}
+	return out
+}
+
+func viewModules(m *model.Model) []vUnit {
+	out := []vUnit{}
 	for _, x := range m.Modules {
-		v.Mods = append(v.Mods, vUnit{ID: x.ID, Type: "mod", Members: []string{}, Tier: x.Tier.Name, Summary: x.Summary, Path: x.Path, Role: x.Role,
+		out = append(out, vUnit{ID: x.ID, Type: "mod", Members: []string{}, Tier: x.Tier.Name, Summary: x.Summary, Path: x.Path, Role: x.Role,
 			DependsOn: names(x.DependsOn), Implements: names(x.Implements), Satisfies: names(x.Satisfies), Needs: vNeeds(m, x.Needs)})
 	}
+	return out
+}
+
+func viewGroups(m *model.Model) []vUnit {
+	out := []vUnit{}
 	for _, g := range m.Groups {
 		u := vUnit{ID: g.ID, Type: "grp", Tier: g.Tier.Name, Summary: g.Summary, Path: g.Path, Kind: g.Kind.Name, Rule: g.Rule,
 			DependsOn: names(g.DependsOn), Implements: []string{}, Satisfies: names(g.Satisfies), Members: []string{}, Needs: vNeeds(m, g.Needs)}
 		for _, mem := range g.Members {
 			u.Members = append(u.Members, mem.ID)
+		}
+		out = append(out, u)
+	}
+	return out
+}
+
+func viewMembers(m *model.Model) []vMember {
+	out := []vMember{}
+	for _, g := range m.Groups {
+		for _, mem := range g.Members {
 			vm := vMember{ID: mem.ID, Type: "mem", Group: g.ID, Summary: mem.Summary, Path: mem.Path(), Exceptions: []vException{},
 				Handles: names(mem.Handles), Satisfies: names(mem.Satisfies), Needs: vNeeds(m, mem.Needs)}
 			for _, e := range mem.Exceptions {
 				vm.Exceptions = append(vm.Exceptions, vException{e.DependsOn.Name, e.Reason})
 			}
-			v.Members = append(v.Members, vm)
+			out = append(out, vm)
 		}
-		v.Groups = append(v.Groups, u)
 	}
+	return out
+}
+
+func viewEnums(m *model.Model) []vEnum {
+	out := []vEnum{}
 	for _, e := range m.Enums {
-		v.Enums = append(v.Enums, vEnum{e.ID, e.In.Name, names(e.Values), vGoOf(e.Go), strsOrEmpty(e.Export), names(e.Satisfies)})
+		out = append(out, vEnum{e.ID, e.In.Name, names(e.Values), vGoOf(e.Go), strsOrEmpty(e.Export), names(e.Satisfies)})
 	}
+	return out
+}
+
+func viewConsts(m *model.Model) []vConst {
+	out := []vConst{}
 	for _, c := range m.Consts {
-		v.Consts = append(v.Consts, vConst{c.ID, c.In.Name, c.Type, c.Value, vGoOf(c.Go), strsOrEmpty(c.Export), names(c.Satisfies)})
+		out = append(out, vConst{c.ID, c.In.Name, c.Type, c.Value, vGoOf(c.Go), strsOrEmpty(c.Export), names(c.Satisfies)})
 	}
+	return out
+}
+
+func viewErrors(m *model.Model) []vError {
+	out := []vError{}
 	for _, e := range m.Errors {
 		ve := vError{ID: e.ID, In: e.In.Name, Message: e.Message, Go: vGoOf(e.Go), Satisfies: names(e.Satisfies)}
 		if e.HTTP != 0 {
 			h := e.HTTP
 			ve.HTTP = &h
 		}
-		v.Errors = append(v.Errors, ve)
+		out = append(out, ve)
 	}
+	return out
+}
+
+func viewTypes(m *model.Model) []vType {
+	out := []vType{}
 	for _, t := range m.Types {
-		v.Types = append(v.Types, vType{t.ID, t.In.Name, vFields(t.Fields), vGoOf(t.Go), names(t.Satisfies)})
+		out = append(out, vType{t.ID, t.In.Name, vFields(t.Fields), vGoOf(t.Go), names(t.Satisfies)})
 	}
+	return out
+}
+
+func viewContracts(m *model.Model) []vContract {
+	out := []vContract{}
 	for _, c := range m.Contracts {
 		vc := vContract{ID: c.ID, In: c.In.Name, Kind: c.Kind, Go: vGoOf(c.Go), Satisfies: names(c.Satisfies), Methods: []vMethod{}}
 		for _, me := range c.Methods {
 			vc.Methods = append(vc.Methods, vMethod{me.Name, vParams(me.Params), names(me.Returns), names(me.Errors), me.HasErrors})
 		}
-		v.Contracts = append(v.Contracts, vc)
+		out = append(out, vc)
 	}
+	return out
+}
+
+func viewHandlerKinds(m *model.Model) []vHK {
+	out := []vHK{}
 	for _, hk := range m.HandlerKinds {
-		v.HKs = append(v.HKs, vHK{hk.ID, hk.In.Name, vGoOf(hk.Go), vParams(hk.Params), names(hk.Returns), hk.Key.Name})
+		out = append(out, vHK{hk.ID, hk.In.Name, vGoOf(hk.Go), vParams(hk.Params), names(hk.Returns), hk.Key.Name})
 	}
+	return out
+}
+
+func viewFuncs(m *model.Model) []vFunc {
+	out := []vFunc{}
 	for _, f := range m.Funcs {
 		vf := vFunc{ID: f.ID, In: f.In.Name, Kind: f.Kind.Name, Handles: f.Handles.Name, Of: f.Of.Name, Errors: names(f.Errors), Satisfies: names(f.Satisfies), Cases: []vCase{}}
 		for _, c := range f.Cases {
@@ -428,41 +510,60 @@ func toView(m *model.Model) *vModel {
 			}
 			vf.Cases = append(vf.Cases, vc)
 		}
-		v.Funcs = append(v.Funcs, vf)
+		out = append(out, vf)
 	}
+	return out
+}
+
+func viewEventKinds(m *model.Model) []vEK {
+	out := []vEK{}
 	for _, ek := range m.EventKinds {
-		v.EKs = append(v.EKs, vEK{ek.ID, ek.In.Name, ek.Key.Name, ek.Encoding, names(ek.Subscribers), names(ek.Satisfies)})
+		out = append(out, vEK{ek.ID, ek.In.Name, ek.Key.Name, ek.Encoding, names(ek.Subscribers), names(ek.Satisfies)})
 	}
+	return out
+}
+
+func viewEvents(m *model.Model) []vEvent {
+	out := []vEvent{}
 	for _, e := range m.Events {
 		in := ""
 		if ek := m.EventKind(e.Kind.Name); ek != nil {
 			in = ek.In.Name
 		}
-		v.Events = append(v.Events, vEvent{e.ID, e.Kind.Name, in, names(e.Publishers), names(e.Subscribers), vFields(e.Data), names(e.Satisfies)})
+		out = append(out, vEvent{e.ID, e.Kind.Name, in, names(e.Publishers), names(e.Subscribers), vFields(e.Data), names(e.Satisfies)})
 	}
+	return out
+}
+
+func viewFlows(m *model.Model) []vFlow {
+	out := []vFlow{}
 	for _, f := range m.Flows {
-		vf := vFlow{ID: f.ID, In: f.In.Name, On: f.On.Name, Summary: f.Summary, Steps: []vStep{}, Satisfies: names(f.Satisfies)}
-		var stack []string
-		committed := false
-		for _, s := range f.Steps {
-			undo := []string{}
-			if !committed && !s.Fatal {
-				for i := len(stack) - 1; i >= 0; i-- {
-					undo = append(undo, stack[i])
-				}
-			}
-			vf.Steps = append(vf.Steps, vStep{ID: s.ID, Undo: s.Undo, Commit: s.Commit, Fatal: s.Fatal, Calls: names(s.Calls),
-				Emits: names(s.Emits), Summary: s.Summary, OnFailUndo: undo, OnFailFatal: s.Fatal})
-			if !committed && s.Undo != "" && !s.Commit {
-				stack = append(stack, s.Undo)
-			}
-			if s.Commit {
-				committed, stack = true, nil
+		out = append(out, vFlow{ID: f.ID, In: f.In.Name, On: f.On.Name, Summary: f.Summary, Steps: viewSteps(f.Steps), Satisfies: names(f.Satisfies)})
+	}
+	return out
+}
+
+func viewSteps(steps []*model.Step) []vStep {
+	out := []vStep{}
+	var stack []string
+	committed := false
+	for _, s := range steps {
+		undo := []string{}
+		if !committed && !s.Fatal {
+			for i := len(stack) - 1; i >= 0; i-- {
+				undo = append(undo, stack[i])
 			}
 		}
-		v.Flows = append(v.Flows, vf)
+		out = append(out, vStep{ID: s.ID, Undo: s.Undo, Commit: s.Commit, Fatal: s.Fatal, Calls: names(s.Calls),
+			Emits: names(s.Emits), Summary: s.Summary, OnFailUndo: undo, OnFailFatal: s.Fatal})
+		if !committed && s.Undo != "" && !s.Commit {
+			stack = append(stack, s.Undo)
+		}
+		if s.Commit {
+			committed, stack = true, nil
+		}
 	}
-	return v
+	return out
 }
 
 func levelName(l model.Level) string {
