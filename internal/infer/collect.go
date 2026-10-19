@@ -3,6 +3,7 @@ package infer
 import (
 	"errors"
 	"fmt"
+	"go/ast"
 	"go/doc"
 	"go/parser"
 	"go/token"
@@ -104,62 +105,90 @@ func collect(root, module string) ([]*pkg, []Skip, error) {
 				return filepath.SkipDir
 			}
 		}
-		files, errs := gosrc.Files(fset, p, parser.SkipObjectResolution)
-		all := files
-		for _, e := range errs {
-			if f, err := gosrc.ImportsOnly(fset, e.Path); err == nil {
-				if f != nil {
-					all = append(all, f)
-				}
-				skips = append(skips, Skip{rel(e.Path), "본문을 읽을 수 없어 import만 반영했다: " + e.Err.Error()})
-				continue
-			}
-			skips = append(skips, Skip{rel(e.Path), "Go 파일을 읽을 수 없다: " + e.Err.Error()})
-		}
+		files, all, fileSkips := readPackage(fset, p, rel)
+		skips = append(skips, fileSkips...)
 		if len(all) == 0 {
 			return nil
 		}
-		pk := &pkg{dir: rel(p)}
-		seen := map[string]bool{}
-		for _, f := range all {
-			if f.Name.Name == "main" {
-				pk.main = true
-			}
-			if pk.doc == "" && f.Doc != nil {
-				pk.doc = strings.TrimSpace(new(doc.Package).Synopsis(f.Doc.Text()))
-			}
-			for _, im := range f.Imports {
-				ip, _ := strconv.Unquote(im.Path.Value)
-				var dep string
-				switch {
-				case ip == module:
-					dep = "."
-				case strings.HasPrefix(ip, module+"/"):
-					dep = strings.TrimPrefix(ip, module+"/")
-				default:
-					if first, _, _ := strings.Cut(ip, "/"); strings.Contains(first, ".") && !seen["ext:"+ip] {
-						seen["ext:"+ip] = true
-						pk.ext = append(pk.ext, ip)
-					}
-					continue
-				}
-				if dep != pk.dir && !seen[dep] {
-					seen[dep] = true
-					pk.imports = append(pk.imports, dep)
-				}
-			}
-		}
-		sort.Strings(pk.imports)
-		sort.Strings(pk.ext)
-		types := stringTypes(files)
-		for _, f := range files {
-			pk.hints = append(pk.hints, fileHints(fset, root, f, types)...)
-			pk.name = f.Name.Name
-			pk.refs = append(pk.refs, fileRefOf(f, module))
-		}
-		pk.decls = exportedDecls(files)
-		pkgs = append(pkgs, pk)
+		pkgs = append(pkgs, packageOf(fset, root, module, rel(p), files, all))
 		return nil
 	})
 	return pkgs, skips, err
+}
+
+func readPackage(fset *token.FileSet, dir string, rel func(string) string) (files, all []*ast.File, skips []Skip) {
+	files, errs := gosrc.Files(fset, dir, parser.SkipObjectResolution)
+	all = files
+	for _, e := range errs {
+		if f, err := gosrc.ImportsOnly(fset, e.Path); err == nil {
+			if f != nil {
+				all = append(all, f)
+			}
+			skips = append(skips, Skip{rel(e.Path), "본문을 읽을 수 없어 import만 반영했다: " + e.Err.Error()})
+			continue
+		}
+		skips = append(skips, Skip{rel(e.Path), "Go 파일을 읽을 수 없다: " + e.Err.Error()})
+	}
+	return files, all, skips
+}
+
+func packageOf(fset *token.FileSet, root, module, dir string, files, all []*ast.File) *pkg {
+	pk := &pkg{dir: dir, main: hasMainFile(all), doc: packageSynopsis(all)}
+	pk.imports, pk.ext = packageImports(all, module, dir)
+	types := stringTypes(files)
+	for _, f := range files {
+		pk.hints = append(pk.hints, fileHints(fset, root, f, types)...)
+		pk.name = f.Name.Name
+		pk.refs = append(pk.refs, fileRefOf(f, module))
+	}
+	pk.decls = exportedDecls(files)
+	return pk
+}
+
+func hasMainFile(files []*ast.File) bool {
+	for _, f := range files {
+		if f.Name.Name == "main" {
+			return true
+		}
+	}
+	return false
+}
+
+func packageSynopsis(files []*ast.File) string {
+	synopsis := ""
+	for _, f := range files {
+		if synopsis == "" && f.Doc != nil {
+			synopsis = strings.TrimSpace(new(doc.Package).Synopsis(f.Doc.Text()))
+		}
+	}
+	return synopsis
+}
+
+func packageImports(files []*ast.File, module, dir string) (imports, ext []string) {
+	seen := map[string]bool{}
+	for _, f := range files {
+		for _, im := range f.Imports {
+			ip, _ := strconv.Unquote(im.Path.Value)
+			var dep string
+			switch {
+			case ip == module:
+				dep = "."
+			case strings.HasPrefix(ip, module+"/"):
+				dep = strings.TrimPrefix(ip, module+"/")
+			default:
+				if first, _, _ := strings.Cut(ip, "/"); strings.Contains(first, ".") && !seen["ext:"+ip] {
+					seen["ext:"+ip] = true
+					ext = append(ext, ip)
+				}
+				continue
+			}
+			if dep != dir && !seen[dep] {
+				seen[dep] = true
+				imports = append(imports, dep)
+			}
+		}
+	}
+	sort.Strings(imports)
+	sort.Strings(ext)
+	return imports, ext
 }
