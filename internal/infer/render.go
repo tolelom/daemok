@@ -13,9 +13,9 @@ func Render(d *Draft) []byte {
 	b.WriteString("version: 0.5\n")
 	fmt.Fprintf(&b, "go_module: %s\n", d.GoModule)
 	fmt.Fprintf(&b, "\nsystem:\n  id: %s\n", d.System)
-	if len(d.Exes) > 0 {
+	if len(d.Executables) > 0 {
 		b.WriteString("\nexecutables:\n")
-		for _, e := range d.Exes {
+		for _, e := range d.Executables {
 			var kv []string
 			if e.Summary != "" {
 				kv = append(kv, "summary: "+quote(e.Summary))
@@ -24,13 +24,13 @@ func Render(d *Draft) []byte {
 			fmt.Fprintf(&b, "  %s: { %s }\n", e.ID, strings.Join(kv, ", "))
 		}
 	}
-	if len(d.Mods) > 0 {
+	if len(d.Modules) > 0 {
 		tiers := make([]string, d.Tiers)
 		for i := range tiers {
 			tiers[i] = tierName(i)
 		}
 		fmt.Fprintf(&b, "\ntiers: %s\n\nmodules:\n", list(tiers))
-		for _, m := range d.Mods {
+		for _, m := range d.Modules {
 			kv := []string{"tier: " + tierName(m.Tier)}
 			if m.Path != "" {
 				kv = append(kv, "path: "+m.Path)

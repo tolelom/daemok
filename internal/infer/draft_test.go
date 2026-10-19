@@ -24,11 +24,11 @@ func TestAnalyzeLayers(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := &Draft{
-		GoModule: "example.com/layers",
-		System:   "layers",
-		Exes:     []Exe{{ID: "app", Dir: "cmd/app", Summary: "app은 예제 실행 파일이다.", Composes: []string{"api"}}},
-		Tiers:    3,
-		Mods: []Mod{
+		GoModule:    "example.com/layers",
+		System:      "layers",
+		Executables: []Executable{{ID: "app", Dir: "cmd/app", Summary: "app은 예제 실행 파일이다.", Composes: []string{"api"}}},
+		Tiers:       3,
+		Modules: []Module{
 			{ID: "internal_util", Path: "internal/util", Tier: 0},
 			{ID: "util", Tier: 0},
 			{ID: "cert_gen", Path: "certGen", Tier: 1, DependsOn: []string{"internal_util"}},
@@ -55,11 +55,11 @@ func TestAnalyzeRootMain(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := a.Draft
-	if d.System != "tool_kit" || len(d.Exes) != 1 || d.Exes[0].ID != "tool_kit" || d.Exes[0].Dir != "." {
+	if d.System != "tool_kit" || len(d.Executables) != 1 || d.Executables[0].ID != "tool_kit" || d.Executables[0].Dir != "." {
 		t.Fatalf("%+v", d)
 	}
-	if len(d.Mods) != 1 || d.Mods[0].ID != "lib" || d.Mods[0].Summary != `Package lib는 "따옴표"와 \역슬래시, #, : 를 쓴다.` {
-		t.Fatalf("%+v", d.Mods)
+	if len(d.Modules) != 1 || d.Modules[0].ID != "lib" || d.Modules[0].Summary != `Package lib는 "따옴표"와 \역슬래시, #, : 를 쓴다.` {
+		t.Fatalf("%+v", d.Modules)
 	}
 }
 
@@ -86,7 +86,7 @@ func TestBuildCycleSharesTier(t *testing.T) {
 	}
 	d, rep := build("example.com/x", pkgs, nil)
 	tiers := map[string]int{}
-	for _, m := range d.Mods {
+	for _, m := range d.Modules {
 		tiers[m.ID] = m.Tier
 	}
 	if tiers["base"] != 0 || tiers["a"] != 1 || tiers["b"] != 1 || tiers["c"] != 2 {

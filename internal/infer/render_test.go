@@ -46,8 +46,8 @@ func TestRenderLayers(t *testing.T) {
 func TestRenderRoundTrip(t *testing.T) {
 	d := &Draft{
 		GoModule: "example.com/x", System: "x", Tiers: 2,
-		Exes: []Exe{{ID: "x", Dir: ".", Summary: "줄\n바꿈과\t탭"}},
-		Mods: []Mod{
+		Executables: []Executable{{ID: "x", Dir: ".", Summary: "줄\n바꿈과\t탭"}},
+		Modules: []Module{
 			{ID: "a", Tier: 0, Summary: `"따옴표"와 \역슬래시, # 샵: 콜론 {중괄호} [대괄호]`},
 			{ID: "b", Path: "pkg/b", Tier: 1, DependsOn: []string{"a"}},
 		},
@@ -63,7 +63,7 @@ func TestRenderRoundTrip(t *testing.T) {
 		t.Fatalf("%+v", m.Executables[0])
 	}
 	a, b := m.Modules[0], m.Modules[1]
-	if a.ID != "a" || a.Summary != d.Mods[0].Summary || a.Tier.Name != "tier0" {
+	if a.ID != "a" || a.Summary != d.Modules[0].Summary || a.Tier.Name != "tier0" {
 		t.Fatalf("%+v", a)
 	}
 	if b.ID != "b" || b.Path != "pkg/b" || len(b.DependsOn) != 1 || b.DependsOn[0].Name != "a" {
@@ -72,7 +72,7 @@ func TestRenderRoundTrip(t *testing.T) {
 }
 
 func TestRenderNoModules(t *testing.T) {
-	d := &Draft{GoModule: "example.com/x", System: "x", Exes: []Exe{{ID: "x", Dir: "."}}}
+	d := &Draft{GoModule: "example.com/x", System: "x", Executables: []Executable{{ID: "x", Dir: "."}}}
 	if _, diags := model.LoadSources(map[string][]byte{"x.yaml": Render(d)}); diags.HasErrors() {
 		t.Fatalf("%v\n%s", diags, Render(d))
 	}

@@ -13,7 +13,7 @@ func FuzzRenderSummary(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, summary string) {
-		d := &Draft{GoModule: "example.com/x", System: "x", Tiers: 1, Mods: []Mod{{ID: "a", Summary: summary}}}
+		d := &Draft{GoModule: "example.com/x", System: "x", Tiers: 1, Modules: []Module{{ID: "a", Summary: summary}}}
 		m, diags := model.LoadSources(map[string][]byte{"x.yaml": Render(d)})
 		if diags.HasErrors() {
 			t.Fatalf("%q: %v\n%s", summary, diags, Render(d))

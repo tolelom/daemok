@@ -15,12 +15,12 @@ var (
 	version   = regexp.MustCompile(`^v[0-9]+$`)
 )
 
-type Exe struct {
+type Executable struct {
 	ID, Dir, Summary string
 	Composes         []string
 }
 
-type Mod struct {
+type Module struct {
 	ID, Path, Summary string
 	Tier              int
 	DependsOn         []string
@@ -28,9 +28,9 @@ type Mod struct {
 
 type Draft struct {
 	GoModule, System string
-	Exes             []Exe
+	Executables      []Executable
 	Tiers            int
-	Mods             []Mod
+	Modules          []Module
 }
 
 type FanIn struct {
@@ -83,7 +83,7 @@ func Analyze(root string) (*Analysis, error) {
 	return &Analysis{Draft: d, YAML: Render(d), Report: rep}, nil
 }
 
-func dirOfMod(m Mod) string {
+func dirOfModule(m Module) string {
 	if m.Path != "" {
 		return m.Path
 	}
@@ -128,14 +128,14 @@ func build(module string, pkgs []*pkg, skips []Skip) (*Draft, Report) {
 		}
 		return out
 	})
-	d.Mods = modules(libDirs, byDir, libIDs, componentTiers(libDirs, byDir, libIDs, comp, comps))
-	d.Tiers = tierCount(d.Mods)
-	d.Exes, skips = executables(exeDirs, byDir, exeIDs, libIDs, skips)
+	d.Modules = modules(libDirs, byDir, libIDs, componentTiers(libDirs, byDir, libIDs, comp, comps))
+	d.Tiers = tierCount(d.Modules)
+	d.Executables, skips = executables(exeDirs, byDir, exeIDs, libIDs, skips)
 	sortDraft(d)
 
-	rep := Report{Packages: len(pkgs), Modules: len(d.Mods), Executables: len(d.Exes)}
+	rep := Report{Packages: len(pkgs), Modules: len(d.Modules), Executables: len(d.Executables)}
 	rep.Cycles = cycles(comps, libIDs)
-	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Mods)
+	rep.GroupCandidates = groupCandidates(libDirs, libIDs, d.Modules)
 	rep.Hints = moduleHints(libDirs, byDir, libIDs)
 	sort.Slice(skips, func(i, j int) bool { return skips[i].Path < skips[j].Path })
 	rep.Skipped = skips
@@ -202,11 +202,11 @@ func internalDeps(p *pkg, libIDs map[string]string) []string {
 	return out
 }
 
-func modules(libDirs []string, byDir map[string]*pkg, libIDs map[string]string, tiers map[string]int) []Mod {
-	var mods []Mod
+func modules(libDirs []string, byDir map[string]*pkg, libIDs map[string]string, tiers map[string]int) []Module {
+	var mods []Module
 	for _, dir := range libDirs {
 		p := byDir[dir]
-		m := Mod{ID: libIDs[dir], Summary: p.doc, Tier: tiers[dir], DependsOn: internalDeps(p, libIDs)}
+		m := Module{ID: libIDs[dir], Summary: p.doc, Tier: tiers[dir], DependsOn: internalDeps(p, libIDs)}
 		if m.ID != dir {
 			m.Path = dir
 		}
@@ -215,7 +215,7 @@ func modules(libDirs []string, byDir map[string]*pkg, libIDs map[string]string, 
 	return mods
 }
 
-func tierCount(mods []Mod) int {
+func tierCount(mods []Module) int {
 	n := 0
 	for _, m := range mods {
 		if m.Tier+1 > n {
@@ -225,8 +225,8 @@ func tierCount(mods []Mod) int {
 	return n
 }
 
-func executables(exeDirs []string, byDir map[string]*pkg, exeIDs, libIDs map[string]string, skips []Skip) ([]Exe, []Skip) {
-	var exes []Exe
+func executables(exeDirs []string, byDir map[string]*pkg, exeIDs, libIDs map[string]string, skips []Skip) ([]Executable, []Skip) {
+	var exes []Executable
 	for _, dir := range exeDirs {
 		id := exeIDs[dir]
 		if !snakeName.MatchString(id) {
@@ -234,19 +234,19 @@ func executables(exeDirs []string, byDir map[string]*pkg, exeIDs, libIDs map[str
 			continue
 		}
 		p := byDir[dir]
-		exes = append(exes, Exe{ID: id, Dir: dir, Summary: p.doc, Composes: internalDeps(p, libIDs)})
+		exes = append(exes, Executable{ID: id, Dir: dir, Summary: p.doc, Composes: internalDeps(p, libIDs)})
 	}
 	return exes, skips
 }
 
 func sortDraft(d *Draft) {
-	sort.Slice(d.Mods, func(i, j int) bool {
-		if d.Mods[i].Tier != d.Mods[j].Tier {
-			return d.Mods[i].Tier < d.Mods[j].Tier
+	sort.Slice(d.Modules, func(i, j int) bool {
+		if d.Modules[i].Tier != d.Modules[j].Tier {
+			return d.Modules[i].Tier < d.Modules[j].Tier
 		}
-		return d.Mods[i].ID < d.Mods[j].ID
+		return d.Modules[i].ID < d.Modules[j].ID
 	})
-	sort.Slice(d.Exes, func(i, j int) bool { return d.Exes[i].ID < d.Exes[j].ID })
+	sort.Slice(d.Executables, func(i, j int) bool { return d.Executables[i].ID < d.Executables[j].ID })
 }
 
 func cycles(comps [][]string, libIDs map[string]string) [][]string {
@@ -279,12 +279,12 @@ func moduleHints(libDirs []string, byDir map[string]*pkg, libIDs map[string]stri
 
 func topFanIn(d *Draft, limit int) []FanIn {
 	fan := map[string]int{}
-	for _, m := range d.Mods {
+	for _, m := range d.Modules {
 		for _, dep := range m.DependsOn {
 			fan[dep]++
 		}
 	}
-	for _, e := range d.Exes {
+	for _, e := range d.Executables {
 		for _, dep := range e.Composes {
 			fan[dep]++
 		}
@@ -307,10 +307,10 @@ func topFanIn(d *Draft, limit int) []FanIn {
 
 func draftIDs(d *Draft) map[string]string {
 	ids := map[string]string{}
-	for _, m := range d.Mods {
-		ids[dirOfMod(m)] = m.ID
+	for _, m := range d.Modules {
+		ids[dirOfModule(m)] = m.ID
 	}
-	for _, e := range d.Exes {
+	for _, e := range d.Executables {
 		ids[e.Dir] = e.ID
 	}
 	return ids
@@ -436,7 +436,7 @@ func components(nodes []string, edges func(string) []string) (map[string]int, []
 	return comp, comps
 }
 
-func groupCandidates(libDirs []string, libIDs map[string]string, mods []Mod) []GroupCandidate {
+func groupCandidates(libDirs []string, libIDs map[string]string, mods []Module) []GroupCandidate {
 	deps := map[string][]string{}
 	for _, m := range mods {
 		deps[m.ID] = m.DependsOn
@@ -490,14 +490,14 @@ func external(requires []string, pkgs []*pkg, d *Draft) []External {
 		return nil
 	}
 	idOf := map[string]string{}
-	for _, m := range d.Mods {
+	for _, m := range d.Modules {
 		dir := m.Path
 		if dir == "" {
 			dir = m.ID
 		}
 		idOf[dir] = m.ID
 	}
-	for _, e := range d.Exes {
+	for _, e := range d.Executables {
 		idOf[e.Dir] = e.ID
 	}
 	users := map[string]map[string]bool{}
