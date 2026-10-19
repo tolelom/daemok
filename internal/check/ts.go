@@ -11,6 +11,15 @@ import (
 )
 
 func (c *checker) ts() {
+	first := c.exportTargets()
+	x := ts.Exported(c.m)
+	if !c.tsOut(first, x.Len()) {
+		return
+	}
+	c.tsNames(x)
+}
+
+func (c *checker) exportTargets() *yaml.Pos {
 	m := c.m
 	exports := func(id string, pos yaml.Pos, export []string) {
 		for _, x := range export {
@@ -38,14 +47,18 @@ func (c *checker) ts() {
 			first = &t.Pos
 		}
 	}
-	x := ts.Exported(m)
+	return first
+}
+
+func (c *checker) tsOut(firstExport *yaml.Pos, exported int) bool {
+	m := c.m
 	switch {
-	case m.TSOut == "" && first != nil:
-		c.errorf(*first, "export: [ts]가 있는데 ts_out이 없다")
-		return
+	case m.TSOut == "" && firstExport != nil:
+		c.errorf(*firstExport, "export: [ts]가 있는데 ts_out이 없다")
+		return false
 	case m.TSOut == "":
-		return
-	case x.Len() == 0:
+		return false
+	case exported == 0:
 		c.warnf(m.TSOutPos, "ts_out이 있는데 export: [ts]인 상수, enum, 타입이 없다")
 	}
 	if filepath.IsAbs(m.TSOut) || path.IsAbs(m.TSOut) {
@@ -54,6 +67,10 @@ func (c *checker) ts() {
 	if !strings.HasSuffix(m.TSOut, ".ts") {
 		c.errorf(m.TSOutPos, "ts_out은 .ts 파일이어야 한다: %s", m.TSOut)
 	}
+	return true
+}
+
+func (c *checker) tsNames(x ts.Nodes) {
 	values, types := map[string]string{}, map[string]string{}
 	name := func(space map[string]string, n, source string, pos yaml.Pos) {
 		if prev, ok := space[n]; ok {
@@ -74,7 +91,7 @@ func (c *checker) ts() {
 	}
 	for _, t := range x.Types {
 		for _, f := range t.Fields {
-			if _, _, err := ts.FieldType(m, f); err != nil {
+			if _, _, err := ts.FieldType(c.m, f); err != nil {
 				c.errorf(f.Pos, "타입 %s 필드 %s: %v", t.ID, f.Name, err)
 			}
 		}
