@@ -90,36 +90,20 @@ func Occurrences(m *model.Model, kind, old, new string) ([]edit.Replacement, err
 	}
 	c := &collector{old: old, new: new}
 	c.at(def, old, new)
+	references(m, c, kind)
+	return c.reps, nil
+}
+
+func references(m *model.Model, c *collector, kind string) {
 	switch kind {
 	case "requirements":
-		for k := range kinds {
-			for _, meta := range metas(m, k) {
-				c.refs(meta.Satisfies)
-			}
-		}
-		if m.System != nil {
-			c.refs(m.System.Satisfies)
-		}
+		requirementRefs(m, c)
 	case "actors":
-		if m.System != nil {
-			for _, it := range m.System.Interfaces {
-				c.refs(it.UsedBy)
-			}
-		}
+		actorRefs(m, c)
 	case "interfaces":
-		for _, e := range m.Executables {
-			c.refs(e.Exposes)
-		}
-		for _, mod := range m.Modules {
-			c.refs(mod.Implements)
-		}
+		interfaceRefs(m, c)
 	case "tiers":
-		for _, mod := range m.Modules {
-			c.ref(mod.Tier)
-		}
-		for _, g := range m.Groups {
-			c.ref(g.Tier)
-		}
+		tierRefs(m, c)
 	case "modules", "groups", "members":
 		deps(m, c)
 		if kind != "groups" {
@@ -130,69 +114,121 @@ func Occurrences(m *model.Model, kind, old, new string) ([]edit.Replacement, err
 	case "consts":
 		eachField(m, func(f *model.Field) { c.ref(f.Max) })
 	case "errors":
-		for _, ct := range m.Contracts {
-			for _, me := range ct.Methods {
-				c.refs(me.Errors)
-			}
-		}
-		for _, f := range m.Funcs {
-			c.refs(f.Errors)
-			for _, cs := range f.Cases {
-				if cs.Error.Name != "invalid" {
-					c.ref(cs.Error)
-				}
-			}
-		}
+		errorRefs(m, c)
 	case "contracts":
-		for _, mod := range m.Modules {
-			needs(mod.Needs, c)
-		}
-		for _, g := range m.Groups {
-			needs(g.Needs, c)
-			for _, mem := range g.Members {
-				needs(mem.Needs, c)
-			}
-		}
-		for _, f := range m.Funcs {
-			c.method(f.Of)
-		}
-		for _, fl := range m.Flows {
-			for _, s := range fl.Steps {
-				for _, r := range s.Calls {
-					c.method(r)
-				}
-			}
-		}
+		contractRefs(m, c)
 	case "handler_kinds":
-		for _, g := range m.Groups {
-			c.ref(g.Kind)
-		}
-		for _, f := range m.Funcs {
-			c.ref(f.Kind)
-		}
+		handlerKindRefs(m, c)
 	case "event_kinds":
 		for _, e := range m.Events {
 			c.ref(e.Kind)
 		}
 	case "events":
-		for _, e := range m.Events {
-			if e.ID != old {
-				continue
-			}
-			if ek := m.EventKind(e.Kind.Name); ek != nil {
-				if en := m.Enum(ek.Key.Name); en != nil {
-					c.refs(en.Values)
-				}
-			}
+		eventRefs(m, c)
+	}
+}
+
+func requirementRefs(m *model.Model, c *collector) {
+	for k := range kinds {
+		for _, meta := range metas(m, k) {
+			c.refs(meta.Satisfies)
 		}
-		for _, fl := range m.Flows {
-			c.ref(fl.On)
-			for _, s := range fl.Steps {
-				c.refs(s.Emits)
+	}
+	if m.System != nil {
+		c.refs(m.System.Satisfies)
+	}
+}
+
+func actorRefs(m *model.Model, c *collector) {
+	if m.System != nil {
+		for _, it := range m.System.Interfaces {
+			c.refs(it.UsedBy)
+		}
+	}
+}
+
+func interfaceRefs(m *model.Model, c *collector) {
+	for _, e := range m.Executables {
+		c.refs(e.Exposes)
+	}
+	for _, mod := range m.Modules {
+		c.refs(mod.Implements)
+	}
+}
+
+func tierRefs(m *model.Model, c *collector) {
+	for _, mod := range m.Modules {
+		c.ref(mod.Tier)
+	}
+	for _, g := range m.Groups {
+		c.ref(g.Tier)
+	}
+}
+
+func errorRefs(m *model.Model, c *collector) {
+	for _, ct := range m.Contracts {
+		for _, me := range ct.Methods {
+			c.refs(me.Errors)
+		}
+	}
+	for _, f := range m.Funcs {
+		c.refs(f.Errors)
+		for _, cs := range f.Cases {
+			if cs.Error.Name != "invalid" {
+				c.ref(cs.Error)
 			}
 		}
 	}
-	return c.reps, nil
+}
+
+func contractRefs(m *model.Model, c *collector) {
+	for _, mod := range m.Modules {
+		needs(mod.Needs, c)
+	}
+	for _, g := range m.Groups {
+		needs(g.Needs, c)
+		for _, mem := range g.Members {
+			needs(mem.Needs, c)
+		}
+	}
+	for _, f := range m.Funcs {
+		c.method(f.Of)
+	}
+	for _, fl := range m.Flows {
+		for _, s := range fl.Steps {
+			for _, r := range s.Calls {
+				c.method(r)
+			}
+		}
+	}
+}
+
+func handlerKindRefs(m *model.Model, c *collector) {
+	for _, g := range m.Groups {
+		c.ref(g.Kind)
+	}
+	for _, f := range m.Funcs {
+		c.ref(f.Kind)
+	}
+}
+
+func eventRefs(m *model.Model, c *collector) {
+	for _, e := range m.Events {
+		if e.ID != c.old {
+			continue
+		}
+		if ek := m.EventKind(e.Kind.Name); ek != nil {
+			if en := m.Enum(ek.Key.Name); en != nil {
+				c.refs(en.Values)
+			}
+		}
+	}
+	for _, fl := range m.Flows {
+		c.ref(fl.On)
+		for _, s := range fl.Steps {
+			c.refs(s.Emits)
+		}
+	}
 }
 
 func signatures(m *model.Model, c *collector, kind string) {
