@@ -106,7 +106,7 @@ func (s *Server) remember(path string) {
 	}
 	list := []string{path}
 	for _, x := range s.recent() {
-		if x != path && len(list) < recentMax {
+		if !samePath(x, path) && len(list) < recentMax {
 			list = append(list, x)
 		}
 	}

@@ -246,6 +246,27 @@ func TestProjectsWorktrees(t *testing.T) {
 	}
 }
 
+// 심볼릭 링크로 연 폴더를 링크 푼 경로로 다시 열어도 최근 목록에는 한 줄만 남고, 마지막으로 연 표기를 쓴다.
+// 깨지면 worktree 항목(git이 준 링크 푼 경로)으로 다시 연 프로젝트가 최근 목록에 두 줄로 보이고 둘 다 "지금"이다.
+func TestRecentSameFolderOnce(t *testing.T) {
+	s, _ := setup(t, design)
+	local(t, s)
+	root := goModule(t)
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(root, link); err != nil {
+		t.Skipf("심볼릭 링크를 만들 수 없다: %v", err)
+	}
+	for _, p := range []string{link, root} {
+		body, _ := json.Marshal(map[string]string{"path": p})
+		if code, out := post(t, s, "/api/open", string(body)); code != 200 {
+			t.Fatalf("%d %v", code, out)
+		}
+	}
+	if _, recent := getProjects(t, s); len(recent) != 1 || recent[0].Path != root || !recent[0].Current {
+		t.Fatalf("recent %+v", recent)
+	}
+}
+
 // 저장소가 아니거나 worktree가 하나뿐이면 worktree 목록은 비어 있다.
 func TestProjectsNoWorktrees(t *testing.T) {
 	s, _ := setup(t, design)
