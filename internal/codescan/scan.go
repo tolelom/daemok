@@ -1,3 +1,4 @@
+// Package codescan은 코드의 import와 이벤트 상수 참조를 설계와 대조한다.
 package codescan
 
 import (

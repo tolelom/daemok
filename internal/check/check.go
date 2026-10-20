@@ -1,3 +1,4 @@
+// Package check는 모델만 보고 설계 검사를 한다. 코드는 읽지 않는다.
 package check
 
 import (

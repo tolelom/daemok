@@ -1,3 +1,4 @@
+// Package gitbase는 git HEAD에 있는 설계 파일과 저장소의 worktree를 읽는다. 설계의 기준은 HEAD다.
 package gitbase
 
 import (

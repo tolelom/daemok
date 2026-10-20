@@ -1,3 +1,4 @@
+// Package serve는 설계 지도를 로컬 웹 페이지로 보여준다. 계산은 서버가 하고 화면은 /api/state를 그린다.
 package serve
 
 import (

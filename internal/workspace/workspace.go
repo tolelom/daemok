@@ -1,3 +1,5 @@
+// Package workspace는 설계 읽기, 설계 검사, 생성, 디스크의 생성 파일 대조를 묶는다.
+// check·gen 명령과 serve가 같은 진단 목록을 쓰도록 한 곳에 둔다.
 package workspace
 
 import (

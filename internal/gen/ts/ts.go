@@ -1,3 +1,4 @@
+// Package ts는 export: [ts]가 붙은 상수, enum, 타입을 ts_out 파일 하나의 TypeScript로 만든다.
 package ts
 
 import (

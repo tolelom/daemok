@@ -1,3 +1,4 @@
+// Package gosrc는 디렉토리의 Go 소스 파일을 고르고 읽는다. codescan과 infer가 같은 파일 집합을 보도록 한 곳에 둔다.
 package gosrc
 
 import (

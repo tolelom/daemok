@@ -1,3 +1,5 @@
+// Package yaml은 daemok 설계 파일이 쓰는 YAML 부분집합을 파싱한다.
+// 모든 노드가 파일·줄·열 위치를 갖는다. 열은 바이트 기준 1-base다.
 package yaml
 
 import (

@@ -1,3 +1,4 @@
+// Package golang은 모델에서 Go 생성 파일을 만든다. 디스크는 읽거나 쓰지 않는다.
 package golang
 
 import (

@@ -1,3 +1,5 @@
+// Package designdiff는 두 설계 파일 묶음을 노드와 키 단위로 비교해 변경 요약을 만든다.
+// 비교는 YAML 값으로 해서 주석, 정렬, 형식, 노드가 든 파일은 변경으로 보지 않는다.
 package designdiff
 
 import (

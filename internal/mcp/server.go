@@ -1,3 +1,5 @@
+// Package mcp는 표준 입출력으로 MCP(JSON-RPC 2.0, 한 줄에 메시지 하나)를 주고받아
+// AI가 설계를 읽고 검사를 돌리게 한다. edit 외의 도구는 읽기 전용이고, edit는 --allow-write일 때만 있다.
 package mcp
 
 import (

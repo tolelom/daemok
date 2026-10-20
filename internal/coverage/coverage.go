@@ -1,3 +1,5 @@
+// Package coverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 수를 센다.
+// 이 비율은 설계 형식을 넓힐지 정하는 근거다.
 package coverage
 
 import (

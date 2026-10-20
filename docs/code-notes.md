@@ -1,6 +1,6 @@
 # 코드 노트
 
-운영 코드 주석에 있던 설명을 파일·선언별로 모았다. 운영 코드(_test.go가 아닌 .go)에는 주석을 두지 않는다(//go:embed 같은 지시문은 예외). 설계 메모는 여기에 둔다. 2026-10-20에 원문 그대로 옮겼으므로 그 시점의 코드를 설명한다.
+운영 코드 주석에 있던 설명을 파일·선언별로 모았다. 운영 코드(_test.go가 아닌 .go)에는 주석을 두지 않는다. 예외는 패키지 주석과 //go:embed 같은 지시문이다. 패키지 주석은 daemok init이 모듈 summary로 읽으므로 코드에 둔다. 설계 메모는 여기에 둔다. 2026-10-20에 원문 그대로 옮겼으므로 그 시점의 코드를 설명한다.
 
 ## cmd/daemok/check.go
 
@@ -21,10 +21,6 @@
 ## cmd/daemok/init.go
 
 - `runInit`: runInit은 설계 파일이 없는 Go 모듈의 코드에서 초안을 만들어 설계 디렉토리에 쓴다. 이미 설계 파일이 있으면 쓰지 않고 1, Go 모듈이 아니거나 쓰지 못하면 2다. --dry-run은 쓰지 않고 출력만 한다. --l3는 설계가 있는 저장소에서 L3 초안을 stdout에, 옮기지 않은 선언을 stderr에 낸다. 쓰지 않는다.
-
-## cmd/daemok/main.go
-
-- `package main`: daemok은 설계 파일을 읽어 검사하고 코드를 생성하는 CLI다.
 
 ## cmd/daemok/mcp.go
 
@@ -51,7 +47,6 @@
 
 ## internal/check/check.go
 
-- `package check`: Package check는 모델만 보고 설계 검사를 한다. 코드는 읽지 않는다.
 - `checker.satisfiers`: 요구사항 ID → 충족한다고 적은 요소
 - `Run`: Run은 설계 검사 전부를 돌려 위치순으로 정렬한 진단을 준다.
 - `checker.eachMeta`: eachMeta는 satisfies를 가질 수 있는 모든 노드를 돈다.
@@ -183,7 +178,6 @@
 
 ## internal/codescan/scan.go
 
-- `package codescan`: Package codescan은 코드의 import와 이벤트 상수 참조를 설계와 대조한다.
 - `scanner.units`: import 경로 → 모듈·멤버 ID
 - `scanner.imports`: 모듈·멤버 ID → 그 패키지가 import한 설계 단위
 - `scanner.refs`: 모듈·멤버 ID → 쓴 이벤트 상수와 목록 함수의 이름
@@ -208,7 +202,6 @@
 
 ## internal/coverage/coverage.go
 
-- `package coverage`: Package coverage는 패키지마다 최상위 선언 중 설계 노드에 대응하는 것의 수를 센다. 이 비율은 설계 형식을 넓힐지 정하는 근거다.
 - `Row`: Row는 패키지 하나의 결과다. Pkg는 코드 루트 기준 슬래시 경로이고 루트는 "."다. Funcs와 FuncsMatched는 Decls·Matched 중 메서드가 아닌 함수다. 설계는 에러 계약이 있는 함수만 두므로 함수를 뺀 비율을 따로 볼 수 있게 한다.
 - `Count`: Count는 root 아래 패키지마다 최상위 선언 수와 그중 설계가 만드는 이름의 수를 준다. 설계가 만드는 이름은 모든 L3·L4 노드를 gen: true로 보고 생성한 코드에서 얻는다. 모델은 바꾸지 않는다. 파싱하지 못한 Go 파일은 세지 않고 함께 돌려준다.
 - `DesignNames`: designNames는 패키지 디렉토리마다 설계가 만드는 최상위 이름이다. 등록 파일이 가리키는 핸들러 함수와 일반 함수도 넣는다.
@@ -217,7 +210,6 @@
 
 ## internal/designdiff/collect.go
 
-- `package designdiff`: Package designdiff는 두 설계 파일 묶음을 노드와 키 단위로 비교해 변경 요약을 만든다. 비교는 YAML 값으로 해서 주석, 정렬, 형식, 노드가 든 파일은 변경으로 보지 않는다.
 - `kinds`: kinds는 노드 종류와 출력 순서다. 설계 파일의 키 순서를 따른다.
 - `settings`: settings는 노드가 아닌 최상위 설정 키다.
 - `node.group`: 멤버의 소속 그룹
@@ -261,7 +253,7 @@
 - `ErrBreaksLoad`: ErrBreaksLoad는 고친 결과가 편집 전에 없던 설계 읽기 오류를 낸다는 뜻이다. 쓰지 않는다.
 - `ErrIO`: ErrIO는 설계 파일을 읽거나 쓰지 못했다는 뜻이다.
 - `Do`: Do는 설계 파일 하나의 내용에 작업 하나를 적용한다.
-- `Ops`: Ops는 Do가 받는 작업 이름이다.
+- `Operations`: Operations는 Do가 받는 작업 이름이다.
 - `ErrOutsideDir`: ErrOutsideDir는 고칠 설계 파일이 심볼릭 링크로 설계 디렉토리 밖을 가리킨다는 뜻이다. 쓰지 않는다.
 - `Apply`: Apply는 설계 디렉토리의 *.yaml 가운데 대상이 있는 파일에 작업을 적용해 쓰고 그 경로를 준다. 고친 결과가 편집 전에 없던 읽기 오류를 내면 쓰지 않는다. 설계 검사 오류는 막지 않는다. 설계 파일이 심볼릭 링크면 가리키는 파일을 고친다.
 - `ApplyConfined`: ApplyConfined는 Apply와 같되, 설계 파일이 심볼릭 링크로 설계 디렉토리 밖을 가리키면 쓰지 않는다. 사람이 화면에서 누르지 않는 경로(MCP)가 설계 디렉토리 밖을 고치지 못하게 한다.
@@ -274,7 +266,6 @@
 
 ## internal/edit/edit.go
 
-- `package edit`: Package edit는 설계 파일의 L2 모듈과 그룹을 줄 단위로 고친다. 파일 전체를 다시 쓰지 않고 파서가 남긴 노드 시작 위치에서 원본 텍스트를 읽어 해당 토큰이나 줄만 바꾼다. 주석과 정렬은 그대로다.
 - `plainID`: plainID는 따옴표 없이 YAML에 그대로 쓸 수 있는 ID다. 모델은 모듈 ID를 snake_case로 강제하지 않는다.
 - `ErrModuleNotInFile`: ErrModuleNotInFile은 고칠 모듈이 이 파일에 없다는 뜻이다. 다른 설계 파일에 있을 수 있다.
 - `ErrNoModuleBlock`: ErrNoModuleBlock은 이 파일에 모듈을 더할 modules 블록이 없다는 뜻이다. 다른 설계 파일에 있을 수 있다.
@@ -346,7 +337,6 @@
 
 ## internal/gen/golang/gen.go
 
-- `package golang`: Package golang은 모델에서 Go 생성 파일을 만든다. 디스크는 읽거나 쓰지 않는다.
 - `Generate`: Generate는 설계 검사를 통과한 모델에서 생성 파일을 경로순으로 만든다.
 - `byDir`: byDir는 노드를 소속 디렉토리별로 처음 나온 순서를 지켜 묶는다.
 - `gen.consts`: 앞자리 0을 8진수로 읽지 않게 한다
@@ -390,7 +380,6 @@
 
 ## internal/gen/ts/ts.go
 
-- `package ts`: Package ts는 export: [ts]가 붙은 상수, enum, 타입을 ts_out 파일 하나의 TypeScript로 만든다.
 - `Header`: Header는 생성 헤더다. Go 생성 파일의 헤더와 같아야 한다(workspace 테스트가 확인).
 - `Generate`: Generate는 ts_out에 쓸 내용을 준다. ts_out이 없거나 내보낼 것이 없으면 false다. gen: false는 Go 선언을 손으로 썼다는 뜻이라 TS에는 영향이 없다.
 - `Generate`: 앞자리 0은 TS 모듈에서 문법 오류다
@@ -407,7 +396,6 @@
 
 ## internal/gitbase/gitbase.go
 
-- `package gitbase`: Package gitbase는 git HEAD에 있는 설계 파일과 저장소의 worktree를 읽는다. 설계의 기준은 HEAD다.
 - `Files`: Files는 designDir의 ref 시점 *.yaml 파일을 준다. 키는 "<ref>:<저장소 기준 경로>"다. git 저장소가 아니거나 커밋이 없어 HEAD가 없으면 ok가 거짓이다. HEAD가 아닌 ref가 없으면 오류다. ref 시점에 설계 디렉토리가 없으면 빈 목록이다.
 - `Files`: -z는 경로를 따옴표로 감싸지 않고 NUL로 구분한다. 비ASCII 경로도 그대로 받는다.
 - `Worktree`: Worktree는 저장소의 작업 폴더 하나다. Branch는 짧은 브랜치 이름이고 detached면 비어 있다.
@@ -424,7 +412,6 @@
 
 ## internal/gosrc/gosrc.go
 
-- `package gosrc`: Package gosrc는 디렉토리의 Go 소스 파일을 고르고 읽는다. codescan과 infer가 같은 파일 집합을 보도록 한 곳에 둔다.
 - `ParseError`: ParseError는 읽거나 파싱하지 못한 파일이다.
 - `Files`: Files는 dir의 Go 파일을 문법 트리로 준다. _test.go와 //go:build ignore 파일은 뺀다. OS·아키텍처 조건은 모두 참으로 보아 어느 플랫폼의 파일이든 읽는다. 디렉토리가 없으면 비어 있다. build 조건을 보려고 mode에 parser.ParseComments를 더한다.
 - `ImportsOnly`: ImportsOnly는 파일의 package 절과 import만 읽는다. 본문에 문법 오류가 있어도 읽힌다. 빌드 제약으로 빠지는 파일이면 nil이다.
@@ -436,7 +423,6 @@
 
 ## internal/infer/collect.go
 
-- `package infer`: Package infer는 Go 모듈의 코드에서 L2 설계 초안을 만든다. 기존 프로젝트를 처음 가져올 때만 쓴다.
 - `pkg`: pkg는 Go 파일이 있는 디렉토리 하나다. 경로는 루트 기준 슬래시 경로이고 루트는 "."다.
 - `pkg.imports`: 같은 모듈 안의 패키지 디렉토리, 정렬
 - `pkg.ext`: 표준 라이브러리가 아닌 다른 모듈의 import 경로, 정렬
@@ -452,8 +438,8 @@
 
 ## internal/infer/draft.go
 
-- `Exe`: Exe는 초안의 실행 단위다.
-- `Mod`: Mod는 초안의 모듈이다. Path는 ID와 다를 때만 있다.
+- `Executable`: Executable은 초안의 실행 단위다.
+- `Module`: Module은 초안의 모듈이다. Path는 ID와 다를 때만 있다.
 - `Draft`: Draft는 코드에서 추정한 L2 설계다. tier 이름은 tier0부터 tier(Tiers-1)까지다.
 - `FanIn`: FanIn은 모듈을 import하는 모듈·실행 단위의 수다.
 - `Report`: Report는 분석 모드 화면과 daemok init이 보여 주는 메모다.
@@ -537,7 +523,6 @@
 
 ## internal/lift/lift.go
 
-- `package lift`: Package lift는 설계 모듈 패키지에 손으로 쓴 선언 중 설계에 없는 것을 gen: false L3 노드 초안으로 만든다. 초안은 기존 설계와 합쳐 검사했을 때 새 오류·경고를 내지 않는 노드만 남긴다.
 - `Node`: Node는 초안 노드 하나다. Line은 "ID: { ... }" 한 줄이다.
 - `Node.Kind`: errors, consts, enums, types, contracts, funcs
 - `Node.Name`: Go 이름
@@ -596,7 +581,6 @@
 
 ## internal/mcp/server.go
 
-- `package mcp`: Package mcp는 표준 입출력으로 MCP(JSON-RPC 2.0, 한 줄에 메시지 하나)를 주고받아 AI가 설계를 읽고 검사를 돌리게 한다. edit 외의 도구는 읽기 전용이고, edit는 --allow-write일 때만 있다.
 - `defaultProtocol`: defaultProtocol은 지원하는 MCP 프로토콜 중 최신이다. 클라이언트가 모르는 버전을 요청하면 이것으로 답한다.
 - `maxLine`: maxLine은 메시지 한 줄의 최대 바이트다. 넘는 줄은 그 줄만 거부한다.
 - `Server`: Server는 기본 설계 디렉토리와 코드 루트를 가진다. 도구 인자로 바꿀 수 있다.
@@ -662,7 +646,6 @@
 
 ## internal/model/model.go
 
-- `package model`: Package model은 설계 파일을 노드 타입으로 옮기고 여러 파일을 하나로 합친다.
 - `Ref`: Ref는 다른 노드를 가리키는 이름과 그 위치다. 해석은 check가 한다.
 - `Meta.Pos`: ID 키 위치
 - `Requirement.Status`: active, held, dropped
@@ -691,7 +674,6 @@
 
 ## internal/rename/kinds.go
 
-- `package rename`: Package rename은 설계 노드 하나의 ID와 그 참조를 설계 파일 전체에서 바꾼다. 기본은 코드 이름을 고정 키로 유지하고, 생성 결과와 진단이 그대로인지 확인한 뒤 쓴다.
 - `PinKind`: PinKind는 코드 이름을 옛 값으로 고정하는 방법이다.
 - `PinNone`: 코드와 무관
 - `PinGoName`: go: { name: ... }
@@ -785,7 +767,6 @@
 
 ## internal/serve/server.go
 
-- `package serve`: Package serve는 설계 지도를 로컬 웹 페이지로 보여준다. 계산은 서버가 하고 화면은 /api/state를 그린다.
 - `state`: state는 /api/state의 본문이다.
 - `state.designSum`: 설계 파일 내용 요약. 내보내지 않는다.
 - `state.Branch`: git 브랜치. 저장소가 아니거나 detached면 비어 있다
@@ -842,7 +823,6 @@
 
 ## internal/workspace/workspace.go
 
-- `package workspace`: Package workspace는 설계 읽기, 설계 검사, 생성, 디스크의 생성 파일 대조를 묶는다. check·gen 명령과 serve가 같은 진단 목록을 쓰도록 한 곳에 둔다.
 - `Plan`: Plan은 gen이 할 일이다. 경로는 코드 루트 기준 슬래시 경로다.
 - `Plan.Write`: 없거나 내용이 다른 생성 파일
 - `Plan.Delete`: 생성 헤더가 있고 이번 결과에 없는 파일
@@ -854,7 +834,7 @@
 - `Result.Plan`: 설계 검사와 생성이 성공했을 때만 있다
 - `Result.Files`: 생성 파일 전부. 설계 검사와 생성이 성공했을 때만 있다
 - `Result.Others`: Others는 Diags에서 생성 파일 대조를 뺀 진단이다. gen이 출력한다.
-- `Result.Code`: Code는 Diags 가운데 코드를 읽어 낸 진단(생성 파일 대조와 codescan)이다.
+- `Result.Code`: Code는 Diagnostics 가운데 코드를 읽어 낸 진단(생성 파일 대조와 codescan)이다.
 - `Run`: Run은 designDir의 설계를 읽고 검사하고 생성해서 root의 파일과 대조한다.
 - `Check`: Check는 코드 대조까지 하는 Run이다. 코드 루트가 없으면 대조할 코드가 없어 통과로 보이므로 진행하지 않는다. gen은 없는 루트에 처음 생성할 수 있어야 하므로 Run을 그대로 쓴다.
 - `RunSources`: RunSources는 디스크가 아닌 설계 파일 내용으로 Run과 같은 일을 한다. 키는 진단 위치에 쓰는 파일 이름이다.
@@ -899,7 +879,6 @@
 
 ## internal/yaml/yaml.go
 
-- `package yaml`: Package yaml은 daemok 설계 파일이 쓰는 YAML 부분집합을 파싱한다. 모든 노드가 파일·줄·열 위치를 갖는다. 열은 바이트 기준 1-base다.
 - `Pos.Less`: Less는 파일, 줄, 열 순으로 p가 q보다 앞인지다.
 - `Node.Value`: Scalar. 따옴표 문자열은 이스케이프를 풀어 담는다.
 - `Node.Quoted`: Scalar가 "..."였는지

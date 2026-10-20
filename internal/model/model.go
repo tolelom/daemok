@@ -1,3 +1,4 @@
+// Package model은 설계 파일을 노드 타입으로 옮기고 여러 파일을 하나로 합친다.
 package model
 
 import "github.com/tolelom/daemok/internal/yaml"
