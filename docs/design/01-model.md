@@ -1,6 +1,6 @@
 # 모델
 
-설계 파일 형식 v0.5. [프로토타입](https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE)은 v0.2를 읽으며, 그 뒤에 더해진 `gen` 필드, 알 수 없는 키 오류, 관계 종류, 이벤트, 흐름은 반영하지 않는다.
+설계 파일 형식 v0.5. [프로토타입](../../prototype/daemok-v2.html)은 v0.2를 읽으며, 그 뒤에 더해진 `gen` 필드, 알 수 없는 키 오류, 관계 종류, 이벤트, 흐름은 반영하지 않는다.
 
 ## 예시
 
@@ -49,7 +49,7 @@ funcs:                             # L4: 함수 하나의 계약과 테스트 �
 ## 파일
 
 - `design/` 아래 `*.yaml`을 모두 읽어 하나의 모델로 합친다. 파일을 어떻게 나눌지는 자유다.
-- 최상위 키 `version`은 형식 버전이고 `0.5`가 아니면 에러다. `go_module`은 생성 코드의 import 경로 접두사, `ts_out`은 TypeScript 출력 파일의 코드 루트 기준 상대 경로이고 코드 루트 밖이어도 된다. `cpp`의 `include_dirs`는 C++ include 검사를 켜는 코드 루트 기준 상대 경로 목록이고, 이때 모듈 `path`는 각 include 디렉토리 아래 폴더다([C++ include 검사 스펙](../superpowers/specs/2026-10-14-daemok-cpp-include-design.md)). 여러 파일에 같은 최상위 스칼라 키가 다른 값으로 있으면 에러다.
+- 최상위 키 `version`은 형식 버전이고 `0.5`가 아니면 에러다. `go_module`은 생성 코드의 import 경로 접두사, `ts_out`은 TypeScript 출력 파일의 코드 루트 기준 상대 경로이고 코드 루트 밖이어도 된다. `cpp`의 `include_dirs`는 C++ include 검사를 켜는 코드 루트 기준 상대 경로 목록이고, 이때 모듈 `path`는 각 include 디렉토리 아래 폴더다([C++ include 검사 스펙](../specs/2026-10-14-daemok-cpp-include-design.md)). 여러 파일에 같은 최상위 스칼라 키가 다른 값으로 있으면 에러다.
 - 같은 종류 안에서 ID가 두 번 나오면 두 위치를 함께 보여주고 에러를 낸다.
 - 어느 노드에서든 형식에 없는 키는 위치와 함께 에러다. 조용히 무시하지 않는다.
 
@@ -108,11 +108,11 @@ L3·L4 노드에 `gen: false`를 적으면 그 노드는 Go 생성에서 빠진�
 | `event_kinds` | `key`(enum), `encoding`(map, json), `subscribers` | 이벤트마다 payload struct, map이면 변환 함수 |
 | `events` | `kind`, `publishers`, `subscribers`, `data`(`types.fields`와 같은 문법) | event_kind 파일에 들어간다 |
 
-`export: [ts]`가 붙은 상수, enum, 타입은 `ts_out`에 TypeScript로도 생성한다. 상수는 `export const PAGE_SIZE = 10;`, enum은 값 목록 `as const`와 그 원소 타입, 타입은 필드 이름을 키로 쓰는 `interface`다. Go JSON에서 nil이 될 수 있는 값(포인터, 슬라이스, `bytes`, map)은 `| null`, `optional` 필드는 `이름?:`이다. `gen: false`와 관계없이 `export`를 따른다. duration 상수와 duration·error·외부 타입 필드는 내보내지 않고, 내보내는 타입이 가리키는 enum·타입도 `export: [ts]`여야 한다. 규칙은 [TS 생성 스펙](../superpowers/specs/2026-10-13-daemok-ts-gen-design.md)에 있다.
+`export: [ts]`가 붙은 상수, enum, 타입은 `ts_out`에 TypeScript로도 생성한다. 상수는 `export const PAGE_SIZE = 10;`, enum은 값 목록 `as const`와 그 원소 타입, 타입은 필드 이름을 키로 쓰는 `interface`다. Go JSON에서 nil이 될 수 있는 값(포인터, 슬라이스, `bytes`, map)은 `| null`, `optional` 필드는 `이름?:`이다. `gen: false`와 관계없이 `export`를 따른다. duration 상수와 duration·error·외부 타입 필드는 내보내지 않고, 내보내는 타입이 가리키는 enum·타입도 `export: [ts]`여야 한다. 규칙은 [TS 생성 스펙](../specs/2026-10-13-daemok-ts-gen-design.md)에 있다.
 
 ### L4
 
-- `funcs`는 핸들러(`kind` + `handles`), 계약 메서드(`of: 계약.메서드`), 일반 함수(둘 다 없음) 중 하나다. 일반 함수는 본문을 늘 손으로 쓰고 시그니처를 적지 않는다. Go 이름은 `go.name`, 없으면 ID의 CamelCase이고, 설계는 에러 계약과 케이스만 둔다. 규칙은 [일반 함수 스펙](../superpowers/specs/2026-10-13-daemok-free-func-design.md)에 있다.
+- `funcs`는 핸들러(`kind` + `handles`), 계약 메서드(`of: 계약.메서드`), 일반 함수(둘 다 없음) 중 하나다. 일반 함수는 본문을 늘 손으로 쓰고 시그니처를 적지 않는다. Go 이름은 `go.name`, 없으면 ID의 CamelCase이고, 설계는 에러 계약과 케이스만 둔다. 규칙은 [일반 함수 스펙](../specs/2026-10-13-daemok-free-func-design.md)에 있다.
 - `cases`는 `{name, given, expect}` 또는 `{name, given, error}` 행의 목록이다. `given`과 `expect`는 키가 문자열인 맵이고 값은 스칼라 또는 같은 형태의 맵이다. 여기서 테이블 테스트를 생성한다. `error: invalid`는 sentinel 없이 에러 여부만 확인한다.
 - 전제·결과 조건을 산문으로 두지 않는다.
 - 목록 필드가 비어 있는 것이 의도라면 `[]`로 적는다. 계약 메서드에 `errors`가 없으면 경고한다. `gen: false` 함수는 케이스 테스트를 생성하지 않으므로 케이스가 없는 에러를 경고하지 않는다.

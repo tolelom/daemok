@@ -4,7 +4,7 @@
 
 ## 목적
 
-[개요](../../design/00-overview.md)의 「다른 언어」 절은 언어 하나를 지원하는 데 생성기와 import 스캐너가 필요하다고 정했습니다. UE5 C++ 프로젝트(claw-machine-shop-simulator)를 측정하니 UE 모듈은 하나이고, 도메인 폴더(`Core`, `UI`, `Player` 등 14개) 사이 include 간선이 74개, 서로 include하는 폴더 짝이 20개였습니다. 생성할 대상은 정해지지 않았고 경계 검사는 바로 쓸 데가 있어, 스캐너만 먼저 만듭니다.
+[개요](../design/00-overview.md)의 「다른 언어」 절은 언어 하나를 지원하는 데 생성기와 import 스캐너가 필요하다고 정했습니다. UE5 C++ 프로젝트(claw-machine-shop-simulator)를 측정하니 UE 모듈은 하나이고, 도메인 폴더(`Core`, `UI`, `Player` 등 14개) 사이 include 간선이 74개, 서로 include하는 폴더 짝이 20개였습니다. 생성할 대상은 정해지지 않았고 경계 검사는 바로 쓸 데가 있어, 스캐너만 먼저 만듭니다.
 
 ## 설계 형식
 

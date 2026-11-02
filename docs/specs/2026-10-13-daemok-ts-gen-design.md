@@ -1,6 +1,6 @@
 # daemok TS 생성
 
-> `export: [ts]`가 붙은 상수, enum, 타입을 `ts_out` 파일 하나에 TypeScript로 생성합니다. 대상은 [tolelog 슬라이스](../../design/03-slice-tolelog.md)처럼 백엔드와 프론트엔드가 다른 저장소에 있는 구성입니다.
+> `export: [ts]`가 붙은 상수, enum, 타입을 `ts_out` 파일 하나에 TypeScript로 생성합니다. 대상은 [tolelog 슬라이스](../design/03-slice-tolelog.md)처럼 백엔드와 프론트엔드가 다른 저장소에 있는 구성입니다.
 
 ## 경로
 

@@ -1,6 +1,6 @@
 # daemok MVP 설계
 
-> 문제, 원칙, 계층은 [개요](../../design/00-overview.md)에, 설계 파일 형식과 설계 검사는 [모델](../../design/01-model.md)에 있다. 이 문서는 MVP의 범위, 명령, 구조를 정한다.
+> 문제, 원칙, 계층은 [개요](../design/00-overview.md)에, 설계 파일 형식과 설계 검사는 [모델](../design/01-model.md)에 있다. 이 문서는 MVP의 범위, 명령, 구조를 정한다.
 
 ## 완료 조건
 
@@ -9,14 +9,14 @@ tolchain 저장소에 다음이 된다.
 1. tolchain 설계 파일(L0~L3, tx_modules의 L4 일부)에 대해 `daemok check`가 설계 검사와 import 대조를 돌리고 결과를 줄 번호와 함께 출력한다.
 2. `daemok gen`이 만든 파일로 `core/transaction.go`의 TxType 상수 블록과 각 tx 모듈의 `init()` 등록을 대체한 뒤 `go build ./...`와 `go test ./...`가 통과한다.
 3. `daemok serve`로 연 브라우저 지도에서 R~L3을 오가고, 설계 파일을 저장하면 지도가 다시 그려진다.
-4. 도입 뒤 tolchain의 패키지 최상위 선언(type, const, var, func) 중 설계 노드에 대응하는 것(생성됐거나 `gen: false`로 적힌 것, 핸들러 함수)의 비율을 패키지별로 [슬라이스 문서](../../design/02-slice-tolchain.md)에 기록한다. 이 비율이 형식을 넓힐지 정하는 근거다.
+4. 도입 뒤 tolchain의 패키지 최상위 선언(type, const, var, func) 중 설계 노드에 대응하는 것(생성됐거나 `gen: false`로 적힌 것, 핸들러 함수)의 비율을 패키지별로 [슬라이스 문서](../design/02-slice-tolchain.md)에 기록한다. 이 비율이 형식을 넓힐지 정하는 근거다.
 
 ## 범위
 
 | 포함 | 제외 |
 |---|---|
 | 설계 파일 읽기(YAML 부분집합), 여러 파일 병합 | MCP 서버 |
-| 설계 검사 전체([모델](../../design/01-model.md#설계-검사)) | 그림에서 편집 |
+| 설계 검사 전체([모델](../design/01-model.md#설계-검사)) | 그림에서 편집 |
 | Go import 대조, 생성 파일 최신 여부 | 라우트, OpenAPI 생성 |
 | Go 생성 | 코드에서 설계 추출 |
 | 로컬 웹 지도, git HEAD 대비 변경 표시 | TS를 포함한 Go 외 언어의 생성과 import 대조 |
@@ -49,7 +49,7 @@ tolchain 저장소에 다음이 된다.
 
 ## 생성 규칙
 
-- 파일 위치, 이름, 이름 변환, 테이블 테스트 형태는 [모델의 생성 파일 절](../../design/01-model.md#생성-파일)을 따른다. 패키지 이름은 모듈 경로의 마지막 요소다.
+- 파일 위치, 이름, 이름 변환, 테이블 테스트 형태는 [모델의 생성 파일 절](../design/01-model.md#생성-파일)을 따른다. 패키지 이름은 모듈 경로의 마지막 요소다.
 - 생성 헤더가 없는 기존 파일을 덮어써야 하면 `gen`은 그 경로를 알리고 거부한다. 거부할 파일이 하나라도 있으면 아무것도 쓰지 않는다.
 - `gen: false`인 노드는 생성하지 않는다. 코드 대조에는 포함한다.
 - 출력은 `go/format.Source`를 거친다.
@@ -107,7 +107,7 @@ Go 표준 라이브러리만 쓴다. 지도는 `embed`로 넣는 로컬 웹 페�
 - 구현은 TDD로 한다.
 - `internal/yaml`: 지원 문법별 파싱 결과, 지원하지 않는 문법별 오류 위치.
 - `internal/model`, `internal/check`: 규칙마다 통과하는 설계와 걸리는 설계를 `testdata`에 둔다.
-- `internal/gen`: `testdata/<샘플>/design`에서 생성한 결과를 골든 파일과 비교한다. 생성된 Go는 임시 모듈에 손으로 쓴 스텁 본문과 함께 넣고 `go build`와 `go vet`을 통과해야 한다. 샘플은 [프로토타입](../../../prototype/daemok-v2.html) `SAMPLES`의 tolchain과 tolelog 설계 파일을 v0.3에 맞춰 옮긴 것이다.
+- `internal/gen`: `testdata/<샘플>/design`에서 생성한 결과를 골든 파일과 비교한다. 생성된 Go는 임시 모듈에 손으로 쓴 스텁 본문과 함께 넣고 `go build`와 `go vet`을 통과해야 한다. 샘플은 [프로토타입](../../prototype/daemok-v2.html) `SAMPLES`의 tolchain과 tolelog 설계 파일을 v0.3에 맞춰 옮긴 것이다.
 - `internal/codescan`: `testdata` 안의 작은 Go 모듈로 허용, 위반, 예외, 관리하지 않는 패키지를 확인한다.
 - `internal/serve`: `httptest`로 `/api/state` 응답을 확인한다.
 - 웹 화면은 자동 테스트를 두지 않는다. 웹 화면 단계를 마칠 때 headless Chrome으로 렌더링과 콘솔 오류를 확인한다.

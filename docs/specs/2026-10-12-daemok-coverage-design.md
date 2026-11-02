@@ -1,6 +1,6 @@
 # daemok coverage
 
-> [tolchain 슬라이스](../../design/02-slice-tolchain.md)의 "설계 노드 대응 비율"을 손으로 세던 것을 명령으로 만듭니다. 이 비율은 형식을 넓힐지 정하는 근거입니다.
+> [tolchain 슬라이스](../design/02-slice-tolchain.md)의 "설계 노드 대응 비율"을 손으로 세던 것을 명령으로 만듭니다. 이 비율은 형식을 넓힐지 정하는 근거입니다.
 
 ## 세는 규칙
 

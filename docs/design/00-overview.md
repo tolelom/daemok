@@ -78,6 +78,6 @@
 
 ## 프로토타입
 
-https://claude.ai/artifact/BeDedmG4Vn8i4M9He2sQmE (소스: [prototype/daemok-v2.html](../../prototype/daemok-v2.html))
+[prototype/daemok-v2.html](../../prototype/daemok-v2.html). 브라우저로 바로 연다.
 
 tolchain과 tolelog 설계 파일을 편집하면 R~L3 지도, 설계 검사, 생성될 Go·TS 코드가 바로 바뀐다. 코드 대조 탭은 저장소 스냅샷 기준의 고정값이다.

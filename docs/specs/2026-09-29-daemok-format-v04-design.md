@@ -1,6 +1,6 @@
 # 설계 파일 형식 v0.4
 
-> [모델](../../design/01-model.md)의 형식 v0.3에 관계 종류, 이벤트, 흐름을 더한다. 명령과 구조는 [MVP 설계](2026-09-27-daemok-mvp-design.md)를 따른다.
+> [모델](../design/01-model.md)의 형식 v0.3에 관계 종류, 이벤트, 흐름을 더한다. 명령과 구조는 [MVP 설계](2026-09-27-daemok-mvp-design.md)를 따른다.
 
 ## 완료 조건
 
@@ -228,7 +228,7 @@ MVP 설계의 구현 순서를 다음으로 바꾼다.
 | 단계 | 결과 |
 |---|---|
 | 1~3 | 끝남(yaml, model, check) |
-| 4 | model·check의 v0.4: 관계, 이벤트, 흐름의 읽기와 설계 검사. 샘플과 [모델](../../design/01-model.md)을 v0.4로 옮긴다 |
+| 4 | model·check의 v0.4: 관계, 이벤트, 흐름의 읽기와 설계 검사. 샘플과 [모델](../design/01-model.md)을 v0.4로 옮긴다 |
 | 5 | `internal/gen/golang`, `daemok gen`, 생성 파일 최신 여부. v0.3 생성물과 v0.4 생성물(needs, contracts, event_kind, 흐름, enum `Values()`) |
 | 6 | `internal/codescan`: import 대조와 이벤트 상수 참조 |
 | 7 | `internal/gitbase`, `internal/serve`, 웹 화면 |
